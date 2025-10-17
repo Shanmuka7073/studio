@@ -7,12 +7,11 @@ import { Store, Product } from '@/lib/types';
 import { useEffect, useState } from 'react';
 import { notFound } from 'next/navigation';
 
-export default function StoreDetailPage({ params }: { params: { id: string } }) {
+export default function StoreDetailPage({ params: { id } }: { params: { id: string } }) {
   const { firestore } = useFirebase();
   const [store, setStore] = useState<Store | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const { id } = params;
 
   useEffect(() => {
     if (firestore) {
