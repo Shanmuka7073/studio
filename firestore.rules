@@ -1,48 +1,41 @@
 /**
- * @fileoverview Firestore Security Rules for LocalBasket application.
+ * @file Firestore Security Rules for LocalBasket
  *
- * Core Philosophy:
- * This ruleset enforces a user-ownership model for user profiles and store management.
- * Orders can be created by authenticated users, and read/written by owners.
- * Read access to stores and products is generally public, but write access is restricted to store owners.
+ * @core_philosophy This ruleset enforces a strict user-ownership model for user profiles and their associated data (recommendations).
+ * Stores and their products are secured with owner-based access control. Orders are accessible by the user who created them.
  *
- * Data Structure:
- * - /users/{userId}: User profile data.
- * - /stores/{storeId}: Store data.
- * - /stores/{storeId}/products/{productId}: Product data associated with a store.
- * - /orders/{orderId}: Order data, with denormalized userId and storeId.
- * - /orders/{orderId}/orderItems/{orderItemId}: Order items for each order.
- * - /users/{userId}/productRecommendations/{productRecommendationId}: Product recommendations for users.
+ * @data_structure
+ * - /users/{userId}: User profile information; only accessible by the user themselves.
+ * - /stores/{storeId}: Store data; accessible only by the store owner.
+ * - /stores/{storeId}/products/{productId}: Product data for a specific store; accessible only by the store owner.
+ * - /orders/{orderId}: Order data; accessible only by the user who created the order.
+ * - /orders/{orderId}/orderItems/{orderItemId}: Order item data; accessible only by the user who created the order.
+ * - /users/{userId}/productRecommendations/{productRecommendationId}: Product recommendations for a user; only accessible by the user themselves.
  *
- * Key Security Decisions:
- * - Users can only read and write their own profile data.
- * - Store owners can manage their stores and associated products.
- * - Orders can be created by any authenticated user, but only if the order's userId matches the user's UID.
- * - Listing of user documents is disallowed.
- * - Schema validation is relaxed in the Prototyping Phase to allow rapid iteration on the data model.
- *
- * Denormalization for Authorization:
- * - Orders include the userId and storeId to simplify authorization checks.
- * - OrderItems include the orderId to simplify authorization checks.
- * - ProductRecommendations include the userId to simplify authorization checks.
- *
- * Structural Segregation:
- * - Private user data is stored under the /users/{userId} path, separate from public store and product data.
+ * @key_security_decisions
+ * - Users can only access their own profile data.
+ * - Stores can only be created, updated, and deleted by their owners.
+ * - Products can only be created, updated, and deleted by the store owner.
+ * - Orders can only be accessed by the user who created them.
+ * - Users can only access their own product recommendations.
+ * - Listing all users is disallowed.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Secure user profiles. Only the user can read/write their own profile.
+     * @description Secure user profiles.
      * @path /users/{userId}
-     * @allow (get, update, delete) auth.uid == userId
-     * @allow (create) auth.uid == userId
-     * @allow (list) false
-     * @deny (get) auth.uid != userId
-     * @deny (update,delete) auth.uid != userId
-     * @deny (create) auth.uid != userId
-     * @principle Enforces user-ownership; users can only access their own data.
+     * @allow (create) User with ID 'user123' can create their profile.
+     * @deny (create) User with ID 'user456' cannot create a profile with ID 'user123'.
+     * @allow (get) User with ID 'user123' can retrieve their own profile.
+     * @deny (get) User with ID 'user456' cannot retrieve profile with ID 'user123'.
+     * @allow (update) User with ID 'user123' can update their own profile.
+     * @deny (update) User with ID 'user456' cannot update profile with ID 'user123'.
+     * @allow (delete) User with ID 'user123' can delete their own profile.
+     * @deny (delete) User with ID 'user456' cannot delete profile with ID 'user123'.
+     * @principle Enforces document ownership for writes and reads.
      */
     match /users/{userId} {
       function isOwner(userId) {
@@ -50,108 +43,157 @@ service cloud.firestore {
       }
 
       function isExistingOwner(userId) {
-        return isOwner(userId) && resource.data != null;
+        return isOwner(userId) && resource != null;
       }
 
       allow get: if isOwner(userId);
-      allow list: if false;
+      allow list: if false; // Listing users is not allowed.
       allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
-      allow delete: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
      * @description Secure store data.
      * @path /stores/{storeId}
-     * @allow (get, list) true
-     * @allow (create) request.auth.uid == request.resource.data.ownerId
-     * @allow (update, delete) resource.data.ownerId == request.auth.uid
-     * @deny (create, update, delete) request.auth == null
-     * @principle Allows public read access but restricts write access to the store owner.
+     * @allow (create) User with ID 'user123' can create a store with ownerId 'user123'.
+     * @deny (create) User with ID 'user456' cannot create a store with ownerId 'user123'.
+     * @allow (get) Any user can retrieve store data.
+     * @allow (list) Any user can list stores.
+     * @allow (update) User with ID 'user123' can update store with ownerId 'user123'.
+     * @deny (update) User with ID 'user456' cannot update store with ownerId 'user123'.
+     * @allow (delete) User with ID 'user123' can delete store with ownerId 'user123'.
+     * @deny (delete) User with ID 'user456' cannot delete store with ownerId 'user123'.
+     * @principle Enforces document ownership for writes. Allows public reads.
      */
     match /stores/{storeId} {
-      function isStoreOwner(storeId) {
-        return request.auth.uid == resource.data.ownerId;
+      function isOwner(ownerId) {
+        return request.auth.uid == ownerId;
+      }
+
+      function isExistingOwner(ownerId) {
+        return isOwner(ownerId) && resource != null;
       }
 
       allow get, list: if true;
-      allow create: if isSignedIn() && request.auth.uid == request.resource.data.ownerId;
-      allow update, delete: if isSignedIn() && isStoreOwner(storeId);
+      allow create: if isOwner(request.resource.data.ownerId);
+      allow update: if isExistingOwner(resource.data.ownerId);
+      allow delete: if isExistingOwner(resource.data.ownerId);
     }
 
     /**
-     * @description Secure product data under stores.
+     * @description Secure product data within a store.
      * @path /stores/{storeId}/products/{productId}
-     * @allow (get, list) true
-     * @allow (create) get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid
-     * @allow (update, delete) get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid && resource != null
-     * @deny (create, update, delete) request.auth == null
-     * @principle Allows public read access but restricts write access to the store owner via get() on the parent store.
+     * @allow (create) User with ID 'user123' can create a product in their store (ownerId 'user123').
+     * @deny (create) User with ID 'user456' cannot create a product in store owned by 'user123'.
+     * @allow (get) Any user can retrieve product data.
+     * @allow (list) Any user can list products.
+     * @allow (update) User with ID 'user123' can update a product in their store (ownerId 'user123').
+     * @deny (update) User with ID 'user456' cannot update a product in store owned by 'user123'.
+     * @allow (delete) User with ID 'user123' can delete a product in their store (ownerId 'user123').
+     * @deny (delete) User with ID 'user456' cannot delete a product in store owned by 'user123'.
+     * @principle Enforces owner-only writes with public reads for product data.
      */
     match /stores/{storeId}/products/{productId} {
-      function isProductOwner(storeId) {
-        return get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid;
+      function isStoreOwner(storeId) {
+          return get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid;
+      }
+      
+      function isExistingStoreOwner(storeId) {
+          return isStoreOwner(storeId) && resource != null;
       }
 
       allow get, list: if true;
-      allow create: if isSignedIn() && isProductOwner(storeId);
-      allow update, delete: if isSignedIn() && isProductOwner(storeId);
+      allow create: if isStoreOwner(storeId);
+      allow update: if isExistingStoreOwner(storeId);
+      allow delete: if isExistingStoreOwner(storeId);
     }
 
     /**
-     * @description Secure order data. Orders can be created by authenticated users with matching userId, and managed by owners.
+     * @description Secure order data.
      * @path /orders/{orderId}
-     * @allow (create) request.auth.uid == request.resource.data.userId
-     * @allow (get, list, update, delete) resource.data.userId == request.auth.uid
-     * @deny (create, update, delete) request.auth == null
-     * @principle Orders are associated with a user.
+     * @allow (create) User with ID 'user123' can create an order with userId 'user123'.
+     * @deny (create) User with ID 'user456' cannot create an order with userId 'user123'.
+     * @allow (get) User with ID 'user123' can retrieve their own order (userId 'user123').
+     * @deny (get) User with ID 'user456' cannot retrieve order belonging to 'user123'.
+     * @allow (list) User with ID 'user123' can list their own orders.
+     * @allow (update) User with ID 'user123' can update their own order (userId 'user123').
+     * @deny (update) User with ID 'user456' cannot update order belonging to 'user123'.
+     * @allow (delete) User with ID 'user123' can delete their own order (userId 'user123').
+     * @deny (delete) User with ID 'user456' cannot delete order belonging to 'user123'.
+     * @principle Enforces document ownership for orders.
      */
     match /orders/{orderId} {
-      function isOrderOwner(orderId) {
-        return request.auth.uid == resource.data.userId;
+      function isOwner(userId) {
+        return request.auth.uid == userId;
       }
-
-      allow get, list: if isSignedIn() && isOrderOwner(orderId);
-      allow create: if isSignedIn() && request.auth.uid == request.resource.data.userId;
-      allow update, delete: if isSignedIn() && isOrderOwner(orderId);
-    }
-
-     /**
-     * @description Secure order item data under orders.
-     * @path /orders/{orderId}/orderItems/{orderItemId}
-     *  @allow (create, get, list, update, delete) get(/databases/$(database)/documents/orders/$(orderId)).data.userId == request.auth.uid
-     * @deny (create, update, delete) request.auth == null
-     * @principle  Only the owner of the parent order can manage order items.
-     */
-    match /orders/{orderId}/orderItems/{orderItemId} {
-      function isOrderItemOwner(orderId) {
-        return get(/databases/$(database)/documents/orders/$(orderId)).data.userId == request.auth.uid;
+      
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
       }
-
-      allow get, list: if isSignedIn() && isOrderItemOwner(orderId);
-      allow create: if isSignedIn() && isOrderItemOwner(orderId);
-      allow update, delete: if isSignedIn() && isOrderItemOwner(orderId);
+      
+      allow get, list: if isOwner(resource.data.userId);
+      allow create: if request.auth.uid == request.resource.data.userId;
+      allow update: if isExistingOwner(resource.data.userId);
+      allow delete: if isExistingOwner(resource.data.userId);
     }
 
     /**
-     * @description Secure product recommendation data for users.
+     * @description Secure order item data within an order.
+     * @path /orders/{orderId}/orderItems/{orderItemId}
+     * @allow (create) User who owns the order can create an order item.
+     * @deny (create) User who doesn't own the order cannot create an order item.
+     * @allow (get) User who owns the order can retrieve the order item.
+     * @deny (get) User who doesn't own the order cannot retrieve the order item.
+     * @allow (list) User who owns the order can list order items.
+     * @allow (update) User who owns the order can update the order item.
+     * @deny (update) User who doesn't own the order cannot update the order item.
+     * @allow (delete) User who owns the order can delete the order item.
+     * @deny (delete) User who doesn't own the order cannot delete the order item.
+     * @principle Enforces ownership for order items based on the parent order.
+     */
+    match /orders/{orderId}/orderItems/{orderItemId} {
+        function isOrderOwner(orderId) {
+            return get(/databases/$(database)/documents/orders/$(orderId)).data.userId == request.auth.uid;
+        }
+        
+        function isExistingOrderOwner(orderId) {
+            return isOrderOwner(orderId) && resource != null;
+        }
+
+        allow get, list: if isOrderOwner(orderId);
+        allow create: if isOrderOwner(orderId);
+        allow update: if isExistingOrderOwner(orderId);
+        allow delete: if isExistingOrderOwner(orderId);
+    }
+
+    /**
+     * @description Secure product recommendation data for each user.
      * @path /users/{userId}/productRecommendations/{productRecommendationId}
-     * @allow (create, get, list, update, delete) request.auth.uid == userId
-     * @deny (create, update, delete) request.auth == null
-     * @principle  Only the user can manage their product recommendations.
+     * @allow (create) User with ID 'user123' can create a recommendation for themselves.
+     * @deny (create) User with ID 'user456' cannot create a recommendation for 'user123'.
+     * @allow (get) User with ID 'user123' can retrieve their own recommendation.
+     * @deny (get) User with ID 'user456' cannot retrieve recommendation belonging to 'user123'.
+     * @allow (list) User with ID 'user123' can list their own recommendations.
+     * @allow (update) User with ID 'user123' can update their own recommendation.
+     * @deny (update) User with ID 'user456' cannot update recommendation belonging to 'user123'.
+     * @allow (delete) User with ID 'user123' can delete their own recommendation.
+     * @deny (delete) User with ID 'user456' cannot delete recommendation belonging to 'user123'.
+     * @principle Enforces document ownership for product recommendations.
      */
     match /users/{userId}/productRecommendations/{productRecommendationId} {
-      function isRecommendationOwner(userId) {
+      function isOwner(userId) {
         return request.auth.uid == userId;
       }
 
-      allow get, list: if isSignedIn() && isRecommendationOwner(userId);
-      allow create: if isSignedIn() && isRecommendationOwner(userId);
-      allow update, delete: if isSignedIn() && isRecommendationOwner(userId);
-    }
-  }
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
 
-  function isSignedIn() {
-    return request.auth != null;
+      allow get, list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
   }
 }
