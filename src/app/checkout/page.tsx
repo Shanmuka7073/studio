@@ -21,13 +21,18 @@ import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 import { getProductImage } from '@/lib/data';
 import { MapPin } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
+import { useFirebase, errorEmitter } from '@/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 const checkoutSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   address: z.string().min(10, 'Please enter a valid address'),
   phone: z.string().min(10, 'Please enter a valid phone number'),
   email: z.string().email('Please enter a valid email address'),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
 });
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
@@ -37,6 +42,8 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLocating, setIsLocating] = useState(false);
+  const [isPlacingOrder, startTransition] = useTransition();
+  const { firestore, user } = useFirebase();
 
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
@@ -54,13 +61,19 @@ export default function CheckoutPage() {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
+          form.setValue('latitude', latitude);
+          form.setValue('longitude', longitude);
+          
+          // For now, we'll just use the coordinates for delivery.
           // In a real app, you'd use a geocoding service to convert coords to an address.
-          // For now, we'll just use the coordinates.
-          form.setValue('address', `Lat: ${latitude.toFixed(4)}, Lon: ${longitude.toFixed(4)}`, { shouldValidate: true });
+          if (!form.getValues('address')) {
+              form.setValue('address', `GPS: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`, { shouldValidate: true });
+          }
+
           setIsLocating(false);
           toast({
             title: 'Location Found',
-            description: 'Your current location has been set as the address.',
+            description: 'Your current location has been captured for delivery.',
           });
         },
         (error) => {
@@ -68,7 +81,7 @@ export default function CheckoutPage() {
           toast({
             variant: "destructive",
             title: 'Location Error',
-            description: 'Could not get your location. Please enter it manually.',
+            description: 'Could not get your location. Please enter address manually.',
           });
           setIsLocating(false);
         }
@@ -83,13 +96,59 @@ export default function CheckoutPage() {
   };
 
   const onSubmit = (data: CheckoutFormValues) => {
-    console.log('Order submitted:', data);
-    clearCart();
-    toast({
-      title: "Order Placed!",
-      description: "Thank you for your purchase.",
+    if (!firestore || !user) {
+        toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to place an order.' });
+        return;
+    }
+
+    // Assume all items in the cart are from the same store for this example
+    const storeId = cartItems[0]?.product.storeId;
+    if (!storeId) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not determine the store for this order.' });
+        return;
+    }
+
+    startTransition(async () => {
+        const orderData = {
+            userId: user.uid,
+            storeId: storeId,
+            customerName: data.name,
+            deliveryAddress: data.address,
+            deliveryLat: data.latitude,
+            deliveryLng: data.longitude,
+            phone: data.phone,
+            email: data.email,
+            orderDate: serverTimestamp(),
+            totalAmount: cartTotal,
+            status: 'Pending',
+            items: cartItems.map(item => ({
+                productId: item.product.id,
+                name: item.product.name,
+                quantity: item.quantity,
+                price: item.product.price,
+            }))
+        };
+
+        try {
+            const ordersCol = collection(firestore, 'orders');
+            await addDoc(ordersCol, orderData);
+            
+            clearCart();
+            toast({
+                title: "Order Placed!",
+                description: "Thank you for your purchase.",
+            });
+            router.push('/order-confirmation');
+
+        } catch (e) {
+            console.error('Error placing order:', e);
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: 'orders',
+                operation: 'create',
+                requestResourceData: orderData
+            }));
+        }
     });
-    router.push('/order-confirmation');
   };
 
   if (cartItems.length === 0) {
@@ -177,7 +236,9 @@ export default function CheckoutPage() {
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">Place Order</Button>
+                  <Button type="submit" disabled={isPlacingOrder} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
+                    {isPlacingOrder ? 'Placing Order...' : 'Place Order'}
+                  </Button>
                 </form>
               </Form>
             </CardContent>

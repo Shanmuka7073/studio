@@ -28,9 +28,14 @@ import { getAuth, signOut } from 'firebase/auth';
 const navLinks = [
   { href: '/', label: 'Home' },
   { href: '/stores', label: 'Stores' },
-  { href: '/dashboard/my-store', label: 'My Store' },
-  { href: '/dashboard/orders', label: 'Orders' },
 ];
+
+const dashboardLinks = [
+    { href: '/dashboard/my-orders', label: 'My Orders'},
+    { href: '/dashboard/my-store', label: 'My Store' },
+    { href: '/dashboard/orders', label: 'Store Orders' },
+    { href: '/dashboard/deliveries', label: 'Deliveries' },
+]
 
 function UserMenu() {
   const { user, isUserLoading } = useFirebase();
@@ -64,6 +69,12 @@ function UserMenu() {
         <DropdownMenuLabel>My Account</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem disabled>{user.email}</DropdownMenuItem>
+        <DropdownMenuSeparator />
+        {dashboardLinks.map(({ href, label }) => (
+             <Link key={href} href={href} passHref>
+                <DropdownMenuItem>{label}</DropdownMenuItem>
+             </Link>
+        ))}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
       </DropdownMenuContent>
@@ -119,7 +130,7 @@ export function Header() {
               <Package2 className="h-6 w-6 text-primary" />
               <span className="sr-only">LocalBasket</span>
             </Link>
-            {navLinks.map(({ href, label }) => (
+            {[...navLinks, ...dashboardLinks].map(({ href, label }) => (
               <Link
                 key={href}
                 href={href}

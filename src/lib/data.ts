@@ -76,53 +76,7 @@ export async function getProduct(
 export const getProductImage = (imageId: string) => getImage(imageId);
 export const getStoreImage = (imageId: string) => getImage(imageId);
 
-// --- Mock data for orders (can be migrated to Firestore later) ---
-
-const MOCK_PRODUCTS: Product[] = [
-    { id: '1', name: 'Organic Apples', description: 'Crisp and sweet, perfect for snacking.', price: 2.99, imageId: 'prod-1', storeId: '1' },
-    { id: '4', name: 'Organic Milk', description: '1 gallon of whole organic milk.', price: 4.99, imageId: 'prod-4', storeId: '1' },
-    { id: '9', name: 'Chicken Breast', description: '1 lb of boneless, skinless chicken breast.', price: 7.99, imageId: 'prod-9', storeId: '3' },
-    { id: '10', name: 'Cheddar Cheese', description: '8oz block of sharp cheddar cheese.', price: 4.49, imageId: 'prod-10', storeId: '3' },
-    { id: '12', name: 'Spaghetti Pasta', description: '16oz box of spaghetti.', price: 1.99, imageId: 'prod-12', storeId: '3' },
-    { id: '7', name: 'Romaine Lettuce', description: 'A head of crisp romaine lettuce.', price: 2.29, imageId: 'prod-7', storeId: '2' },
-]
-
-const orders: Order[] = [
-  {
-    id: 'ORD001',
-    customerName: 'John Doe',
-    address: '123 Maple Street, Springfield, USA',
-    items: [
-      { product: MOCK_PRODUCTS[0], quantity: 2 },
-      { product: MOCK_PRODUCTS[1], quantity: 1 },
-    ],
-    total: 10.97,
-    status: 'Delivered',
-    date: '2023-10-26',
-  },
-  {
-    id: 'ORD002',
-    customerName: 'Jane Smith',
-    address: '456 Oak Avenue, Springfield, USA',
-    items: [
-      { product: MOCK_PRODUCTS[2], quantity: 1 },
-      { product: MOCK_PRODUCTS[3], quantity: 1 },
-      { product: MOCK_PRODUCTS[4], quantity: 1 },
-    ],
-    total: 14.47,
-    status: 'Processing',
-    date: '2023-10-27',
-  },
-  {
-    id: 'ORD003',
-    customerName: 'Alice Johnson',
-    address: '789 Pine Lane, Springfield, USA',
-    items: [{ product: MOCK_PRODUCTS[5], quantity: 3 }],
-    total: 6.87,
-    status: 'Out for Delivery',
-    date: '2023-10-28',
-  },
-];
-export const getOrders = (): Order[] => orders;
-
-    
+// Note: The mock `getOrders` function is now obsolete as orders are fetched directly from Firestore.
+// It is left here to prevent breaking any components that might still reference it before being updated.
+const MOCK_ORDERS: any[] = [];
+export const getOrders = (): any[] => MOCK_ORDERS;
