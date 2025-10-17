@@ -9,6 +9,7 @@ import {
   SheetTrigger,
   SheetHeader,
   SheetTitle,
+  SheetClose,
 } from '@/components/ui/sheet';
 import { CartIcon } from '@/components/cart/cart-icon';
 import { usePathname } from 'next/navigation';
@@ -143,47 +144,50 @@ export function Header() {
           </Button>
         </SheetTrigger>
         <SheetContent side="left">
-          <SheetHeader>
-            <SheetTitle>Menu</SheetTitle>
-          </SheetHeader>
-          <nav className="grid gap-6 text-lg font-medium mt-4">
-            <Link
-              href="/"
-              className="flex items-center gap-2 text-lg font-semibold"
-            >
-              <Package2 className="h-6 w-6 text-primary" />
-              <span className="sr-only">LocalBasket</span>
-            </Link>
-            {navLinks.map(({ href, label }) => (
-              <Link
-                key={href}
-                href={href}
-                className={cn(
-                  'hover:text-foreground',
-                  pathname === href
-                    ? 'text-foreground'
-                    : 'text-muted-foreground'
-                )}
-              >
-                {label}
-              </Link>
-            ))}
-             <div className="border-t pt-4">
-                <p className="px-2 text-sm font-medium text-muted-foreground">My Account</p>
-                <div className="grid gap-2 mt-2">
-                    {[...customerLinks, ...ownerLinks, ...deliveryLinks].map(({ href, label, icon: Icon }) => (
-                    <Link
-                        key={href}
-                        href={href}
-                        className="flex items-center gap-3 rounded-lg px-2 py-2 text-muted-foreground transition-all hover:text-primary"
+           <SheetHeader>
+            <SheetTitle>
+                 <Link
+                    href="/"
+                    className="flex items-center gap-2 text-lg font-semibold"
                     >
-                        <Icon className="h-4 w-4" />
+                    <Package2 className="h-6 w-6 text-primary" />
+                    <span className="font-headline">LocalBasket</span>
+                </Link>
+            </SheetTitle>
+          </SheetHeader>
+          <div className="flex h-full flex-col justify-between">
+            <nav className="grid gap-6 text-lg font-medium mt-8">
+                {navLinks.map(({ href, label }) => (
+                <SheetClose asChild key={href}>
+                    <Link
+                        href={href}
+                        className={cn(
+                        'flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary',
+                        pathname === href && 'text-primary'
+                        )}
+                    >
                         {label}
                     </Link>
+                </SheetClose>
+                ))}
+            </nav>
+            <div className="border-t pt-4">
+                <p className="px-3 text-sm font-medium text-muted-foreground mb-2">Dashboard</p>
+                <div className="grid gap-2">
+                    {[...customerLinks, ...ownerLinks, ...deliveryLinks].map(({ href, label, icon: Icon }) => (
+                    <SheetClose asChild key={href}>
+                        <Link
+                            href={href}
+                            className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+                        >
+                            <Icon className="h-4 w-4" />
+                            {label}
+                        </Link>
+                    </SheetClose>
                     ))}
                 </div>
             </div>
-          </nav>
+          </div>
         </SheetContent>
       </Sheet>
       <div className="flex w-full items-center justify-end gap-4 md:ml-auto md:gap-2 lg:gap-4">
