@@ -7,20 +7,20 @@ import { Store, Product } from '@/lib/types';
 import { useEffect, useState } from 'react';
 import { notFound } from 'next/navigation';
 
-export default function StoreDetailPage({ params: { id } }: { params: { id: string } }) {
+export default function StoreDetailPage({ params }: { params: { id: string } }) {
   const { firestore } = useFirebase();
   const [store, setStore] = useState<Store | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (firestore) {
+    if (firestore && params.id) {
       const fetchStoreData = async () => {
         setLoading(true);
-        const storeData = await getStore(firestore, id);
+        const storeData = await getStore(firestore, params.id);
         if (storeData) {
           setStore(storeData as Store);
-          const productData = await getProducts(firestore, id);
+          const productData = await getProducts(firestore, params.id);
           setProducts(productData);
         } else {
           notFound();
@@ -29,7 +29,7 @@ export default function StoreDetailPage({ params: { id } }: { params: { id: stri
       };
       fetchStoreData();
     }
-  }, [firestore, id]);
+  }, [firestore, params.id]);
 
   if (loading) {
     return <div className="container mx-auto py-12 px-4 md:px-6">Loading...</div>;
