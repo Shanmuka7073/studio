@@ -114,10 +114,19 @@ export async function getOrdersAction({
       // Ensure orderDate is a Firestore Timestamp before converting
       const orderDate = data.orderDate as Timestamp;
       return {
-        ...data,
         id: doc.id,
-        // Convert Timestamp to ISO string for serialization
-        orderDate: orderDate.toDate().toISOString(),
+        userId: data.userId,
+        storeId: data.storeId,
+        customerName: data.customerName,
+        deliveryAddress: data.deliveryAddress,
+        deliveryLat: data.deliveryLat,
+        deliveryLng: data.deliveryLng,
+        items: data.items,
+        totalAmount: data.totalAmount,
+        status: data.status,
+        orderDate: orderDate.toDate().toISOString(), // Convert Timestamp to ISO string for serialization
+        phone: data.phone,
+        email: data.email,
       } as Order;
     });
 
