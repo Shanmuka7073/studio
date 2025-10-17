@@ -24,9 +24,17 @@ import {
 } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Upload } from 'lucide-react';
-import { createStoreAction } from '@/app/actions';
-import type { Store } from '@/lib/types';
-import { getStore } from '@/lib/data';
+import { createStoreAction, createProductAction } from '@/app/actions';
+import type { Store, Product } from '@/lib/types';
+import { getStore, getProducts } from '@/lib/data';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 const storeSchema = z.object({
   name: z.string().min(3, 'Store name must be at least 3 characters'),
@@ -34,15 +42,163 @@ const storeSchema = z.object({
     .string()
     .min(10, 'Description must be at least 10 characters'),
   address: z.string().min(10, 'Please enter a valid address'),
-  // We're not handling file uploads yet, so we can make this optional
-  // logo: z.any().refine(files => files?.length === 1, 'Logo is required.'),
+});
+
+const productSchema = z.object({
+  name: z.string().min(3, 'Product name is required'),
+  price: z.coerce.number().positive('Price must be a positive number'),
+  description: z.string().optional(),
 });
 
 type StoreFormValues = z.infer<typeof storeSchema>;
+type ProductFormValues = z.infer<typeof productSchema>;
 
-// In a real app, this would be the logged-in user's store ID.
-// We'll hardcode it for now to simulate a user owning store '4'.
 const MY_STORE_ID = '4';
+
+function AddProductForm({ storeId, onProductAdded }: { storeId: string, onProductAdded: (product: Product) => void }) {
+  const { toast } = useToast();
+  const [isPending, startTransition] = useTransition();
+
+  const form = useForm<ProductFormValues>({
+    resolver: zodResolver(productSchema),
+    defaultValues: { name: '', price: 0, description: '' },
+  });
+
+  const onSubmit = (data: ProductFormValues) => {
+    startTransition(async () => {
+      const result = await createProductAction({ ...data, storeId });
+      if (result.success && result.product) {
+        toast({
+          title: 'Product Added!',
+          description: `${result.product.name} has been added to your store.`,
+        });
+        onProductAdded(result.product);
+        form.reset();
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Error adding product',
+          description: result.error,
+        });
+      }
+    });
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Add a New Product</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Product Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., Organic Apples" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="price"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Price ($)</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="0.01" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Product Description (Optional)</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Describe the product" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <Button type="submit" disabled={isPending} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+              {isPending ? 'Adding...' : 'Add Product'}
+            </Button>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ManageStoreView({ store }: { store: Store }) {
+    const [products, setProducts] = useState<Product[]>([]);
+
+    useEffect(() => {
+        setProducts(getProducts(store.id));
+    }, [store.id]);
+
+    const handleProductAdded = (newProduct: Product) => {
+        setProducts(prev => [...prev, newProduct]);
+    }
+
+    return (
+        <div className="grid md:grid-cols-2 gap-8">
+          <div>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Manage {store.name}</CardTitle>
+                    <CardDescription>
+                        Add new products and view your existing inventory.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                   <AddProductForm storeId={store.id} onProductAdded={handleProductAdded} />
+                </CardContent>
+            </Card>
+          </div>
+          <div>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Your Products</CardTitle>
+                </CardHeader>
+                <CardContent>
+                   {products.length > 0 ? (
+                     <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Price</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {products.map(product => (
+                                <TableRow key={product.id}>
+                                    <TableCell>{product.name}</TableCell>
+                                    <TableCell>${product.price.toFixed(2)}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                     </Table>
+                   ) : (
+                    <p className="text-muted-foreground">You haven't added any products yet.</p>
+                   )}
+                </CardContent>
+            </Card>
+          </div>
+        </div>
+    )
+}
 
 export default function MyStorePage() {
   const { toast } = useToast();
@@ -50,13 +206,11 @@ export default function MyStorePage() {
   const [myStore, setMyStore] = useState<Store | null>(null);
 
   useEffect(() => {
-    // Check if the user's store already exists when the component loads.
     const existingStore = getStore(MY_STORE_ID);
     if (existingStore) {
       setMyStore(existingStore);
     }
   }, []);
-
 
   const form = useForm<StoreFormValues>({
     resolver: zodResolver(storeSchema),
@@ -69,7 +223,6 @@ export default function MyStorePage() {
 
   const onSubmit = (data: StoreFormValues) => {
     startTransition(async () => {
-      // We pass the hardcoded ID to the action
       const result = await createStoreAction({
         ...data,
         id: MY_STORE_ID,
@@ -90,147 +243,125 @@ export default function MyStorePage() {
     });
   };
 
-  if (myStore) {
-    // Render the store management view if a store already exists.
-    return (
-      <div className="container mx-auto py-12 px-4 md:px-6">
-        <h1 className="text-4xl font-bold font-headline mb-8">
-          Manage {myStore.name}
-        </h1>
-        <Card>
-          <CardHeader>
-            <CardTitle>Welcome, Store Owner!</CardTitle>
-            <CardDescription>
-              This is your dashboard. You can add products, view orders, and
-              edit your store details here.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p>Coming soon:</p>
-            <ul className="list-disc list-inside text-muted-foreground">
-              <li>A form to add new products to your store.</li>
-              <li>A table to view and manage your existing products.</li>
-              <li>An overview of incoming orders.</li>
-            </ul>
-            <Button className="mt-4">Add a New Product</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Render the create store form if no store exists.
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
-      <Card className="max-w-3xl mx-auto">
-        <CardHeader>
-          <CardTitle className="text-3xl font-headline">
-            Create Your Store
-          </CardTitle>
-          <CardDescription>
-            Fill out the details below to get your shop listed on LocalBasket.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Store Name</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="e.g., Patel Kirana Store"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Store Description</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Describe what makes your store special."
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="address"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Full Store Address</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="123 Market Street, Mumbai"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="logo"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Store Logo (Optional)</FormLabel>
-                    <FormControl>
-                      <div className="flex items-center gap-4">
-                        <div className="w-full">
-                          <label
-                            htmlFor="logo-upload"
-                            className="flex items-center gap-2 cursor-pointer rounded-md border border-input p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                          >
-                            <Upload className="h-4 w-4" />
-                            <span>
-                              {field.value?.[0]?.name ?? 'Upload a file'}
-                            </span>
-                          </label>
-                          <Input
-                            id="logo-upload"
-                            type="file"
-                            className="sr-only"
-                            accept="image/*"
-                            onBlur={field.onBlur}
-                            name={field.name}
-                            onChange={(e) => {
-                              field.onChange(e.target.files);
-                            }}
-                            ref={field.ref}
-                            disabled
-                          />
+      <h1 className="text-4xl font-bold font-headline mb-8">
+        {myStore ? `Dashboard: ${myStore.name}` : 'Create Your Store'}
+      </h1>
+
+      {myStore ? (
+        <ManageStoreView store={myStore} />
+      ) : (
+        <Card className="max-w-3xl mx-auto">
+          <CardHeader>
+            <CardTitle className="text-3xl font-headline">
+              Create Your Store
+            </CardTitle>
+            <CardDescription>
+              Fill out the details below to get your shop listed on LocalBasket.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Store Name</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g., Patel Kirana Store"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Store Description</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Describe what makes your store special."
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Full Store Address</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="123 Market Street, Mumbai"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="logo"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Store Logo (Optional)</FormLabel>
+                      <FormControl>
+                        <div className="flex items-center gap-4">
+                          <div className="w-full">
+                            <label
+                              htmlFor="logo-upload"
+                              className="flex items-center gap-2 cursor-pointer rounded-md border border-input p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                            >
+                              <Upload className="h-4 w-4" />
+                              <span>
+                                {field.value?.[0]?.name ?? 'Upload a file'}
+                              </span>
+                            </label>
+                            <Input
+                              id="logo-upload"
+                              type="file"
+                              className="sr-only"
+                              accept="image/*"
+                              onBlur={field.onBlur}
+                              name={field.name}
+                              onChange={(e) => {
+                                field.onChange(e.target.files);
+                              }}
+                              ref={field.ref}
+                              disabled
+                            />
+                          </div>
                         </div>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button
-                type="submit"
-                className="w-full bg-accent hover:bg-accent/90 text-accent-foreground"
-                disabled={isPending}
-              >
-                {isPending ? 'Creating...' : 'Create Store'}
-              </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button
+                  type="submit"
+                  className="w-full bg-accent hover:bg-accent/90 text-accent-foreground"
+                  disabled={isPending}
+                >
+                  {isPending ? 'Creating...' : 'Create Store'}
+                </Button>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

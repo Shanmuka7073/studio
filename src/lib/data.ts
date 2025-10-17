@@ -15,7 +15,7 @@ const getImage = (id: string) => {
 
 let stores: Store[] = [];
 
-const products: Product[] = [
+let products: Product[] = [
   // Green Valley Organics
   {
     id: '1',
@@ -211,11 +211,9 @@ export const getStore = (id: string): Store | undefined =>
 export const createStore = (storeData: Store): Store => {
   const existingStore = stores.find(s => s.id === storeData.id);
   if (existingStore) {
-    // Update existing store
     stores = stores.map(s => s.id === storeData.id ? storeData : s);
     return storeData;
   }
-  // Add new store
   stores.push(storeData);
   return storeData;
 };
@@ -226,6 +224,16 @@ export const getProducts = (storeId?: string): Product[] => {
   }
   return products;
 };
+
+export const createProduct = (productData: Omit<Product, 'id'>): Product => {
+    const newProduct = {
+        ...productData,
+        id: `prod-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+    };
+    products.push(newProduct);
+    return newProduct;
+}
+
 export const getProduct = (id: string): Product | undefined =>
   products.find((p) => p.id === id);
 export const getOrders = (): Order[] => orders;
