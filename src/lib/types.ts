@@ -17,6 +17,8 @@ export type Store = {
   address: string;
   imageId: string;
   ownerId: string;
+  latitude: number;
+  longitude: number;
 };
 
 export type CartItem = {

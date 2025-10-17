@@ -7,25 +7,75 @@ import StoreCard from '@/components/store-card';
 import { useFirebase } from '@/firebase';
 import { Store } from '@/lib/types';
 import { useEffect, useState } from 'react';
+import haversine from 'haversine-distance';
+
+type Coords = {
+  latitude: number;
+  longitude: number;
+};
 
 export default function Home() {
   const { firestore } = useFirebase();
-  const [featuredStores, setFeaturedStores] = useState<Store[]>([]);
+  const [allStores, setAllStores] = useState<Store[]>([]);
+  const [nearbyStores, setNearbyStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (firestore) {
-      getStores(firestore)
-        .then((stores) => {
-          setFeaturedStores(stores.slice(0, 3));
+    async function fetchStoresAndLocation() {
+      if (!firestore) return;
+
+      setLoading(true);
+      setLocationError(null);
+
+      try {
+        const stores = await getStores(firestore);
+        setAllStores(stores);
+
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              const userLocation: Coords = {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+              };
+              
+              const storesWithinRadius = stores.filter((store) => {
+                const storeLocation = { latitude: store.latitude, longitude: store.longitude };
+                const distanceInMeters = haversine(userLocation, storeLocation);
+                const distanceInKm = distanceInMeters / 1000;
+                return distanceInKm <= 3;
+              });
+
+              setNearbyStores(storesWithinRadius);
+              if (storesWithinRadius.length === 0) {
+                setLocationError("No stores found within a 3km radius. Showing all stores instead.");
+                setNearbyStores(stores); // Fallback to show all stores
+              }
+              setLoading(false);
+            },
+            (error) => {
+              console.error("Geolocation error:", error);
+              setLocationError("Could not get your location. Showing all available stores.");
+              setNearbyStores(stores); // Fallback to show all stores
+              setLoading(false);
+            }
+          );
+        } else {
+          setLocationError("Geolocation is not supported by your browser. Showing all stores.");
+          setNearbyStores(stores); // Fallback to show all stores
           setLoading(false);
-        })
-        .catch((err) => {
-          console.error(err);
-          setLoading(false);
-        });
+        }
+      } catch (err) {
+        console.error(err);
+        setLocationError("Failed to load stores.");
+        setLoading(false);
+      }
     }
+
+    fetchStoresAndLocation();
   }, [firestore]);
+
 
   return (
     <div className="flex flex-col">
@@ -45,9 +95,10 @@ export default function Home() {
                 <form className="flex space-x-2">
                   <Input
                     type="text"
-                    placeholder="Enter your location or zip code"
+                    placeholder="Your location is detected automatically"
                     className="max-w-lg flex-1"
                     aria-label="Location"
+                    disabled
                   />
                   <Button type="submit" variant="default" className="bg-accent hover:bg-accent/90 text-accent-foreground">
                     <MapPin className="mr-2 h-4 w-4" />
@@ -55,7 +106,7 @@ export default function Home() {
                   </Button>
                 </form>
                 <p className="text-xs text-foreground/60">
-                  Get groceries from your favorite local stores delivered in minutes.
+                  We'll show you stores within 3km of your location.
                 </p>
               </div>
             </div>
@@ -77,15 +128,15 @@ export default function Home() {
             <div className="space-y-2">
               <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl font-headline">Featured Local Stores</h2>
               <p className="max-w-[900px] text-foreground/80 md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-                Explore a curated selection of our top-rated local stores, loved by your community.
+                {locationError ? locationError : 'Explore top-rated local stores right in your neighborhood.'}
               </p>
             </div>
           </div>
           <div className="mx-auto grid grid-cols-1 gap-6 py-12 sm:grid-cols-2 lg:grid-cols-3">
             {loading ? (
-              <p>Loading stores...</p>
+              <p>Finding nearby stores...</p>
             ) : (
-              featuredStores.map((store) => (
+              nearbyStores.map((store) => (
                 <StoreCard key={store.id} store={store} />
               ))
             )}

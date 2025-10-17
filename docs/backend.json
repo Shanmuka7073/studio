@@ -29,6 +29,14 @@
         "imageId": {
           "type": "string",
           "description": "ID for the store's placeholder image."
+        },
+        "latitude": {
+          "type": "number",
+          "description": "The latitude of the store's location."
+        },
+        "longitude": {
+          "type": "number",
+          "description": "The longitude of the store's location."
         }
       },
       "required": [
@@ -37,7 +45,9 @@
         "description",
         "address",
         "ownerId",
-        "imageId"
+        "imageId",
+        "latitude",
+        "longitude"
       ]
     },
     "Product": {
@@ -369,5 +379,3 @@
     ]
   }
 }
-
-    

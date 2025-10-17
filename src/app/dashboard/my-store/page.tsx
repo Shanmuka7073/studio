@@ -36,6 +36,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { MapPin } from 'lucide-react';
 
 const storeSchema = z.object({
   name: z.string().min(3, 'Store name must be at least 3 characters'),
@@ -43,6 +44,8 @@ const storeSchema = z.object({
     .string()
     .min(10, 'Description must be at least 10 characters'),
   address: z.string().min(10, 'Please enter a valid address'),
+  latitude: z.number(),
+  longitude: z.number(),
 });
 
 const productSchema = z.object({
@@ -158,7 +161,6 @@ function ManageStoreView({ store }: { store: Store }) {
 
     const productsQuery = useMemoFirebase(() => {
         if (!firestore) return null;
-        // Query the 'products' subcollection of the specific store
         return collection(firestore, 'stores', store.id, 'products');
     }, [firestore, store.id]);
 
@@ -219,6 +221,7 @@ export default function MyStorePage() {
   const [isPending, startTransition] = useTransition();
   const { firestore, user, isUserLoading } = useFirebase();
   const router = useRouter();
+  const [isLocating, setIsLocating] = useState(false);
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -241,8 +244,43 @@ export default function MyStorePage() {
       name: '',
       description: '',
       address: '',
+      latitude: 0,
+      longitude: 0,
     },
   });
+
+  const handleGetCurrentLocation = () => {
+    if (navigator.geolocation) {
+      setIsLocating(true);
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          form.setValue('latitude', position.coords.latitude);
+          form.setValue('longitude', position.coords.longitude);
+          setIsLocating(false);
+          toast({
+            title: 'Location Set!',
+            description: 'Your store\'s location has been set to your current position.',
+          });
+        },
+        (error) => {
+          console.error("Geolocation error:", error);
+          toast({
+            variant: "destructive",
+            title: 'Location Error',
+            description: 'Could not get your location.',
+          });
+          setIsLocating(false);
+        }
+      );
+    } else {
+       toast({
+        variant: "destructive",
+        title: 'Unsupported',
+        description: 'Geolocation is not supported by your browser.',
+      });
+    }
+  };
+
 
   const onSubmit = (data: StoreFormValues) => {
     if (!user || !firestore) {
@@ -252,6 +290,15 @@ export default function MyStorePage() {
             description: 'You must be logged in to create a store.',
         });
         return;
+    }
+    
+    if (data.latitude === 0 && data.longitude === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Location Required',
+        description: 'Please set your store location before creating it.',
+      });
+      return;
     }
 
     startTransition(() => {
@@ -352,6 +399,25 @@ export default function MyStorePage() {
                     </FormItem>
                   )}
                 />
+                 <FormItem>
+                    <FormLabel>Store Location</FormLabel>
+                    <div className="flex items-center gap-4">
+                        <Button 
+                        type="button" 
+                        variant="outline" 
+                        onClick={handleGetCurrentLocation}
+                        disabled={isLocating}
+                        >
+                        <MapPin className="mr-2 h-4 w-4" />
+                        {isLocating ? 'Locating...' : 'Set to My Current Location'}
+                        </Button>
+                        {(form.watch('latitude') !== 0 || form.watch('longitude') !== 0) && (
+                            <span className="text-sm text-muted-foreground">Location set!</span>
+                        )}
+                    </div>
+                     <FormMessage>{form.formState.errors.latitude?.message || form.formState.errors.longitude?.message}</FormMessage>
+                </FormItem>
+
                 <Button
                   type="submit"
                   className="w-full bg-accent hover:bg-accent/90 text-accent-foreground"
