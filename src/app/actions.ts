@@ -109,13 +109,13 @@ export async function getOrdersAction({ by, value }: GetOrdersParams): Promise<O
 
     switch (by) {
       case 'userId':
-        querySnapshot = await ordersCollection.where('userId', '==', value).orderBy('orderDate', 'desc').get();
+        querySnapshot = await ordersCollection.where('userId', '==', value).get();
         break;
       case 'storeId':
-        querySnapshot = await ordersCollection.where('storeId', '==', value).orderBy('orderDate', 'desc').get();
+        querySnapshot = await ordersCollection.where('storeId', '==', value).get();
         break;
       case 'deliveryStatus':
-         querySnapshot = await ordersCollection.where('status', '==', value).orderBy('orderDate', 'desc').get();
+         querySnapshot = await ordersCollection.where('status', '==', value).get();
         break;
       default:
         return [];
@@ -128,12 +128,20 @@ export async function getOrdersAction({ by, value }: GetOrdersParams): Promise<O
     // Firestore Timestamps need to be converted to a serializable format (e.g., ISO string)
     const orders = querySnapshot.docs.map(doc => {
       const data = doc.data();
+      // Handle cases where orderDate might be missing or not a Timestamp
+      const orderDate = data.orderDate && typeof data.orderDate.toDate === 'function'
+        ? data.orderDate.toDate().toISOString()
+        : new Date().toISOString(); 
+
       return {
         ...data,
         id: doc.id,
-        orderDate: (data.orderDate.toDate()).toISOString(), // Convert Timestamp to ISO string
+        orderDate: orderDate,
       } as Order;
     });
+
+    // Sort manually after fetching
+    orders.sort((a, b) => new Date(b.orderDate as string).getTime() - new Date(a.orderDate as string).getTime());
 
     return orders;
 

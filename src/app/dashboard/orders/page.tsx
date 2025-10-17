@@ -1,6 +1,6 @@
 'use client';
 
-import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { Order, Store } from '@/lib/types';
 import { collection, query, where } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { format, parseISO } from 'date-fns';
 import { useState, useEffect } from 'react';
 import { getOrdersAction } from '@/app/actions';
+import { useCollection, useMemoFirebase } from '@/firebase';
+
 
 export default function OrdersDashboardPage() {
   const { firestore, user } = useFirebase();

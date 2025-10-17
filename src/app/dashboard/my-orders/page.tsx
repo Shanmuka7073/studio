@@ -22,7 +22,7 @@ export default function MyOrdersPage() {
       if (user) {
         setIsLoading(true);
         const fetchedOrders = await getOrdersAction({ by: 'userId', value: user.uid });
-        // The dates from the server action will be ISO strings, so we convert them back to Date objects
+        // The dates from the server action will be ISO strings, so we convert them back to Date objects for formatting
         const ordersWithDates = fetchedOrders.map(o => ({...o, orderDate: parseISO(o.orderDate as any)}));
         setOrders(ordersWithDates as any);
         setIsLoading(false);
