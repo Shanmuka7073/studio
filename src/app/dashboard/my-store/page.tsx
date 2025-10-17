@@ -25,7 +25,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { revalidateStorePaths, revalidateProductPaths } from '@/app/actions';
 import type { Store, Product } from '@/lib/types';
-import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirebase, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, query, where, addDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import {
@@ -68,33 +68,31 @@ function AddProductForm({ storeId }: { storeId: string }) {
     if (!firestore) return;
 
     startTransition(async () => {
-        try {
-            const productData = {
-                ...data,
-                storeId,
-                imageId: `prod-${Math.floor(Math.random() * 20)}`,
-                quantity: 1, // Default quantity
-                category: 'Uncategorized' // Default category
-            };
-            
-            const productsCol = collection(firestore, 'stores', storeId, 'products');
-            const newProduct = await addDoc(productsCol, productData);
-            
+        const productData = {
+            ...data,
+            storeId,
+            imageId: `prod-${Math.floor(Math.random() * 20)}`,
+            quantity: 1, // Default quantity
+            category: 'Uncategorized' // Default category
+        };
+        
+        const productsCol = collection(firestore, 'stores', storeId, 'products');
+        
+        addDoc(productsCol, productData).then(async () => {
             await revalidateProductPaths(storeId);
-
             toast({
                 title: 'Product Added!',
                 description: `${data.name} has been added to your store.`,
             });
             form.reset();
-        } catch (error) {
-            console.error("Error creating product:", error);
-            toast({
-                variant: 'destructive',
-                title: 'Error adding product',
-                description: 'Failed to add product.',
+        }).catch(async (serverError) => {
+            const permissionError = new FirestorePermissionError({
+              path: productsCol.path,
+              operation: 'create',
+              requestResourceData: productData,
             });
-        }
+            errorEmitter.emit('permission-error', permissionError);
+        });
     });
   };
 
@@ -256,30 +254,28 @@ export default function MyStorePage() {
         return;
     }
 
-    startTransition(async () => {
-      try {
+    startTransition(() => {
         const storeData = {
             ...data,
             ownerId: user.uid,
             imageId: `store-${Math.floor(Math.random() * 10)}`,
         };
         const storesCol = collection(firestore, 'stores');
-        await addDoc(storesCol, storeData);
         
-        await revalidateStorePaths();
-
-        toast({
-          title: 'Store Created!',
-          description: `Your store "${data.name}" has been successfully created.`,
+        addDoc(storesCol, storeData).then(async () => {
+            await revalidateStorePaths();
+            toast({
+              title: 'Store Created!',
+              description: `Your store "${data.name}" has been successfully created.`,
+            });
+        }).catch(async (serverError) => {
+            const permissionError = new FirestorePermissionError({
+              path: storesCol.path,
+              operation: 'create',
+              requestResourceData: storeData,
+            });
+            errorEmitter.emit('permission-error', permissionError);
         });
-      } catch (error) {
-        console.error("Error creating store: ", error)
-        toast({
-          variant: 'destructive',
-          title: 'Error creating store',
-          description: "Failed to create store.",
-        });
-      }
     });
   };
 
@@ -371,5 +367,3 @@ export default function MyStorePage() {
     </div>
   );
 }
-
-    
