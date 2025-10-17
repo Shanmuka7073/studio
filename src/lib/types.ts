@@ -14,6 +14,7 @@ export type Store = {
   description: string;
   address: string;
   imageId: string;
+  // ownerId?: string; // Add this later for multi-user support
 };
 
 export type CartItem = {

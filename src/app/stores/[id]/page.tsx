@@ -1,17 +1,44 @@
-
+'use client';
 import { getStore, getProducts, getStoreImage } from '@/lib/data';
-import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import ProductCard from '@/components/product-card';
+import { useFirebase } from '@/firebase';
+import { Store, Product } from '@/lib/types';
+import { useEffect, useState } from 'react';
+import { notFound } from 'next/navigation';
 
 export default function StoreDetailPage({ params }: { params: { id: string } }) {
-  const store = getStore(params.id);
-  
-  if (!store) {
-    notFound();
+  const { firestore } = useFirebase();
+  const [store, setStore] = useState<Store | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (firestore) {
+      const fetchStoreData = async () => {
+        setLoading(true);
+        const storeData = await getStore(firestore, params.id);
+        if (storeData) {
+          setStore(storeData as Store);
+          const productData = await getProducts(firestore, params.id);
+          setProducts(productData);
+        } else {
+          notFound();
+        }
+        setLoading(false);
+      };
+      fetchStoreData();
+    }
+  }, [firestore, params.id]);
+
+  if (loading) {
+    return <div className="container mx-auto py-12 px-4 md:px-6">Loading...</div>;
   }
 
-  const products = getProducts(store.id);
+  if (!store) {
+    return notFound();
+  }
+
   const image = getStoreImage(store.imageId);
 
   return (

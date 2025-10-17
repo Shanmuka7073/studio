@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getProduct } from '@/lib/data';
 import type { Product } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
@@ -13,12 +12,14 @@ interface ProductSuggestionsProps {
   pastPurchases?: string[];
   currentCartItems?: string[];
   optimalDisplayTime: 'Before Checkout' | 'During Checkout' | 'After Checkout';
+  resolveProduct: (productId: string) => Promise<Product | undefined>;
 }
 
 export default function ProductSuggestions({
   pastPurchases = [],
   currentCartItems = [],
   optimalDisplayTime,
+  resolveProduct,
 }: ProductSuggestionsProps) {
   const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([]);
   const [reason, setReason] = useState<string>('');
@@ -38,9 +39,10 @@ export default function ProductSuggestions({
       if ('error' in result) {
         setError(result.error as string);
       } else if (result?.recommendedProducts) {
-        const products = result.recommendedProducts
-          .map((id) => getProduct(id))
-          .filter((p): p is Product => p !== undefined);
+        const products = (await Promise.all(
+          result.recommendedProducts.map(id => resolveProduct(id))
+        )).filter((p): p is Product => p !== undefined);
+        
         setRecommendedProducts(products);
         setReason(result.reason || '');
       }
@@ -48,7 +50,7 @@ export default function ProductSuggestions({
     }
 
     fetchRecommendations();
-  }, [pastPurchases, currentCartItems, optimalDisplayTime]);
+  }, [pastPurchases, currentCartItems, optimalDisplayTime, resolveProduct]);
   
   const title = optimalDisplayTime === 'After Checkout' 
     ? "Since you bought..."

@@ -7,6 +7,7 @@ import {
 import { createStore, createProduct } from '@/lib/data';
 import type { Store, Product } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
+import { getSdks, initializeFirebase } from '@/firebase';
 
 export async function getRecommendationsAction(
   input: ProductRecommendationsInput
@@ -21,12 +22,12 @@ export async function getRecommendationsAction(
 }
 
 export async function createStoreAction(
-  storeData: Omit<Store, 'imageId'> & { id: string }
+  storeData: Omit<Store, 'id' | 'imageId'> & { imageId: string }
 ) {
   try {
-    const newStore = createStore({
+    const { firestore } = initializeFirebase();
+    const newStore = await createStore(firestore, {
       ...storeData,
-      imageId: `store-${Math.floor(Math.random() * 1000)}`, // Temporary random image
     });
 
     revalidatePath('/');
@@ -40,18 +41,19 @@ export async function createStoreAction(
 }
 
 export async function createProductAction(
-  productData: Omit<Product, 'id' | 'imageId'>
+  productData: Omit<Product, 'id' | 'imageId'> & { imageId: string }
 ) {
   try {
+    const { firestore } = initializeFirebase();
     // In a real app, you'd handle image uploads properly.
     // For now, we'll assign a placeholder imageId.
-    const newProduct = createProduct({
+    const newProduct = await createProduct(firestore, {
       ...productData,
-      imageId: `prod-${Math.floor(Math.random() * 20)}`, // Temporary random image
     });
 
     // Revalidate the path for the specific store
     revalidatePath(`/stores/${productData.storeId}`);
+    revalidatePath(`/dashboard/my-store`);
 
     return { success: true, product: newProduct };
   } catch (error) {

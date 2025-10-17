@@ -10,10 +10,14 @@ import Link from 'next/link';
 import { getProductImage } from '@/lib/data';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import ProductSuggestions from '@/components/product-suggestions';
+import { useFirebase } from '@/firebase';
+import { getProduct } from '@/lib/data';
+import { Product } from '@/lib/types';
 
 export default function CartPage() {
   const { cartItems, removeItem, updateQuantity, cartTotal, cartCount } = useCart();
   const cartProductIds = cartItems.map(item => item.product.id);
+  const {firestore} = useFirebase();
 
   if (cartCount === 0) {
     return (
@@ -25,6 +29,11 @@ export default function CartPage() {
         </Button>
       </div>
     );
+  }
+
+  const resolveProduct = async (productId: string) => {
+    if (!firestore) return undefined;
+    return await getProduct(firestore, productId);
   }
 
   return (
@@ -114,6 +123,7 @@ export default function CartPage() {
             <ProductSuggestions
               currentCartItems={cartProductIds}
               optimalDisplayTime="During Checkout"
+              resolveProduct={resolveProduct}
             />
         </div>
       </div>

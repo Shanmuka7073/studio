@@ -26,7 +26,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Upload } from 'lucide-react';
 import { createStoreAction, createProductAction } from '@/app/actions';
 import type { Store, Product } from '@/lib/types';
-import { getStore, getProducts } from '@/lib/data';
+import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, where } from 'firebase/firestore';
+
 import {
   Table,
   TableBody,
@@ -53,7 +55,7 @@ const productSchema = z.object({
 type StoreFormValues = z.infer<typeof storeSchema>;
 type ProductFormValues = z.infer<typeof productSchema>;
 
-const MY_STORE_ID = '4';
+const MY_STORE_ID = '4'; // This will eventually come from the logged-in user
 
 function AddProductForm({ storeId, onProductAdded }: { storeId: string, onProductAdded: (product: Product) => void }) {
   const { toast } = useToast();
@@ -66,13 +68,17 @@ function AddProductForm({ storeId, onProductAdded }: { storeId: string, onProduc
 
   const onSubmit = (data: ProductFormValues) => {
     startTransition(async () => {
-      const result = await createProductAction({ ...data, storeId });
+      const result = await createProductAction({
+        ...data,
+        storeId,
+        imageId: `prod-${Math.floor(Math.random() * 20)}`, // Temporary random image
+      });
       if (result.success && result.product) {
         toast({
           title: 'Product Added!',
           description: `${result.product.name} has been added to your store.`,
         });
-        onProductAdded(result.product);
+        // onProductAdded(result.product); // No longer needed with real-time updates
         form.reset();
       } else {
         toast({
@@ -142,14 +148,17 @@ function AddProductForm({ storeId, onProductAdded }: { storeId: string, onProduc
 }
 
 function ManageStoreView({ store }: { store: Store }) {
-    const [products, setProducts] = useState<Product[]>([]);
+    const { firestore } = useFirebase();
 
-    useEffect(() => {
-        setProducts(getProducts(store.id));
-    }, [store.id]);
+    const productsQuery = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return query(collection(firestore, 'products'), where('storeId', '==', store.id));
+    }, [firestore, store.id]);
+
+    const { data: products, isLoading } = useCollection<Product>(productsQuery);
 
     const handleProductAdded = (newProduct: Product) => {
-        setProducts(prev => [...prev, newProduct]);
+        // This function is now just a placeholder, as useCollection handles updates
     }
 
     return (
@@ -173,7 +182,9 @@ function ManageStoreView({ store }: { store: Store }) {
                     <CardTitle>Your Products</CardTitle>
                 </CardHeader>
                 <CardContent>
-                   {products.length > 0 ? (
+                   {isLoading ? (
+                     <p>Loading products...</p>
+                   ) : products && products.length > 0 ? (
                      <Table>
                         <TableHeader>
                             <TableRow>
@@ -203,14 +214,25 @@ function ManageStoreView({ store }: { store: Store }) {
 export default function MyStorePage() {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
-  const [myStore, setMyStore] = useState<Store | null>(null);
+  const { firestore, user } = useFirebase(); // Assuming we'll have a user object later
 
-  useEffect(() => {
-    const existingStore = getStore(MY_STORE_ID);
-    if (existingStore) {
-      setMyStore(existingStore);
-    }
-  }, []);
+  // For now, we'll query for a store owned by a simulated user/ID
+  // In the future, this would be `user.uid`
+  const simulatedUserId = 'user1'; 
+
+  const storeQuery = useMemoFirebase(() => {
+      if (!firestore) return null;
+      // This is a placeholder for how we'd find the user's store.
+      // We'd ideally have an 'ownerId' field on the store document.
+      // For now, we'll just fetch all stores and take the first one as "the user's store"
+      // This is not robust and just for demonstration.
+      return query(collection(firestore, 'stores'));
+  }, [firestore]);
+  
+  const { data: stores, isLoading: isStoreLoading } = useCollection<Store>(storeQuery);
+
+  // For this demo, we assume the user owns the *first* store found.
+  const myStore = stores?.[0];
 
   const form = useForm<StoreFormValues>({
     resolver: zodResolver(storeSchema),
@@ -225,14 +247,15 @@ export default function MyStorePage() {
     startTransition(async () => {
       const result = await createStoreAction({
         ...data,
-        id: MY_STORE_ID,
+        imageId: `store-${Math.floor(Math.random() * 10)}`, // Assign a random image
+        // ownerId: simulatedUserId // In the future, we'd add this
       });
       if (result.success && result.store) {
         toast({
           title: 'Store Created!',
           description: `Your store "${result.store.name}" has been successfully created.`,
         });
-        setMyStore(result.store);
+        // The page will now automatically switch to the management view because useCollection will update
       } else {
         toast({
           variant: 'destructive',
@@ -242,6 +265,10 @@ export default function MyStorePage() {
       }
     });
   };
+  
+  if (isStoreLoading) {
+    return <div className="container mx-auto py-12 px-4 md:px-6">Loading your store...</div>
+  }
 
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
@@ -307,44 +334,6 @@ export default function MyStorePage() {
                           placeholder="123 Market Street, Mumbai"
                           {...field}
                         />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="logo"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Store Logo (Optional)</FormLabel>
-                      <FormControl>
-                        <div className="flex items-center gap-4">
-                          <div className="w-full">
-                            <label
-                              htmlFor="logo-upload"
-                              className="flex items-center gap-2 cursor-pointer rounded-md border border-input p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                            >
-                              <Upload className="h-4 w-4" />
-                              <span>
-                                {field.value?.[0]?.name ?? 'Upload a file'}
-                              </span>
-                            </label>
-                            <Input
-                              id="logo-upload"
-                              type="file"
-                              className="sr-only"
-                              accept="image/*"
-                              onBlur={field.onBlur}
-                              name={field.name}
-                              onChange={(e) => {
-                                field.onChange(e.target.files);
-                              }}
-                              ref={field.ref}
-                              disabled
-                            />
-                          </div>
-                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>

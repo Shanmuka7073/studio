@@ -1,13 +1,23 @@
+'use client'
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import { CheckCircle } from 'lucide-react';
 import ProductSuggestions from '@/components/product-suggestions';
+import { useFirebase } from '@/firebase';
+import { getProduct } from '@/lib/data';
+import { Product } from '@/lib/types';
 
 export default function OrderConfirmationPage() {
+  const { firestore } = useFirebase();
   // In a real app, you'd fetch order details using an ID from the URL.
   // For now, we'll just show a generic success message.
   const pastPurchases = ['1', '6']; // Mock past purchases for AI suggestions
+
+  const resolveProduct = async (productId: string): Promise<Product | undefined> => {
+    if (!firestore) return undefined;
+    return await getProduct(firestore, productId);
+  };
 
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
@@ -39,6 +49,7 @@ export default function OrderConfirmationPage() {
         <ProductSuggestions
           pastPurchases={pastPurchases}
           optimalDisplayTime="After Checkout"
+          resolveProduct={resolveProduct}
         />
       </div>
     </div>

@@ -1,12 +1,31 @@
-
+'use client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { getStores } from '@/lib/data';
 import { MapPin } from 'lucide-react';
 import StoreCard from '@/components/store-card';
+import { useFirebase } from '@/firebase';
+import { Store } from '@/lib/types';
+import { useEffect, useState } from 'react';
 
 export default function Home() {
-  const featuredStores = getStores().slice(0, 3);
+  const { firestore } = useFirebase();
+  const [featuredStores, setFeaturedStores] = useState<Store[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (firestore) {
+      getStores(firestore)
+        .then((stores) => {
+          setFeaturedStores(stores.slice(0, 3));
+          setLoading(false);
+        })
+        .catch((err) => {
+          console.error(err);
+          setLoading(false);
+        });
+    }
+  }, [firestore]);
 
   return (
     <div className="flex flex-col">
@@ -63,9 +82,13 @@ export default function Home() {
             </div>
           </div>
           <div className="mx-auto grid grid-cols-1 gap-6 py-12 sm:grid-cols-2 lg:grid-cols-3">
-            {featuredStores.map((store) => (
-              <StoreCard key={store.id} store={store} />
-            ))}
+            {loading ? (
+              <p>Loading stores...</p>
+            ) : (
+              featuredStores.map((store) => (
+                <StoreCard key={store.id} store={store} />
+              ))
+            )}
           </div>
         </div>
       </section>
