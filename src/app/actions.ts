@@ -140,7 +140,7 @@ export async function getOrdersAction({ by, value }: GetOrdersParams): Promise<O
       } as Order;
     });
 
-    // Sort manually after fetching
+    // Sort manually after fetching to show most recent orders first
     orders.sort((a, b) => new Date(b.orderDate as string).getTime() - new Date(a.orderDate as string).getTime());
 
     return orders;
