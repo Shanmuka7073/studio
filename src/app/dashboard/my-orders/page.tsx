@@ -28,11 +28,11 @@ export default function MyOrdersPage() {
         setIsLoading(false);
       }
     }
+    
+    // We run the effect when the user object is available, not just when loading is finished.
+    fetchOrders();
 
-    if (!isUserLoading) {
-      fetchOrders();
-    }
-  }, [user, isUserLoading]);
+  }, [user]);
 
   const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
     switch (status) {
