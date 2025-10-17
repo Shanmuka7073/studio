@@ -13,29 +13,7 @@ const getImage = (id: string) => {
   );
 };
 
-let stores: Store[] = [
-  {
-    id: '1',
-    name: 'Green Valley Organics',
-    description: 'Fresh, organic produce and pantry staples.',
-    address: '123 Green St, Springfield',
-    imageId: 'store-1',
-  },
-  {
-    id: '2',
-    name: 'City Fresh Produce',
-    description: 'The best fruits and vegetables from local farms.',
-    address: '456 Market Ave, Springfield',
-    imageId: 'store-2',
-  },
-  {
-    id: '3',
-    name: 'The Corner Grocer',
-    description: 'Your friendly neighborhood grocery store.',
-    address: '789 Main St, Springfield',
-    imageId: 'store-3',
-  },
-];
+let stores: Store[] = [];
 
 const products: Product[] = [
   // Green Valley Organics
