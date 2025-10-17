@@ -15,7 +15,8 @@ export default function DeliveriesPage() {
   useEffect(() => {
     async function fetchDeliveries() {
       setIsLoading(true);
-      const fetchedOrders = await getOrdersAction({ by: 'deliveryStatus', value: 'Out for Delivery' });
+      // Fetch pending orders for delivery partners
+      const fetchedOrders = await getOrdersAction({ by: 'deliveryStatus', value: 'Pending' });
       setDeliveries(fetchedOrders);
       setIsLoading(false);
     }
@@ -32,13 +33,13 @@ export default function DeliveriesPage() {
       <h1 className="text-4xl font-bold mb-8 font-headline">Active Deliveries</h1>
       <Card>
         <CardHeader>
-          <CardTitle>Orders to Deliver</CardTitle>
+          <CardTitle>New Orders to Deliver</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <p>Loading deliveries...</p>
           ) : !deliveries || deliveries.length === 0 ? (
-            <p className="text-muted-foreground">No orders are currently out for delivery.</p>
+            <p className="text-muted-foreground">No new orders are currently available for delivery.</p>
           ) : (
             <Table>
               <TableHeader>

@@ -129,25 +129,22 @@ export default function CheckoutPage() {
             }))
         };
 
-        try {
-            const ordersCol = collection(firestore, 'orders');
-            await addDoc(ordersCol, orderData);
-            
+        const ordersCol = collection(firestore, 'orders');
+        addDoc(ordersCol, orderData).then(() => {
             clearCart();
             toast({
                 title: "Order Placed!",
                 description: "Thank you for your purchase.",
             });
             router.push('/order-confirmation');
-
-        } catch (e) {
-            console.error('Error placing order:', e);
-            errorEmitter.emit('permission-error', new FirestorePermissionError({
-                path: 'orders',
+        }).catch((e) => {
+             console.error('Error placing order:', e);
+             errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: ordersCol.path,
                 operation: 'create',
                 requestResourceData: orderData
             }));
-        }
+        });
     });
   };
 
