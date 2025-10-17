@@ -19,64 +19,67 @@ export function CartSheetContent() {
       <SheetHeader>
         <SheetTitle>Shopping Cart ({cartCount})</SheetTitle>
       </SheetHeader>
-      <ScrollArea className="h-[calc(100vh-150px)] pr-4">
-        {cartItems.length > 0 ? (
-          <div className="flex flex-col gap-4 py-4">
-            {cartItems.map(({ product, quantity }) => {
-                const image = getProductImage(product.imageId);
-                return(
-              <div key={product.id} className="flex items-center gap-4 w-full">
-                <Image
-                  src={image.imageUrl}
-                  alt={product.name}
-                  data-ai-hint={image.imageHint}
-                  width={64}
-                  height={64}
-                  className="rounded-md object-cover"
-                />
-                <div className="flex-1 grid gap-1.5">
-                  <p className="font-medium leading-tight">{product.name}</p>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      min="1"
-                      value={quantity}
-                      onChange={(e) => updateQuantity(product.id, parseInt(e.target.value) || 1)}
-                      className="w-16 h-8 text-center"
-                      aria-label={`Quantity for ${product.name}`}
-                    />
-                     <p className="text-sm font-semibold">${(product.price * quantity).toFixed(2)}</p>
+      
+      <div className="flex flex-col h-[calc(100vh-8rem)]">
+        <ScrollArea className="flex-1 pr-4">
+          {cartItems.length > 0 ? (
+            <div className="flex flex-col gap-4 py-4">
+              {cartItems.map(({ product, quantity }) => {
+                  const image = getProductImage(product.imageId);
+                  return(
+                <div key={product.id} className="flex items-center gap-4 w-full">
+                  <Image
+                    src={image.imageUrl}
+                    alt={product.name}
+                    data-ai-hint={image.imageHint}
+                    width={64}
+                    height={64}
+                    className="rounded-md object-cover"
+                  />
+                  <div className="flex-1 grid gap-1.5">
+                    <p className="font-medium leading-tight">{product.name}</p>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min="1"
+                        value={quantity}
+                        onChange={(e) => updateQuantity(product.id, parseInt(e.target.value) || 1)}
+                        className="w-16 h-8 text-center"
+                        aria-label={`Quantity for ${product.name}`}
+                      />
+                      <p className="text-sm font-semibold">${(product.price * quantity).toFixed(2)}</p>
+                    </div>
                   </div>
+                  <Button variant="ghost" size="icon" onClick={() => removeItem(product.id)}>
+                    <Trash2 className="h-4 w-4" />
+                    <span className="sr-only">Remove {product.name}</span>
+                  </Button>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => removeItem(product.id)}>
-                  <Trash2 className="h-4 w-4" />
-                   <span className="sr-only">Remove {product.name}</span>
-                </Button>
-              </div>
-            )})}
-          </div>
-        ) : (
-          <div className="flex h-full items-center justify-center">
-            <p>Your cart is empty.</p>
-          </div>
-        )}
-      </ScrollArea>
-      {cartItems.length > 0 && (
-        <SheetFooter>
-          <div className="w-full space-y-4">
-            <Separator />
-            <div className="flex justify-between font-bold text-lg">
-              <span>Total</span>
-              <span>${cartTotal.toFixed(2)}</span>
+              )})}
             </div>
-            <SheetClose asChild>
-                <Button asChild className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-                    <Link href="/cart">Proceed to Checkout</Link>
-                </Button>
-            </SheetClose>
-          </div>
-        </SheetFooter>
-      )}
+          ) : (
+            <div className="flex h-full items-center justify-center">
+              <p>Your cart is empty.</p>
+            </div>
+          )}
+        </ScrollArea>
+        {cartItems.length > 0 && (
+          <SheetFooter className="mt-auto">
+            <div className="w-full space-y-4">
+              <Separator />
+              <div className="flex justify-between font-bold text-lg">
+                <span>Total</span>
+                <span>${cartTotal.toFixed(2)}</span>
+              </div>
+              <SheetClose asChild>
+                  <Button asChild className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
+                      <Link href="/cart">Proceed to Checkout</Link>
+                  </Button>
+              </SheetClose>
+            </div>
+          </SheetFooter>
+        )}
+      </div>
     </>
   );
 }
