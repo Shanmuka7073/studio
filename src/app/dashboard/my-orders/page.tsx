@@ -28,7 +28,7 @@ export default function MyOrdersPage() {
       }
     }
     
-    if (!isUserLoading) {
+    if (!isUserLoading && user) {
         fetchOrders();
     }
 
