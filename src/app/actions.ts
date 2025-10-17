@@ -21,7 +21,7 @@ export async function getRecommendationsAction(
 }
 
 export async function createStoreAction(
-  storeData: Omit<Store, 'id' | 'imageId'>
+  storeData: Omit<Store, 'imageId'> & { id: string }
 ) {
   try {
     // In a real app, you'd handle image uploads properly.

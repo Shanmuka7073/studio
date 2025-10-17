@@ -230,13 +230,16 @@ export const getStores = (): Store[] => stores;
 export const getStore = (id: string): Store | undefined =>
   stores.find((s) => s.id === id);
 
-export const createStore = (storeData: Omit<Store, 'id'>): Store => {
-  const newStore: Store = {
-    ...storeData,
-    id: (stores.length + 1).toString(), // Simple ID generation
-  };
-  stores.push(newStore);
-  return newStore;
+export const createStore = (storeData: Store): Store => {
+  const existingStore = stores.find(s => s.id === storeData.id);
+  if (existingStore) {
+    // Update existing store
+    stores = stores.map(s => s.id === storeData.id ? storeData : s);
+    return storeData;
+  }
+  // Add new store
+  stores.push(storeData);
+  return storeData;
 };
 
 export const getProducts = (storeId?: string): Product[] => {

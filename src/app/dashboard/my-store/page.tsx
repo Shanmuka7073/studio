@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -26,6 +26,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Upload } from 'lucide-react';
 import { createStoreAction } from '@/app/actions';
 import type { Store } from '@/lib/types';
+import { getStore } from '@/lib/data';
 
 const storeSchema = z.object({
   name: z.string().min(3, 'Store name must be at least 3 characters'),
@@ -39,11 +40,23 @@ const storeSchema = z.object({
 
 type StoreFormValues = z.infer<typeof storeSchema>;
 
+// In a real app, this would be the logged-in user's store ID.
+// We'll hardcode it for now to simulate a user owning store '4'.
+const MY_STORE_ID = '4';
+
 export default function MyStorePage() {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
-  // We'll track the created store in state
   const [myStore, setMyStore] = useState<Store | null>(null);
+
+  useEffect(() => {
+    // Check if the user's store already exists when the component loads.
+    const existingStore = getStore(MY_STORE_ID);
+    if (existingStore) {
+      setMyStore(existingStore);
+    }
+  }, []);
+
 
   const form = useForm<StoreFormValues>({
     resolver: zodResolver(storeSchema),
@@ -56,7 +69,11 @@ export default function MyStorePage() {
 
   const onSubmit = (data: StoreFormValues) => {
     startTransition(async () => {
-      const result = await createStoreAction(data);
+      // We pass the hardcoded ID to the action
+      const result = await createStoreAction({
+        ...data,
+        id: MY_STORE_ID,
+      });
       if (result.success && result.store) {
         toast({
           title: 'Store Created!',
