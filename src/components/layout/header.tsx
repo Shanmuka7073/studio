@@ -1,12 +1,29 @@
 'use client';
 
 import Link from 'next/link';
-import { Package2, Menu } from 'lucide-react';
+import { Package2, Menu, UserCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from '@/components/ui/sheet';
 import { CartIcon } from '@/components/cart/cart-icon';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { useFirebase } from '@/firebase';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { getAuth, signOut } from 'firebase/auth';
 
 const navLinks = [
   { href: '/', label: 'Home' },
@@ -14,6 +31,45 @@ const navLinks = [
   { href: '/dashboard/my-store', label: 'My Store' },
   { href: '/dashboard/orders', label: 'Orders' },
 ];
+
+function UserMenu() {
+  const { user, isUserLoading } = useFirebase();
+
+  const handleLogout = async () => {
+    const auth = getAuth();
+    await signOut(auth);
+  };
+
+  if (isUserLoading) {
+    return null; // Or a loading spinner
+  }
+
+  if (!user) {
+    return (
+      <Button asChild variant="outline">
+        <Link href="/login">Login</Link>
+      </Button>
+    );
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="secondary" size="icon" className="rounded-full">
+          <UserCircle className="h-5 w-5" />
+          <span className="sr-only">Toggle user menu</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel>My Account</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem disabled>{user.email}</DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 export function Header() {
   const pathname = usePathname();
@@ -50,8 +106,10 @@ export function Header() {
         </SheetTrigger>
         <SheetContent side="left">
           <SheetHeader>
-             <SheetTitle>Menu</SheetTitle>
-             <SheetDescription className="sr-only">Navigation links for mobile view</SheetDescription>
+            <SheetTitle>Menu</SheetTitle>
+            <SheetDescription className="sr-only">
+              Navigation links for mobile view
+            </SheetDescription>
           </SheetHeader>
           <nav className="grid gap-6 text-lg font-medium mt-4">
             <Link
@@ -67,7 +125,9 @@ export function Header() {
                 href={href}
                 className={cn(
                   'hover:text-foreground',
-                  pathname === href ? 'text-foreground' : 'text-muted-foreground'
+                  pathname === href
+                    ? 'text-foreground'
+                    : 'text-muted-foreground'
                 )}
               >
                 {label}
@@ -78,6 +138,7 @@ export function Header() {
       </Sheet>
       <div className="flex w-full items-center justify-end gap-4 md:ml-auto md:gap-2 lg:gap-4">
         <CartIcon />
+        <UserMenu />
       </div>
     </header>
   );

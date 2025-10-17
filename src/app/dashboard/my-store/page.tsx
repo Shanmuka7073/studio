@@ -27,6 +27,8 @@ import { createStoreAction, createProductAction } from '@/app/actions';
 import type { Store, Product } from '@/lib/types';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
+import { useRouter } from 'next/navigation';
+
 
 import {
   Table,
@@ -209,6 +211,13 @@ export default function MyStorePage() {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const { firestore, user, isUserLoading } = useFirebase();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.push('/login?redirectTo=/dashboard/my-store');
+    }
+  }, [isUserLoading, user, router]);
 
   const storeQuery = useMemoFirebase(() => {
       if (!firestore || !user) return null;

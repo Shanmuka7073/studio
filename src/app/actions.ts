@@ -32,6 +32,7 @@ export async function createStoreAction(
 
     revalidatePath('/');
     revalidatePath('/stores');
+    revalidatePath('/dashboard/my-store');
 
     return { success: true, store: newStore };
   } catch (error) {
