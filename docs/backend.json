@@ -1,0 +1,381 @@
+{
+  "entities": {
+    "Store": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Store",
+      "type": "object",
+      "description": "Represents a local store that lists products on LocalBasket.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Store entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the store."
+        },
+        "description": {
+          "type": "string",
+          "description": "A brief description of the store."
+        },
+        "location": {
+          "type": "string",
+          "description": "The physical address or location details of the store."
+        },
+        "ownerName": {
+          "type": "string",
+          "description": "Name of the owner of the store"
+        },
+        "contactNumber": {
+          "type": "string",
+          "description": "Contact number of the store"
+        },
+        "openingHours": {
+          "type": "string",
+          "description": "String representing the store's opening hours"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "location",
+        "ownerName",
+        "contactNumber",
+        "openingHours"
+      ]
+    },
+    "Product": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Product",
+      "type": "object",
+      "description": "Represents a product listed by a store.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Product entity."
+        },
+        "storeId": {
+          "type": "string",
+          "description": "Reference to Store. (Relationship: Store 1:N Product)"
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the product."
+        },
+        "description": {
+          "type": "string",
+          "description": "A detailed description of the product."
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "URL of the product image."
+        },
+        "price": {
+          "type": "number",
+          "description": "The price of the product."
+        },
+        "category": {
+          "type": "string",
+          "description": "Category the product falls under."
+        },
+        "quantity": {
+          "type": "number",
+          "description": "Available quantity of the product in the store."
+        }
+      },
+      "required": [
+        "id",
+        "storeId",
+        "name",
+        "description",
+        "imageUrl",
+        "price",
+        "category",
+        "quantity"
+      ]
+    },
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the LocalBasket application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "firstName": {
+          "type": "string",
+          "description": "The first name of the user."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "The last name of the user."
+        },
+        "email": {
+          "type": "string",
+          "description": "The email address of the user.",
+          "format": "email"
+        },
+        "address": {
+          "type": "string",
+          "description": "The address of the user."
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "The phone number of the user."
+        }
+      },
+      "required": [
+        "id",
+        "firstName",
+        "lastName",
+        "email",
+        "address",
+        "phoneNumber"
+      ]
+    },
+    "Order": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Order",
+      "type": "object",
+      "description": "Represents an order placed by a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Order entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Order)"
+        },
+        "storeId": {
+          "type": "string",
+          "description": "Reference to Store. (Relationship: Store 1:N Order)"
+        },
+        "orderDate": {
+          "type": "string",
+          "description": "The date and time the order was placed.",
+          "format": "date-time"
+        },
+        "totalAmount": {
+          "type": "number",
+          "description": "The total amount of the order."
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the order (e.g., pending, processing, delivered)."
+        },
+        "deliveryAddress": {
+          "type": "string",
+          "description": "Delivery address for the order."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "storeId",
+        "orderDate",
+        "totalAmount",
+        "status",
+        "deliveryAddress"
+      ]
+    },
+    "OrderItem": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "OrderItem",
+      "type": "object",
+      "description": "Represents an item within an order.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the OrderItem entity."
+        },
+        "orderId": {
+          "type": "string",
+          "description": "Reference to Order. (Relationship: Order 1:N OrderItem)"
+        },
+        "productId": {
+          "type": "string",
+          "description": "Reference to Product. (Relationship: Product 1:N OrderItem)"
+        },
+        "quantity": {
+          "type": "number",
+          "description": "The quantity of the product in the order item."
+        },
+        "price": {
+          "type": "number",
+          "description": "The price of the product at the time of the order."
+        }
+      },
+      "required": [
+        "id",
+        "orderId",
+        "productId",
+        "quantity",
+        "price"
+      ]
+    },
+    "ProductRecommendation": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ProductRecommendation",
+      "type": "object",
+      "description": "Represents a product recommendation for a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the ProductRecommendation entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N ProductRecommendation)"
+        },
+        "productId": {
+          "type": "string",
+          "description": "Reference to Product. (Relationship: Product 1:N ProductRecommendation)"
+        },
+        "recommendationReason": {
+          "type": "string",
+          "description": "The reason for the product recommendation (e.g., 'Based on past purchases', 'Frequently bought together')."
+        },
+        "recommendationScore": {
+          "type": "number",
+          "description": "A score indicating the relevance of the recommendation."
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "The time the recommendation was generated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "productId",
+        "recommendationReason",
+        "recommendationScore",
+        "timestamp"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profile data. Accessible only by the user themselves.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/stores/{storeId}",
+        "definition": {
+          "entityName": "Store",
+          "schema": {
+            "$ref": "#/backend/entities/Store"
+          },
+          "description": "Stores data related to each store.",
+          "params": [
+            {
+              "name": "storeId",
+              "description": "The unique identifier of the store."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/stores/{storeId}/products/{productId}",
+        "definition": {
+          "entityName": "Product",
+          "schema": {
+            "$ref": "#/backend/entities/Product"
+          },
+          "description": "Stores product information for each store.  Includes denormalized 'storeId' for authorization independence.",
+          "params": [
+            {
+              "name": "storeId",
+              "description": "The unique identifier of the store."
+            },
+            {
+              "name": "productId",
+              "description": "The unique identifier of the product."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/orders/{orderId}",
+        "definition": {
+          "entityName": "Order",
+          "schema": {
+            "$ref": "#/backend/entities/Order"
+          },
+          "description": "Stores order information. Includes denormalized 'userId' and 'storeId' for querying and security rules.",
+          "params": [
+            {
+              "name": "orderId",
+              "description": "The unique identifier of the order."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/orders/{orderId}/orderItems/{orderItemId}",
+        "definition": {
+          "entityName": "OrderItem",
+          "schema": {
+            "$ref": "#/backend/entities/OrderItem"
+          },
+          "description": "Stores order item information for each order. Includes denormalized 'orderId' for authorization independence.",
+          "params": [
+            {
+              "name": "orderId",
+              "description": "The unique identifier of the order."
+            },
+            {
+              "name": "orderItemId",
+              "description": "The unique identifier of the order item."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/productRecommendations/{productRecommendationId}",
+        "definition": {
+          "entityName": "ProductRecommendation",
+          "schema": {
+            "$ref": "#/backend/entities/ProductRecommendation"
+          },
+          "description": "Stores product recommendations for each user. Includes denormalized 'userId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            },
+            {
+              "name": "productRecommendationId",
+              "description": "The unique identifier of the product recommendation."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to support LocalBasket's core features (Product Listings, Store Browsing, Order Placement, and AI Product Suggestions) while prioritizing security, scalability, and debuggability. The design adheres to the core principles of Authorization Independence, Clarity of Intent, DBAC, and QAPs.\n\n**Authorization Independence:** Denormalization is extensively used to avoid `get()` calls in security rules. For instance, access to products within a store is determined by the store's attributes which would be copied into product document upon creation.\n\n**Structural Segregation:** Data with different access needs is stored in separate collections. User profiles are stored under `/users/{userId}` for private access, while stores are stored in a separate `/stores` collection.\n\n**Access Modeling:**\n*   **User Data:** User-specific data (e.g., user profiles) are stored under `/users/{userId}`.\n*   **Store Data:** Store data is stored in the `/stores/{storeId}` collection.\n*   **Order Data:** Orders are stored under `/orders/{orderId}`, with denormalized `userId` and `storeId` to simplify querying and security rules.\n\n**QAPs (Rules are not Filters):** The structure facilitates secure `list` operations by segregating data based on access requirements. For example, listing products is always performed against the `/stores/{storeId}/products` collection, where rules can be applied to filter based on the current user's role or store membership.\n\n**Invariants:** The structure supports data integrity by enforcing ownership and relationships through path-based ownership and denormalization. Timestamps can be added to documents to track creation and modification times and secure them with rules to prevent tampering."
+  }
+}
