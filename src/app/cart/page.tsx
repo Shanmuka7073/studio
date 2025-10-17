@@ -11,13 +11,10 @@ import { getProductImage } from '@/lib/data';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import ProductSuggestions from '@/components/product-suggestions';
 import { useFirebase } from '@/firebase';
-import { getProduct } from '@/lib/data';
-import { Product } from '@/lib/types';
 
 export default function CartPage() {
   const { cartItems, removeItem, updateQuantity, cartTotal, cartCount } = useCart();
-  const cartProductIds = cartItems.map(item => item.product.id);
-  const {firestore} = useFirebase();
+  const cartProductRefs = cartItems.map(item => ({ productId: item.product.id, storeId: item.product.storeId }));
 
   if (cartCount === 0) {
     return (
@@ -29,17 +26,6 @@ export default function CartPage() {
         </Button>
       </div>
     );
-  }
-
-  const resolveProduct = async (productId: string) => {
-    if (!firestore) return undefined;
-    // This logic might need adjustment depending on how products are resolved globally
-    // For now, assuming we can't know the storeId from just the productId
-    console.warn("Resolving product by ID without storeId, this may be inefficient or incorrect.");
-    // A better approach would be to have product IDs be globally unique or store storeId with cart item.
-    // As a placeholder, this won't work correctly with the new subcollection structure.
-    // We will need to address this. For now, suggestions might be broken.
-    return undefined;
   }
 
   return (
@@ -127,14 +113,11 @@ export default function CartPage() {
                 </CardContent>
             </Card>
             <ProductSuggestions
-              currentCartItems={cartProductIds}
+              currentCartItems={cartProductRefs}
               optimalDisplayTime="During Checkout"
-              resolveProduct={resolveProduct}
             />
         </div>
       </div>
     </div>
   );
 }
-
-    

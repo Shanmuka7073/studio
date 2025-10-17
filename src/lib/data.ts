@@ -1,4 +1,4 @@
-import type { Store, Product, Order } from './types';
+import type { Store, Product } from './types';
 import placeholderData from './placeholder-images.json';
 import {
   collection,
@@ -7,6 +7,8 @@ import {
   getDocs,
   query,
   Firestore,
+  collectionGroup,
+  where,
 } from 'firebase/firestore';
 
 const { placeholderImages } = placeholderData;
@@ -71,12 +73,55 @@ export async function getProduct(
   return undefined;
 }
 
+export async function getProductsByIds(
+  productRefs: { productId: string; storeId: string }[]
+): Promise<Product[]> {
+  if (typeof window !== 'undefined') {
+    throw new Error('getProductsByIds should only be called on the server');
+  }
+
+  // This is a server-side function, we need to initialize admin app
+  const { getFirestore } = await import('firebase-admin/firestore');
+  const { initializeApp, getApps, cert } = await import('firebase-admin/app');
+
+  const serviceAccount = JSON.parse(
+    process.env.FIREBASE_SERVICE_ACCOUNT_KEY as string
+  );
+
+  if (!getApps().length) {
+    initializeApp({
+      credential: cert(serviceAccount),
+    });
+  }
+
+  const adminDb = getFirestore();
+
+  const products: Product[] = [];
+  for (const { productId, storeId } of productRefs) {
+    try {
+      const productSnap = await adminDb
+        .collection('stores')
+        .doc(storeId)
+        .collection('products')
+        .doc(productId)
+        .get();
+      if (productSnap.exists) {
+        products.push({
+          id: productSnap.id,
+          ...productSnap.data(),
+        } as Product);
+      }
+    } catch (error) {
+      console.error(
+        `Failed to fetch product ${productId} from store ${storeId}`,
+        error
+      );
+    }
+  }
+  return products;
+}
+
 // --- Keeping placeholder image functions ---
 
 export const getProductImage = (imageId: string) => getImage(imageId);
 export const getStoreImage = (imageId: string) => getImage(imageId);
-
-// Note: The mock `getOrders` function is now obsolete as orders are fetched directly from Firestore.
-// It is left here to prevent breaking any components that might still reference it before being updated.
-const MOCK_ORDERS: any[] = [];
-export const getOrders = (): any[] => MOCK_ORDERS;
