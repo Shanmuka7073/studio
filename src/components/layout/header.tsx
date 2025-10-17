@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Package2, Menu, UserCircle } from 'lucide-react';
+import { Package2, Menu, UserCircle, Store, ShoppingBag, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -9,7 +9,6 @@ import {
   SheetTrigger,
   SheetHeader,
   SheetTitle,
-  SheetDescription,
 } from '@/components/ui/sheet';
 import { CartIcon } from '@/components/cart/cart-icon';
 import { usePathname } from 'next/navigation';
@@ -22,23 +21,33 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu';
 import { getAuth, signOut } from 'firebase/auth';
+import { useState } from 'react';
 
 const navLinks = [
   { href: '/', label: 'Home' },
   { href: '/stores', label: 'Stores' },
 ];
 
-const dashboardLinks = [
-    { href: '/dashboard/my-orders', label: 'My Orders'},
-    { href: '/dashboard/my-store', label: 'My Store' },
-    { href: '/dashboard/orders', label: 'Store Orders' },
-    { href: '/dashboard/deliveries', label: 'Deliveries' },
+const customerLinks = [
+    { href: '/dashboard/my-orders', label: 'My Orders', icon: ShoppingBag},
 ]
+
+const ownerLinks = [
+    { href: '/dashboard/my-store', label: 'My Store', icon: Store },
+    { href: '/dashboard/orders', label: 'Store Orders', icon: ShoppingBag },
+]
+
+const deliveryLinks = [
+    { href: '/dashboard/deliveries', label: 'Deliveries', icon: Truck },
+]
+
 
 function UserMenu() {
   const { user, isUserLoading } = useFirebase();
+  const [isOwnerView, setIsOwnerView] = useState(false);
 
   const handleLogout = async () => {
     const auth = getAuth();
@@ -46,7 +55,7 @@ function UserMenu() {
   };
 
   if (isUserLoading) {
-    return null; // Or a loading spinner
+    return <Skeleton className="h-10 w-10 rounded-full" />;
   }
 
   if (!user) {
@@ -56,6 +65,8 @@ function UserMenu() {
       </Button>
     );
   }
+
+  const visibleDashboardLinks = isOwnerView ? [...ownerLinks, ...deliveryLinks] : customerLinks;
 
   return (
     <DropdownMenu>
@@ -67,12 +78,22 @@ function UserMenu() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>My Account</DropdownMenuLabel>
-        <DropdownMenuSeparator />
         <DropdownMenuItem disabled>{user.email}</DropdownMenuItem>
         <DropdownMenuSeparator />
-        {dashboardLinks.map(({ href, label }) => (
+        <DropdownMenuCheckboxItem
+            checked={isOwnerView}
+            onCheckedChange={setIsOwnerView}
+        >
+            Store Owner/Partner View
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>Dashboard</DropdownMenuLabel>
+        {visibleDashboardLinks.map(({ href, label, icon: Icon }) => (
              <Link key={href} href={href} passHref>
-                <DropdownMenuItem>{label}</DropdownMenuItem>
+                <DropdownMenuItem>
+                    <Icon className="mr-2 h-4 w-4" />
+                    <span>{label}</span>
+                </DropdownMenuItem>
              </Link>
         ))}
         <DropdownMenuSeparator />
@@ -81,6 +102,12 @@ function UserMenu() {
     </DropdownMenu>
   );
 }
+
+// Add Skeleton component for loading state
+function Skeleton({ className }: { className?: string }) {
+  return <div className={cn('animate-pulse rounded-md bg-muted', className)} />;
+}
+
 
 export function Header() {
   const pathname = usePathname();
@@ -118,9 +145,6 @@ export function Header() {
         <SheetContent side="left">
           <SheetHeader>
             <SheetTitle>Menu</SheetTitle>
-            <SheetDescription className="sr-only">
-              Navigation links for mobile view
-            </SheetDescription>
           </SheetHeader>
           <nav className="grid gap-6 text-lg font-medium mt-4">
             <Link
@@ -130,7 +154,7 @@ export function Header() {
               <Package2 className="h-6 w-6 text-primary" />
               <span className="sr-only">LocalBasket</span>
             </Link>
-            {[...navLinks, ...dashboardLinks].map(({ href, label }) => (
+            {navLinks.map(({ href, label }) => (
               <Link
                 key={href}
                 href={href}
@@ -144,6 +168,21 @@ export function Header() {
                 {label}
               </Link>
             ))}
+             <div className="border-t pt-4">
+                <p className="px-2 text-sm font-medium text-muted-foreground">My Account</p>
+                <div className="grid gap-2 mt-2">
+                    {[...customerLinks, ...ownerLinks, ...deliveryLinks].map(({ href, label, icon: Icon }) => (
+                    <Link
+                        key={href}
+                        href={href}
+                        className="flex items-center gap-3 rounded-lg px-2 py-2 text-muted-foreground transition-all hover:text-primary"
+                    >
+                        <Icon className="h-4 w-4" />
+                        {label}
+                    </Link>
+                    ))}
+                </div>
+            </div>
           </nav>
         </SheetContent>
       </Sheet>
