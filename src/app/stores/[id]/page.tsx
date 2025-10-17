@@ -12,15 +12,16 @@ export default function StoreDetailPage({ params }: { params: { id: string } }) 
   const [store, setStore] = useState<Store | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const { id } = params;
 
   useEffect(() => {
     if (firestore) {
       const fetchStoreData = async () => {
         setLoading(true);
-        const storeData = await getStore(firestore, params.id);
+        const storeData = await getStore(firestore, id);
         if (storeData) {
           setStore(storeData as Store);
-          const productData = await getProducts(firestore, params.id);
+          const productData = await getProducts(firestore, id);
           setProducts(productData);
         } else {
           notFound();
@@ -29,7 +30,7 @@ export default function StoreDetailPage({ params }: { params: { id: string } }) 
       };
       fetchStoreData();
     }
-  }, [firestore, params.id]);
+  }, [firestore, id]);
 
   if (loading) {
     return <div className="container mx-auto py-12 px-4 md:px-6">Loading...</div>;
@@ -68,5 +69,3 @@ export default function StoreDetailPage({ params }: { params: { id: string } }) 
     </div>
   );
 }
-
-    
