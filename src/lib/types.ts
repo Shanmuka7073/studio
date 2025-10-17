@@ -46,4 +46,6 @@ export type Order = {
   totalAmount: number;
   status: 'Pending' | 'Processing' | 'Out for Delivery' | 'Delivered';
   orderDate: Timestamp | Date | string; // Allow string for serialized format
+  phone: string;
+  email: string;
 };
