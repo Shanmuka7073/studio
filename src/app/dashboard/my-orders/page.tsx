@@ -21,15 +21,24 @@ export default function MyOrdersPage() {
     async function fetchOrders() {
       if (user) {
         setIsLoading(true);
-        const fetchedOrders = await getOrdersAction({ by: 'userId', value: user.uid });
-        // The dates from the server action are already ISO strings.
-        setOrders(fetchedOrders);
-        setIsLoading(false);
+        try {
+            const fetchedOrders = await getOrdersAction({ by: 'userId', value: user.uid });
+            setOrders(fetchedOrders);
+        } catch (error) {
+            console.error("Failed to fetch user orders:", error);
+            setOrders([]); // Clear orders on error
+        } finally {
+            setIsLoading(false);
+        }
       }
     }
     
+    // Only fetch orders when the user object is available and not loading.
     if (!isUserLoading && user) {
         fetchOrders();
+    } else if (!isUserLoading && !user) {
+        // If not loading and no user, no orders to fetch.
+        setIsLoading(false);
     }
 
   }, [user, isUserLoading]);
@@ -44,6 +53,7 @@ export default function MyOrdersPage() {
     }
   }
 
+  // The page is loading if the user state is loading OR if we are fetching orders.
   const effectiveLoading = isLoading || isUserLoading;
 
   return (
@@ -56,7 +66,14 @@ export default function MyOrdersPage() {
         <CardContent>
           {effectiveLoading ? (
             <p>Loading your orders...</p>
-          ) : !orders || orders.length === 0 ? (
+          ) : !user ? (
+            <div className="text-center py-12">
+                <p className="text-muted-foreground mb-4">Please log in to see your orders.</p>
+                <Button asChild>
+                    <Link href="/login">Login</Link>
+                </Button>
+            </div>
+          ) : orders.length === 0 ? (
             <div className="text-center py-12">
                 <p className="text-muted-foreground mb-4">You haven't placed any orders yet.</p>
                 <Button asChild>

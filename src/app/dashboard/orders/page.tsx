@@ -10,6 +10,8 @@ import { format, parseISO } from 'date-fns';
 import { useState, useEffect } from 'react';
 import { getOrdersAction } from '@/app/actions';
 import { useCollection, useMemoFirebase } from '@/firebase';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 
 export default function OrdersDashboardPage() {
@@ -42,9 +44,12 @@ export default function OrdersDashboardPage() {
         }
     }
     
-    // This effect runs when the store is found or when the user changes.
+    // This effect runs when the store is found.
     if (!isStoreLoading && myStore) {
         fetchOrdersForStore();
+    } else if (!isStoreLoading && !myStore) {
+        // If not loading and no store, no orders to fetch.
+        setAreOrdersLoading(false);
     }
 
   }, [myStore, isStoreLoading]);
@@ -72,8 +77,13 @@ export default function OrdersDashboardPage() {
           {isLoading ? (
             <p>Loading orders...</p>
           ) : !myStore ? (
-            <p className="text-muted-foreground">You need to create a store to see orders.</p>
-          ) : !orders || orders.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground mb-4">You need to create a store to see your orders.</p>
+              <Button asChild>
+                <Link href="/dashboard/my-store">Create Store</Link>
+              </Button>
+            </div>
+          ) : orders.length === 0 ? (
             <p className="text-muted-foreground">No orders found.</p>
           ) : (
             <Table>
