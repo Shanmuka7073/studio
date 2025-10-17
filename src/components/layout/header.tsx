@@ -11,7 +11,8 @@ import { cn } from '@/lib/utils';
 const navLinks = [
   { href: '/', label: 'Home' },
   { href: '/stores', label: 'Stores' },
-  { href: '/dashboard/orders', label: 'Dashboard' },
+  { href: '/dashboard/my-store', label: 'My Store' },
+  { href: '/dashboard/orders', label: 'Orders' },
 ];
 
 export function Header() {
@@ -48,11 +49,11 @@ export function Header() {
           </Button>
         </SheetTrigger>
         <SheetContent side="left">
-          <SheetHeader className="sr-only">
-             <SheetTitle>Mobile Menu</SheetTitle>
-             <SheetDescription>Navigation links for mobile view</SheetDescription>
+          <SheetHeader>
+             <SheetTitle>Menu</SheetTitle>
+             <SheetDescription className="sr-only">Navigation links for mobile view</SheetDescription>
           </SheetHeader>
-          <nav className="grid gap-6 text-lg font-medium">
+          <nav className="grid gap-6 text-lg font-medium mt-4">
             <Link
               href="/"
               className="flex items-center gap-2 text-lg font-semibold"
