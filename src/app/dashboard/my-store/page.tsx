@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -15,24 +15,35 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Upload } from 'lucide-react';
+import { createStoreAction } from '@/app/actions';
+import type { Store } from '@/lib/types';
 
 const storeSchema = z.object({
   name: z.string().min(3, 'Store name must be at least 3 characters'),
-  description: z.string().min(10, 'Description must be at least 10 characters'),
+  description: z
+    .string()
+    .min(10, 'Description must be at least 10 characters'),
   address: z.string().min(10, 'Please enter a valid address'),
-  logo: z.any().refine(files => files?.length === 1, 'Logo is required.'),
+  // We're not handling file uploads yet, so we can make this optional
+  // logo: z.any().refine(files => files?.length === 1, 'Logo is required.'),
 });
 
 type StoreFormValues = z.infer<typeof storeSchema>;
 
 export default function MyStorePage() {
   const { toast } = useToast();
-  // In a real app, you would fetch this from a database.
-  // We use component state to simulate store creation for now.
-  const [hasStore, setHasStore] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  // We'll track the created store in state
+  const [myStore, setMyStore] = useState<Store | null>(null);
 
   const form = useForm<StoreFormValues>({
     resolver: zodResolver(storeSchema),
@@ -44,128 +55,165 @@ export default function MyStorePage() {
   });
 
   const onSubmit = (data: StoreFormValues) => {
-    console.log('Store data submitted:', data);
-    // Here you would typically call a server action to create/update the store.
-    toast({
-      title: 'Store Created!',
-      description: `Your store "${data.name}" has been successfully created.`,
+    startTransition(async () => {
+      const result = await createStoreAction(data);
+      if (result.success && result.store) {
+        toast({
+          title: 'Store Created!',
+          description: `Your store "${result.store.name}" has been successfully created.`,
+        });
+        setMyStore(result.store);
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Error creating store',
+          description: result.error,
+        });
+      }
     });
-    setHasStore(true);
   };
-  
-  if (hasStore) {
+
+  if (myStore) {
     // Render the store management view if a store already exists.
     return (
-        <div className="container mx-auto py-12 px-4 md:px-6">
-            <h1 className="text-4xl font-bold font-headline mb-8">Manage Your Store</h1>
-            <Card>
-                <CardHeader>
-                    <CardTitle>Welcome, Store Owner!</CardTitle>
-                    <CardDescription>This is your dashboard. You can add products, view orders, and edit your store details here.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <p>Coming soon:</p>
-                    <ul className="list-disc list-inside text-muted-foreground">
-                        <li>A form to add new products to your store.</li>
-                        <li>A table to view and manage your existing products.</li>
-                        <li>An overview of incoming orders.</li>
-                    </ul>
-                     <Button className="mt-4">Add a New Product</Button>
-                </CardContent>
-            </Card>
-        </div>
-    )
+      <div className="container mx-auto py-12 px-4 md:px-6">
+        <h1 className="text-4xl font-bold font-headline mb-8">
+          Manage {myStore.name}
+        </h1>
+        <Card>
+          <CardHeader>
+            <CardTitle>Welcome, Store Owner!</CardTitle>
+            <CardDescription>
+              This is your dashboard. You can add products, view orders, and
+              edit your store details here.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p>Coming soon:</p>
+            <ul className="list-disc list-inside text-muted-foreground">
+              <li>A form to add new products to your store.</li>
+              <li>A table to view and manage your existing products.</li>
+              <li>An overview of incoming orders.</li>
+            </ul>
+            <Button className="mt-4">Add a New Product</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   // Render the create store form if no store exists.
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
-        <Card className="max-w-3xl mx-auto">
-            <CardHeader>
-                <CardTitle className="text-3xl font-headline">Create Your Store</CardTitle>
-                <CardDescription>Fill out the details below to get your shop listed on LocalBasket.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-                        <FormField
-                            control={form.control}
-                            name="name"
-                            render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Store Name</FormLabel>
-                                <FormControl>
-                                <Input placeholder="e.g., Patel Kirana Store" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                            )}
-                        />
-                         <FormField
-                            control={form.control}
-                            name="description"
-                            render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Store Description</FormLabel>
-                                <FormControl>
-                                <Textarea placeholder="Describe what makes your store special." {...field} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="address"
-                            render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Full Store Address</FormLabel>
-                                <FormControl>
-                                <Input placeholder="123 Market Street, Mumbai" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="logo"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Store Logo</FormLabel>
-                                    <FormControl>
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-full">
-                                                <label htmlFor="logo-upload" className="flex items-center gap-2 cursor-pointer rounded-md border border-input p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground">
-                                                    <Upload className="h-4 w-4" />
-                                                    <span>{field.value?.[0]?.name ?? 'Upload a file'}</span>
-                                                </label>
-                                                <Input
-                                                    id="logo-upload"
-                                                    type="file"
-                                                    className="sr-only"
-                                                    accept="image/*"
-                                                    onBlur={field.onBlur}
-                                                    name={field.name}
-                                                    onChange={(e) => {
-                                                        field.onChange(e.target.files)
-                                                    }}
-                                                    ref={field.ref}
-                                                />
-                                            </div>
-                                        </div>
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-                            Create Store
-                        </Button>
-                    </form>
-                </Form>
-            </CardContent>
-        </Card>
+      <Card className="max-w-3xl mx-auto">
+        <CardHeader>
+          <CardTitle className="text-3xl font-headline">
+            Create Your Store
+          </CardTitle>
+          <CardDescription>
+            Fill out the details below to get your shop listed on LocalBasket.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Store Name</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="e.g., Patel Kirana Store"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Store Description</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Describe what makes your store special."
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Full Store Address</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="123 Market Street, Mumbai"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="logo"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Store Logo (Optional)</FormLabel>
+                    <FormControl>
+                      <div className="flex items-center gap-4">
+                        <div className="w-full">
+                          <label
+                            htmlFor="logo-upload"
+                            className="flex items-center gap-2 cursor-pointer rounded-md border border-input p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                          >
+                            <Upload className="h-4 w-4" />
+                            <span>
+                              {field.value?.[0]?.name ?? 'Upload a file'}
+                            </span>
+                          </label>
+                          <Input
+                            id="logo-upload"
+                            type="file"
+                            className="sr-only"
+                            accept="image/*"
+                            onBlur={field.onBlur}
+                            name={field.name}
+                            onChange={(e) => {
+                              field.onChange(e.target.files);
+                            }}
+                            ref={field.ref}
+                            disabled
+                          />
+                        </div>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button
+                type="submit"
+                className="w-full bg-accent hover:bg-accent/90 text-accent-foreground"
+                disabled={isPending}
+              >
+                {isPending ? 'Creating...' : 'Create Store'}
+              </Button>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
