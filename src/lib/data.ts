@@ -4,14 +4,12 @@ import {
   collection,
   doc,
   addDoc,
-  setDoc,
   getDoc,
   getDocs,
   query,
   where,
   Firestore,
 } from 'firebase/firestore';
-import { getSdks } from '@/firebase';
 
 const { placeholderImages } = placeholderData;
 

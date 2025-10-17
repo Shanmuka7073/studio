@@ -22,13 +22,11 @@ export async function getRecommendationsAction(
 }
 
 export async function createStoreAction(
-  storeData: Omit<Store, 'id' | 'imageId'> & { imageId: string }
+  storeData: Omit<Store, 'id'>
 ) {
   try {
     const { firestore } = initializeFirebase();
-    const newStore = await createStore(firestore, {
-      ...storeData,
-    });
+    const newStore = await createStore(firestore, storeData);
 
     revalidatePath('/');
     revalidatePath('/stores');
