@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Package2, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { CartIcon } from '@/components/cart/cart-icon';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -48,6 +48,10 @@ export function Header() {
           </Button>
         </SheetTrigger>
         <SheetContent side="left">
+          <SheetHeader className="sr-only">
+             <SheetTitle>Mobile Menu</SheetTitle>
+             <SheetDescription>Navigation links for mobile view</SheetDescription>
+          </SheetHeader>
           <nav className="grid gap-6 text-lg font-medium">
             <Link
               href="/"
