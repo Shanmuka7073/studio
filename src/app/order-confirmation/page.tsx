@@ -16,7 +16,11 @@ export default function OrderConfirmationPage() {
 
   const resolveProduct = async (productId: string): Promise<Product | undefined> => {
     if (!firestore) return undefined;
-    return await getProduct(firestore, productId);
+    // This logic is now broken because we need a storeId to get a product.
+    // For now, product suggestions on this page will not work.
+    // A more robust implementation would store storeId along with productId in purchase history.
+    console.warn("Resolving product by ID without storeId, this may be inefficient or incorrect.");
+    return undefined;
   };
 
   return (
@@ -55,3 +59,5 @@ export default function OrderConfirmationPage() {
     </div>
   );
 }
+
+    

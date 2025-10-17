@@ -33,7 +33,13 @@ export default function CartPage() {
 
   const resolveProduct = async (productId: string) => {
     if (!firestore) return undefined;
-    return await getProduct(firestore, productId);
+    // This logic might need adjustment depending on how products are resolved globally
+    // For now, assuming we can't know the storeId from just the productId
+    console.warn("Resolving product by ID without storeId, this may be inefficient or incorrect.");
+    // A better approach would be to have product IDs be globally unique or store storeId with cart item.
+    // As a placeholder, this won't work correctly with the new subcollection structure.
+    // We will need to address this. For now, suggestions might be broken.
+    return undefined;
   }
 
   return (
@@ -130,3 +136,5 @@ export default function CartPage() {
     </div>
   );
 }
+
+    

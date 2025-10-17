@@ -68,3 +68,5 @@ export default function StoreDetailPage({ params }: { params: { id: string } }) 
     </div>
   );
 }
+
+    

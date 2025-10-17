@@ -23,13 +23,11 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { createProductAction, revalidateStorePaths } from '@/app/actions';
+import { revalidateStorePaths, revalidateProductPaths } from '@/app/actions';
 import type { Store, Product } from '@/lib/types';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, addDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
-
-
 import {
   Table,
   TableBody,
@@ -59,6 +57,7 @@ type ProductFormValues = z.infer<typeof productSchema>;
 function AddProductForm({ storeId }: { storeId: string }) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
+  const { firestore } = useFirebase();
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -66,27 +65,36 @@ function AddProductForm({ storeId }: { storeId: string }) {
   });
 
   const onSubmit = (data: ProductFormValues) => {
+    if (!firestore) return;
+
     startTransition(async () => {
-      const result = await createProductAction({
-        ...data,
-        storeId,
-        imageId: `prod-${Math.floor(Math.random() * 20)}`,
-        quantity: 1, // Default quantity
-        category: 'Uncategorized' // Default category
-      });
-      if (result.success && result.product) {
-        toast({
-          title: 'Product Added!',
-          description: `${result.product.name} has been added to your store.`,
-        });
-        form.reset();
-      } else {
-        toast({
-          variant: 'destructive',
-          title: 'Error adding product',
-          description: result.error,
-        });
-      }
+        try {
+            const productData = {
+                ...data,
+                storeId,
+                imageId: `prod-${Math.floor(Math.random() * 20)}`,
+                quantity: 1, // Default quantity
+                category: 'Uncategorized' // Default category
+            };
+            
+            const productsCol = collection(firestore, 'stores', storeId, 'products');
+            const newProduct = await addDoc(productsCol, productData);
+            
+            await revalidateProductPaths(storeId);
+
+            toast({
+                title: 'Product Added!',
+                description: `${data.name} has been added to your store.`,
+            });
+            form.reset();
+        } catch (error) {
+            console.error("Error creating product:", error);
+            toast({
+                variant: 'destructive',
+                title: 'Error adding product',
+                description: 'Failed to add product.',
+            });
+        }
     });
   };
 
@@ -152,7 +160,8 @@ function ManageStoreView({ store }: { store: Store }) {
 
     const productsQuery = useMemoFirebase(() => {
         if (!firestore) return null;
-        return query(collection(firestore, 'products'), where('storeId', '==', store.id));
+        // Query the 'products' subcollection of the specific store
+        return collection(firestore, 'stores', store.id, 'products');
     }, [firestore, store.id]);
 
     const { data: products, isLoading } = useCollection<Product>(productsQuery);
@@ -362,3 +371,5 @@ export default function MyStorePage() {
     </div>
   );
 }
+
+    

@@ -18,31 +18,26 @@
           "type": "string",
           "description": "A brief description of the store."
         },
-        "location": {
+        "address": {
           "type": "string",
-          "description": "The physical address or location details of the store."
+          "description": "The physical address or location of the store."
         },
-        "ownerName": {
+        "ownerId": {
           "type": "string",
-          "description": "Name of the owner of the store"
+          "description": "The UID of the user who owns the store."
         },
-        "contactNumber": {
+        "imageId": {
           "type": "string",
-          "description": "Contact number of the store"
-        },
-        "openingHours": {
-          "type": "string",
-          "description": "String representing the store's opening hours"
+          "description": "ID for the store's placeholder image."
         }
       },
       "required": [
         "id",
         "name",
         "description",
-        "location",
-        "ownerName",
-        "contactNumber",
-        "openingHours"
+        "address",
+        "ownerId",
+        "imageId"
       ]
     },
     "Product": {
@@ -67,10 +62,6 @@
           "type": "string",
           "description": "A detailed description of the product."
         },
-        "imageUrl": {
-          "type": "string",
-          "description": "URL of the product image."
-        },
         "price": {
           "type": "number",
           "description": "The price of the product."
@@ -82,17 +73,18 @@
         "quantity": {
           "type": "number",
           "description": "Available quantity of the product in the store."
+        },
+        "imageId": {
+          "type": "string",
+          "description": "ID for the product's placeholder image."
         }
       },
       "required": [
         "id",
         "storeId",
         "name",
-        "description",
-        "imageUrl",
         "price",
-        "category",
-        "quantity"
+        "imageId"
       ]
     },
     "User": {
@@ -261,8 +253,7 @@
   },
   "auth": {
     "providers": [
-      "password",
-      "anonymous"
+      "password"
     ]
   },
   "firestore": {
@@ -306,7 +297,7 @@
           "schema": {
             "$ref": "#/backend/entities/Product"
           },
-          "description": "Stores product information for each store.  Includes denormalized 'storeId' for authorization independence.",
+          "description": "Stores product information as a subcollection of a store.",
           "params": [
             {
               "name": "storeId",
@@ -375,7 +366,8 @@
           ]
         }
       }
-    ],
-    "reasoning": "The Firestore structure is designed to support LocalBasket's core features (Product Listings, Store Browsing, Order Placement, and AI Product Suggestions) while prioritizing security, scalability, and debuggability. The design adheres to the core principles of Authorization Independence, Clarity of Intent, DBAC, and QAPs.\n\n**Authorization Independence:** Denormalization is extensively used to avoid `get()` calls in security rules. For instance, access to products within a store is determined by the store's attributes which would be copied into product document upon creation.\n\n**Structural Segregation:** Data with different access needs is stored in separate collections. User profiles are stored under `/users/{userId}` for private access, while stores are stored in a separate `/stores` collection.\n\n**Access Modeling:**\n*   **User Data:** User-specific data (e.g., user profiles) are stored under `/users/{userId}`.\n*   **Store Data:** Store data is stored in the `/stores/{storeId}` collection.\n*   **Order Data:** Orders are stored under `/orders/{orderId}`, with denormalized `userId` and `storeId` to simplify querying and security rules.\n\n**QAPs (Rules are not Filters):** The structure facilitates secure `list` operations by segregating data based on access requirements. For example, listing products is always performed against the `/stores/{storeId}/products` collection, where rules can be applied to filter based on the current user's role or store membership.\n\n**Invariants:** The structure supports data integrity by enforcing ownership and relationships through path-based ownership and denormalization. Timestamps can be added to documents to track creation and modification times and secure them with rules to prevent tampering."
+    ]
   }
 }
+
+    

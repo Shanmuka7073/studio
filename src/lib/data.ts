@@ -3,11 +3,9 @@ import placeholderData from './placeholder-images.json';
 import {
   collection,
   doc,
-  addDoc,
   getDoc,
   getDocs,
   query,
-  where,
   Firestore,
 } from 'firebase/firestore';
 
@@ -23,7 +21,7 @@ const getImage = (id: string) => {
   );
 };
 
-// --- New Firestore-based functions ---
+// --- Firestore-based functions ---
 
 export async function getStores(db: Firestore): Promise<Store[]> {
   const storesCol = collection(db, 'stores');
@@ -47,20 +45,11 @@ export async function getStore(
   return undefined;
 }
 
-export async function createStore(db: Firestore, storeData: Omit<Store, 'id'>): Promise<Store> {
-  const storesCol = collection(db, 'stores');
-  const docRef = await addDoc(storesCol, storeData);
-  return { id: docRef.id, ...storeData };
-}
-
 export async function getProducts(
   db: Firestore,
-  storeId?: string
+  storeId: string
 ): Promise<Product[]> {
-  let productsQuery = query(collection(db, 'products'));
-  if (storeId) {
-    productsQuery = query(productsQuery, where('storeId', '==', storeId));
-  }
+  const productsQuery = query(collection(db, 'stores', storeId, 'products'));
   const productSnapshot = await getDocs(productsQuery);
   const productList = productSnapshot.docs.map((doc) => ({
     id: doc.id,
@@ -69,20 +58,12 @@ export async function getProducts(
   return productList;
 }
 
-export async function createProduct(
-  db: Firestore,
-  productData: Omit<Product, 'id'>
-): Promise<Product> {
-    const productsCol = collection(db, 'products');
-    const docRef = await addDoc(productsCol, productData);
-    return { id: docRef.id, ...productData };
-}
-
 export async function getProduct(
   db: Firestore,
-  id: string
+  storeId: string,
+  productId: string
 ): Promise<Product | undefined> {
-  const productDocRef = doc(db, 'products', id);
+  const productDocRef = doc(db, 'stores', storeId, 'products', productId);
   const productSnap = await getDoc(productDocRef);
   if (productSnap.exists()) {
     return { id: productSnap.id, ...productSnap.data() } as Product;
@@ -143,3 +124,5 @@ const orders: Order[] = [
   },
 ];
 export const getOrders = (): Order[] => orders;
+
+    
