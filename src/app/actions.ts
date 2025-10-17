@@ -6,7 +6,17 @@ import {
 } from '@/ai/flows/product-recommendations';
 import type { Order, Product } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
-import type { Query as FirestoreQuery } from 'firebase-admin/firestore'; // Use type alias to avoid conflict
+import {
+  getFirestore,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  where,
+  Timestamp,
+} from 'firebase/firestore';
+import { initializeFirebase } from '@/firebase';
 
 export async function getRecommendationsAction(
   input: ProductRecommendationsInput
@@ -21,9 +31,9 @@ export async function getRecommendationsAction(
 }
 
 export async function revalidateStorePaths() {
-    revalidatePath('/');
-    revalidatePath('/stores');
-    revalidatePath('/dashboard/my-store');
+  revalidatePath('/');
+  revalidatePath('/stores');
+  revalidatePath('/dashboard/my-store');
 }
 
 export async function revalidateProductPaths(storeId: string) {
@@ -31,124 +41,90 @@ export async function revalidateProductPaths(storeId: string) {
   revalidatePath(`/dashboard/my-store`);
 }
 
-export async function getProductsByIdsAction(productRefs: {productId: string, storeId: string}[]): Promise<Product[]> {
-  // Moved firebase-admin imports and initialization inside the action
-  const { initializeApp, getApps, cert } = await import('firebase-admin/app');
-  const { getFirestore } = await import('firebase-admin/firestore');
+export async function getProductsByIdsAction(
+  productRefs: { productId: string; storeId: string }[]
+): Promise<Product[]> {
+  const { firestore } = initializeFirebase();
+  const products: Product[] = [];
 
-  if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-    console.error('FIREBASE_SERVICE_ACCOUNT_KEY is not set.');
-    return [];
-  }
-
-  try {
-      const serviceAccount = JSON.parse(
-        process.env.FIREBASE_SERVICE_ACCOUNT_KEY as string
+  for (const { productId, storeId } of productRefs) {
+    try {
+      const productDocRef = doc(
+        firestore,
+        'stores',
+        storeId,
+        'products',
+        productId
       );
-
-      if (!getApps().length) {
-        initializeApp({
-          credential: cert(serviceAccount),
-        });
+      const productSnap = await getDoc(productDocRef);
+      if (productSnap.exists()) {
+        products.push({
+          id: productSnap.id,
+          ...productSnap.data(),
+        } as Product);
       }
-      
-      const adminDb = getFirestore();
-      
-      const products: Product[] = [];
-      for (const { productId, storeId } of productRefs) {
-        try {
-          const productSnap = await adminDb
-            .collection('stores')
-            .doc(storeId)
-            .collection('products')
-            .doc(productId)
-            .get();
-          if (productSnap.exists) {
-            products.push({
-              id: productSnap.id,
-              ...productSnap.data(),
-            } as Product);
-          }
-        } catch (error) {
-          console.error(
-            `Failed to fetch product ${productId} from store ${storeId}`,
-            error
-          );
-        }
-      }
-      return products;
-  } catch (error) {
-    console.error('Error fetching products by IDs:', error);
-    return [];
+    } catch (error) {
+      console.error(
+        `Failed to fetch product ${productId} from store ${storeId}`,
+        error
+      );
+    }
   }
+  return products;
 }
-
 
 type GetOrdersParams = {
   by: 'userId' | 'storeId' | 'deliveryStatus';
   value: string;
 };
 
-export async function getOrdersAction({ by, value }: GetOrdersParams): Promise<Order[]> {
-  const { initializeApp, getApps, cert } = await import('firebase-admin/app');
-  const { getFirestore } = await import('firebase-admin/firestore');
+export async function getOrdersAction({
+  by,
+  value,
+}: GetOrdersParams): Promise<Order[]> {
+  const { firestore } = initializeFirebase();
+  const ordersCollection = collection(firestore, 'orders');
+  let q;
 
-  if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-    console.error('FIREBASE_SERVICE_ACCOUNT_KEY is not set.');
-    return [];
+  switch (by) {
+    case 'userId':
+      q = query(ordersCollection, where('userId', '==', value));
+      break;
+    case 'storeId':
+      q = query(ordersCollection, where('storeId', '==', value));
+      break;
+    case 'deliveryStatus':
+      q = query(ordersCollection, where('status', '==', value));
+      break;
+    default:
+      console.error(`Invalid 'by' parameter: ${by}`);
+      return [];
   }
 
   try {
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY as string);
-    if (!getApps().length) {
-      initializeApp({ credential: cert(serviceAccount) });
-    }
-    const adminDb = getFirestore();
-
-    const ordersCollection = adminDb.collection('orders');
-    let query: FirestoreQuery;
-
-    switch (by) {
-      case 'userId':
-        query = ordersCollection.where('userId', '==', value);
-        break;
-      case 'storeId':
-        query = ordersCollection.where('storeId', '==', value);
-        break;
-      case 'deliveryStatus':
-         query = ordersCollection.where('status', '==', value);
-        break;
-      default:
-        console.error(`Invalid 'by' parameter: ${by}`);
-        return [];
-    }
-
-    const querySnapshot = await query.get();
+    const querySnapshot = await getDocs(q);
 
     if (querySnapshot.empty) {
       return [];
     }
 
-    // Firestore Timestamps need to be converted to a serializable format (e.g., ISO string)
-    const orders = querySnapshot.docs.map(doc => {
+    const orders = querySnapshot.docs.map((doc) => {
       const data = doc.data();
-      // Handle cases where orderDate might be missing or not a Timestamp
-      const orderDate = data.orderDate && typeof data.orderDate.toDate === 'function'
-        ? data.orderDate.toDate().toISOString()
-        : new Date().toISOString(); 
-
+      const orderDate = data.orderDate as Timestamp;
       return {
         ...data,
         id: doc.id,
-        orderDate: orderDate,
+        orderDate: orderDate.toDate().toISOString(),
       } as Order;
     });
 
-    // Sort manually after fetching to show most recent orders first
-    orders.sort((a, b) => new Date(b.orderDate as string).getTime() - new Date(a.orderDate as string).getTime());
+    orders.sort(
+      (a, b) =>
+        new Date(b.orderDate as string).getTime() -
+        new Date(a.orderDate as string).getTime()
+    );
 
     return orders;
-
   } catch (error) {
     console.error('Error fetching orders:', error);
     return [];
