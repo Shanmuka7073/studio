@@ -1,3 +1,97 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "store-1",
+      "description": "Green Valley Organics storefront",
+      "imageUrl": "https://picsum.photos/seed/store1/400/300",
+      "imageHint": "organic market"
+    },
+    {
+      "id": "store-2",
+      "description": "City Fresh Produce stall",
+      "imageUrl": "https://picsum.photos/seed/store2/400/300",
+      "imageHint": "farmers market"
+    },
+    {
+      "id": "store-3",
+      "description": "The Corner Grocer exterior",
+      "imageUrl": "https://picsum.photos/seed/store3/400/300",
+      "imageHint": "corner store"
+    },
+    {
+      "id": "prod-1",
+      "imageUrl": "https://picsum.photos/seed/prod1/300/300",
+      "imageHint": "apple"
+    },
+    {
+      "id": "prod-2",
+      "imageUrl": "https://picsum.photos/seed/prod2/300/300",
+      "imageHint": "banana"
+    },
+    {
+      "id": "prod-3",
+      "imageUrl": "https://picsum.photos/seed/prod3/300/300",
+      "imageHint": "bread"
+    },
+    {
+      "id": "prod-4",
+      "imageUrl": "https://picsum.photos/seed/prod4/300/300",
+      "imageHint": "milk"
+    },
+    {
+      "id": "prod-5",
+      "imageUrl": "https://picsum.photos/seed/prod5/300/300",
+      "imageHint": "eggs"
+    },
+    {
+      "id": "prod-6",
+      "imageUrl": "https://picsum.photos/seed/prod6/300/300",
+      "imageHint": "carrots"
+    },
+    {
+      "id": "prod-7",
+      "imageUrl": "https://picsum.photos/seed/prod7/300/300",
+      "imageHint": "lettuce"
+    },
+    {
+      "id": "prod-8",
+      "imageUrl": "https://picsum.photos/seed/prod8/300/300",
+      "imageHint": "tomatoes"
+    },
+    {
+      "id": "prod-9",
+      "imageUrl": "https://picsum.photos/seed/prod9/300/300",
+      "imageHint": "chicken breast"
+    },
+    {
+      "id": "prod-10",
+      "imageUrl": "https://picsum.photos/seed/prod10/300/300",
+      "imageHint": "cheese"
+    },
+    {
+      "id": "prod-11",
+      "imageUrl": "https://picsum.photos/seed/prod11/300/300",
+      "imageHint": "yogurt"
+    },
+    {
+      "id": "prod-12",
+      "imageUrl": "https://picsum.photos/seed/prod12/300/300",
+      "imageHint": "pasta"
+    },
+    {
+      "id": "prod-13",
+      "imageUrl": "https://picsum.photos/seed/prod13/300/300",
+      "imageHint": "rice"
+    },
+    {
+      "id": "prod-14",
+      "imageUrl": "https://picsum.photos/seed/prod14/300/300",
+      "imageHint": "cereal"
+    },
+    {
+      "id": "prod-15",
+      "imageUrl": "https://picsum.photos/seed/prod15/300/300",
+      "imageHint": "orange juice"
+    }
+  ]
 }
