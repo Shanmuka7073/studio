@@ -22,17 +22,17 @@ export default function MyOrdersPage() {
       if (user) {
         setIsLoading(true);
         const fetchedOrders = await getOrdersAction({ by: 'userId', value: user.uid });
-        // The dates from the server action will be ISO strings, so we convert them back to Date objects for formatting
-        const ordersWithDates = fetchedOrders.map(o => ({...o, orderDate: parseISO(o.orderDate as any)}));
-        setOrders(ordersWithDates as any);
+        // The dates from the server action are already ISO strings.
+        setOrders(fetchedOrders);
         setIsLoading(false);
       }
     }
     
-    // We run the effect when the user object is available, not just when loading is finished.
-    fetchOrders();
+    if (!isUserLoading) {
+        fetchOrders();
+    }
 
-  }, [user]);
+  }, [user, isUserLoading]);
 
   const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
     switch (status) {
@@ -71,7 +71,7 @@ export default function MyOrdersPage() {
                     <div className="flex justify-between w-full pr-4">
                         <div className="flex-1 text-left">
                             <p className="font-medium">Order #{order.id.substring(0, 7)}</p>
-                            <p className="text-sm text-muted-foreground">{format(order.orderDate, 'PPP')}</p>
+                            <p className="text-sm text-muted-foreground">{format(parseISO(order.orderDate as string), 'PPP')}</p>
                         </div>
                         <div className="flex-1 text-center">
                             <Badge variant={getStatusVariant(order.status)}>{order.status}</Badge>

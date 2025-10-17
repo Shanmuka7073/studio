@@ -111,14 +111,17 @@ export async function getOrdersAction({
 
     const orders = querySnapshot.docs.map((doc) => {
       const data = doc.data();
+      // Ensure orderDate is a Firestore Timestamp before converting
       const orderDate = data.orderDate as Timestamp;
       return {
         ...data,
         id: doc.id,
+        // Convert Timestamp to ISO string for serialization
         orderDate: orderDate.toDate().toISOString(),
       } as Order;
     });
 
+    // Sort by date after conversion
     orders.sort(
       (a, b) =>
         new Date(b.orderDate as string).getTime() -
