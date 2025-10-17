@@ -6,7 +6,7 @@ import {
 } from '@/ai/flows/product-recommendations';
 import type { Order, Product } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
-import type { Query } from 'firebase-admin/firestore';
+import type { Query } from 'firebase/firestore';
 
 export async function getRecommendationsAction(
   input: ProductRecommendationsInput
