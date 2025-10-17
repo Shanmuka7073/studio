@@ -15,8 +15,9 @@ import {
   query,
   where,
   Timestamp,
+  Query,
 } from 'firebase/firestore';
-import { initializeFirebase } from '@/firebase';
+import { initializeServerFirebase } from '@/firebase/server-init';
 
 export async function getRecommendationsAction(
   input: ProductRecommendationsInput
@@ -44,7 +45,7 @@ export async function revalidateProductPaths(storeId: string) {
 export async function getProductsByIdsAction(
   productRefs: { productId: string; storeId: string }[]
 ): Promise<Product[]> {
-  const { firestore } = initializeFirebase();
+  const { firestore } = initializeServerFirebase();
   const products: Product[] = [];
 
   for (const { productId, storeId } of productRefs) {
@@ -82,9 +83,9 @@ export async function getOrdersAction({
   by,
   value,
 }: GetOrdersParams): Promise<Order[]> {
-  const { firestore } = initializeFirebase();
+  const { firestore } = initializeServerFirebase();
   const ordersCollection = collection(firestore, 'orders');
-  let q;
+  let q: Query;
 
   switch (by) {
     case 'userId':
