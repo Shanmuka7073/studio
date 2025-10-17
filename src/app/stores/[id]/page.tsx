@@ -5,22 +5,24 @@ import ProductCard from '@/components/product-card';
 import { useFirebase } from '@/firebase';
 import { Store, Product } from '@/lib/types';
 import { useEffect, useState } from 'react';
-import { notFound } from 'next/navigation';
+import { notFound, useParams } from 'next/navigation';
 
-export default function StoreDetailPage({ params }: { params: { id: string } }) {
+export default function StoreDetailPage() {
+  const params = useParams();
+  const id = params.id as string;
   const { firestore } = useFirebase();
   const [store, setStore] = useState<Store | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (firestore && params.id) {
+    if (firestore && id) {
       const fetchStoreData = async () => {
         setLoading(true);
-        const storeData = await getStore(firestore, params.id);
+        const storeData = await getStore(firestore, id);
         if (storeData) {
           setStore(storeData as Store);
-          const productData = await getProducts(firestore, params.id);
+          const productData = await getProducts(firestore, id);
           setProducts(productData);
         } else {
           notFound();
@@ -29,7 +31,7 @@ export default function StoreDetailPage({ params }: { params: { id: string } }) 
       };
       fetchStoreData();
     }
-  }, [firestore, params.id]);
+  }, [firestore, id]);
 
   if (loading) {
     return <div className="container mx-auto py-12 px-4 md:px-6">Loading...</div>;
