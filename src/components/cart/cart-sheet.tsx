@@ -2,7 +2,7 @@
 
 import { useCart } from '@/lib/cart';
 import { Button } from '@/components/ui/button';
-import { SheetHeader, SheetTitle, SheetFooter, SheetClose } from '@/components/ui/sheet';
+import { SheetHeader, SheetTitle, SheetFooter, SheetClose, SheetDescription } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Trash2 } from 'lucide-react';
@@ -18,6 +18,9 @@ export function CartSheetContent() {
     <>
       <SheetHeader>
         <SheetTitle>Shopping Cart ({cartCount})</SheetTitle>
+        <SheetDescription className="sr-only">
+          A summary of the items in your shopping cart. You can view, update quantities, or remove items.
+        </SheetDescription>
       </SheetHeader>
       
       <div className="flex-1 flex flex-col h-full overflow-hidden">
