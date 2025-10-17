@@ -6,6 +6,7 @@ import {
 } from '@/ai/flows/product-recommendations';
 import type { Order, Product } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
+import type { Query } from 'firebase-admin/firestore';
 
 export async function getRecommendationsAction(
   input: ProductRecommendationsInput
@@ -105,7 +106,7 @@ export async function getOrdersAction({ by, value }: GetOrdersParams): Promise<O
     const adminDb = getFirestore();
 
     const ordersCollection = adminDb.collection('orders');
-    let query;
+    let query: Query;
 
     switch (by) {
       case 'userId':
