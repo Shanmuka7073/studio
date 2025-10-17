@@ -32,11 +32,7 @@ export default function OrdersDashboardPage() {
             setAreOrdersLoading(true);
             try {
                 const fetchedOrders = await getOrdersAction({ by: 'storeId', value: myStore.id });
-                const ordersWithDates = fetchedOrders.map(o => ({
-                    ...o,
-                    orderDate: parseISO(o.orderDate as string), 
-                }));
-                setOrders(ordersWithDates as any);
+                setOrders(fetchedOrders);
             } catch (error) {
                 console.error("Failed to fetch store orders:", error);
                 setOrders([]);
@@ -47,9 +43,11 @@ export default function OrdersDashboardPage() {
     }
     
     // This effect runs when the store is found or when the user changes.
-    fetchOrdersForStore();
+    if (!isStoreLoading && myStore) {
+        fetchOrdersForStore();
+    }
 
-  }, [myStore, user]);
+  }, [myStore, isStoreLoading]);
 
   const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
     switch (status) {
@@ -95,7 +93,7 @@ export default function OrdersDashboardPage() {
                     <TableCell className="font-medium truncate max-w-[100px]">{order.id}</TableCell>
                     <TableCell>{order.customerName}</TableCell>
                     <TableCell>{order.deliveryAddress}</TableCell>
-                    <TableCell>{format(order.orderDate, 'PPP')}</TableCell>
+                    <TableCell>{format(parseISO(order.orderDate as string), 'PPP')}</TableCell>
                     <TableCell>
                       <Badge variant={getStatusVariant(order.status)}>{order.status}</Badge>
                     </TableCell>
