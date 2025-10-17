@@ -20,6 +20,8 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 import { getProductImage } from '@/lib/data';
+import { MapPin } from 'lucide-react';
+import { useState } from 'react';
 
 const checkoutSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -34,6 +36,7 @@ export default function CheckoutPage() {
   const { cartItems, cartTotal, clearCart } = useCart();
   const router = useRouter();
   const { toast } = useToast();
+  const [isLocating, setIsLocating] = useState(false);
 
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
@@ -44,6 +47,40 @@ export default function CheckoutPage() {
       email: '',
     },
   });
+
+  const handleGetCurrentLocation = () => {
+    if (navigator.geolocation) {
+      setIsLocating(true);
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          // In a real app, you'd use a geocoding service to convert coords to an address.
+          // For now, we'll just use the coordinates.
+          form.setValue('address', `Lat: ${latitude.toFixed(4)}, Lon: ${longitude.toFixed(4)}`, { shouldValidate: true });
+          setIsLocating(false);
+          toast({
+            title: 'Location Found',
+            description: 'Your current location has been set as the address.',
+          });
+        },
+        (error) => {
+          console.error("Geolocation error:", error);
+          toast({
+            variant: "destructive",
+            title: 'Location Error',
+            description: 'Could not get your location. Please enter it manually.',
+          });
+          setIsLocating(false);
+        }
+      );
+    } else {
+       toast({
+        variant: "destructive",
+        title: 'Unsupported',
+        description: 'Geolocation is not supported by your browser.',
+      });
+    }
+  };
 
   const onSubmit = (data: CheckoutFormValues) => {
     console.log('Order submitted:', data);
@@ -94,7 +131,19 @@ export default function CheckoutPage() {
                     name="address"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Shipping Address</FormLabel>
+                        <div className="flex justify-between items-center">
+                          <FormLabel>Shipping Address</FormLabel>
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={handleGetCurrentLocation}
+                            disabled={isLocating}
+                          >
+                            <MapPin className="mr-2 h-4 w-4" />
+                            {isLocating ? 'Locating...' : 'Use Current Location'}
+                          </Button>
+                        </div>
                         <FormControl>
                           <Input placeholder="123 Green St, Springfield" {...field} />
                         </FormControl>
