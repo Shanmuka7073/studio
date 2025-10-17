@@ -104,22 +104,24 @@ export async function getOrdersAction({ by, value }: GetOrdersParams): Promise<O
     }
     const adminDb = getFirestore();
 
-    let querySnapshot;
     const ordersCollection = adminDb.collection('orders');
+    let query;
 
     switch (by) {
       case 'userId':
-        querySnapshot = await ordersCollection.where('userId', '==', value).get();
+        query = ordersCollection.where('userId', '==', value);
         break;
       case 'storeId':
-        querySnapshot = await ordersCollection.where('storeId', '==', value).get();
+        query = ordersCollection.where('storeId', '==', value);
         break;
       case 'deliveryStatus':
-         querySnapshot = await ordersCollection.where('status', '==', value).get();
+         query = ordersCollection.where('status', '==', value);
         break;
       default:
         return [];
     }
+
+    const querySnapshot = await query.get();
 
     if (querySnapshot.empty) {
       return [];
