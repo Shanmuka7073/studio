@@ -20,9 +20,9 @@ export function CartSheetContent() {
         <SheetTitle>Shopping Cart ({cartCount})</SheetTitle>
       </SheetHeader>
       
-      <div className="flex flex-col h-[calc(100vh-8rem)]">
-        <ScrollArea className="flex-1 pr-4">
-          {cartItems.length > 0 ? (
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
+        {cartItems.length > 0 ? (
+        <ScrollArea className="flex-1 pr-1">
             <div className="flex flex-col gap-4 py-4">
               {cartItems.map(({ product, quantity }) => {
                   const image = getProductImage(product.imageId);
@@ -57,14 +57,14 @@ export function CartSheetContent() {
                 </div>
               )})}
             </div>
-          ) : (
-            <div className="flex h-full items-center justify-center">
-              <p>Your cart is empty.</p>
-            </div>
-          )}
         </ScrollArea>
+        ) : (
+          <div className="flex flex-1 h-full items-center justify-center">
+            <p>Your cart is empty.</p>
+          </div>
+        )}
         {cartItems.length > 0 && (
-          <SheetFooter className="mt-auto">
+          <SheetFooter className="mt-auto pt-4">
             <div className="w-full space-y-4">
               <Separator />
               <div className="flex justify-between font-bold text-lg">
