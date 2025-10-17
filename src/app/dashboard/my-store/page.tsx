@@ -67,7 +67,7 @@ function AddProductForm({ storeId }: { storeId: string }) {
   const onSubmit = (data: ProductFormValues) => {
     if (!firestore) return;
 
-    startTransition(async () => {
+    startTransition(() => {
         const productData = {
             ...data,
             storeId,
@@ -78,8 +78,8 @@ function AddProductForm({ storeId }: { storeId: string }) {
         
         const productsCol = collection(firestore, 'stores', storeId, 'products');
         
-        addDoc(productsCol, productData).then(async () => {
-            await revalidateProductPaths(storeId);
+        addDoc(productsCol, productData).then(() => {
+            revalidateProductPaths(storeId);
             toast({
                 title: 'Product Added!',
                 description: `${data.name} has been added to your store.`,
