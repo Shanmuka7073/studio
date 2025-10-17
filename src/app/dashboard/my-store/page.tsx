@@ -345,7 +345,7 @@ export default function MyStorePage() {
               Create Your Store
             </CardTitle>
             <CardDescription>
-              Fill out the details below to get your shop listed on LocalBasket.
+              Fill out the details below to get your shop listed on mkservices.
             </CardDescription>
           </CardHeader>
           <CardContent>

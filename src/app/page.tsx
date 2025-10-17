@@ -95,7 +95,7 @@ export default function Home() {
             <div className="flex flex-col justify-center space-y-4">
               <div className="space-y-2">
                 <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none font-headline">
-                  Shop Fresh, Shop Local with LocalBasket
+                  Shop Fresh, Shop Local with mkservices
                 </h1>
                 <p className="max-w-[600px] text-foreground/80 md:text-xl">
                   Discover the best groceries from your neighborhood stores. We connect you with local vendors for fresh produce, everyday essentials, and more, all delivered to your door.

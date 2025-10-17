@@ -136,7 +136,7 @@ export function Header() {
           className="flex items-center gap-2 text-lg font-semibold md:text-base"
         >
           <Package2 className="h-6 w-6 text-primary" />
-          <span className="font-headline">LocalBasket</span>
+          <span className="font-headline">mkservices</span>
         </Link>
         {navLinks.map(({ href, label }) => (
           <Link
@@ -166,7 +166,7 @@ export function Header() {
                     className="flex items-center gap-2 text-lg font-semibold"
                     >
                     <Package2 className="h-6 w-6 text-primary" />
-                    <span className="font-headline">LocalBasket</span>
+                    <span className="font-headline">mkservices</span>
                 </Link>
             </SheetTitle>
           </SheetHeader>

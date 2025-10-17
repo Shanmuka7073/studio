@@ -34,7 +34,7 @@ function DynamicMetadata() {
     if (siteConfig?.siteTitle) {
       document.title = siteConfig.siteTitle;
     } else {
-      document.title = 'LocalBasket';
+      document.title = 'mkservices';
     }
   }, [siteConfig]);
 
