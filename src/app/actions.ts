@@ -6,7 +6,7 @@ import {
 } from '@/ai/flows/product-recommendations';
 import type { Order, Product } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
-import type { Query } from 'firebase/firestore';
+import type { Query as FirestoreQuery } from 'firebase-admin/firestore'; // Use type alias to avoid conflict
 
 export async function getRecommendationsAction(
   input: ProductRecommendationsInput
@@ -106,7 +106,7 @@ export async function getOrdersAction({ by, value }: GetOrdersParams): Promise<O
     const adminDb = getFirestore();
 
     const ordersCollection = adminDb.collection('orders');
-    let query: Query;
+    let query: FirestoreQuery;
 
     switch (by) {
       case 'userId':
@@ -119,6 +119,7 @@ export async function getOrdersAction({ by, value }: GetOrdersParams): Promise<O
          query = ordersCollection.where('status', '==', value);
         break;
       default:
+        console.error(`Invalid 'by' parameter: ${by}`);
         return [];
     }
 
