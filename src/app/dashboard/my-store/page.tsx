@@ -23,7 +23,6 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Upload } from 'lucide-react';
 import { createStoreAction, createProductAction } from '@/app/actions';
 import type { Store, Product } from '@/lib/types';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
@@ -55,9 +54,7 @@ const productSchema = z.object({
 type StoreFormValues = z.infer<typeof storeSchema>;
 type ProductFormValues = z.infer<typeof productSchema>;
 
-const MY_STORE_ID = '4'; // This will eventually come from the logged-in user
-
-function AddProductForm({ storeId, onProductAdded }: { storeId: string, onProductAdded: (product: Product) => void }) {
+function AddProductForm({ storeId }: { storeId: string }) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
 
@@ -71,14 +68,15 @@ function AddProductForm({ storeId, onProductAdded }: { storeId: string, onProduc
       const result = await createProductAction({
         ...data,
         storeId,
-        imageId: `prod-${Math.floor(Math.random() * 20)}`, // Temporary random image
+        imageId: `prod-${Math.floor(Math.random() * 20)}`,
+        quantity: 1, // Default quantity
+        category: 'Uncategorized' // Default category
       });
       if (result.success && result.product) {
         toast({
           title: 'Product Added!',
           description: `${result.product.name} has been added to your store.`,
         });
-        // onProductAdded(result.product); // No longer needed with real-time updates
         form.reset();
       } else {
         toast({
@@ -157,10 +155,6 @@ function ManageStoreView({ store }: { store: Store }) {
 
     const { data: products, isLoading } = useCollection<Product>(productsQuery);
 
-    const handleProductAdded = (newProduct: Product) => {
-        // This function is now just a placeholder, as useCollection handles updates
-    }
-
     return (
         <div className="grid md:grid-cols-2 gap-8">
           <div>
@@ -172,7 +166,7 @@ function ManageStoreView({ store }: { store: Store }) {
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                   <AddProductForm storeId={store.id} onProductAdded={handleProductAdded} />
+                   <AddProductForm storeId={store.id} />
                 </CardContent>
             </Card>
           </div>
@@ -214,24 +208,15 @@ function ManageStoreView({ store }: { store: Store }) {
 export default function MyStorePage() {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
-  const { firestore, user } = useFirebase(); // Assuming we'll have a user object later
-
-  // For now, we'll query for a store owned by a simulated user/ID
-  // In the future, this would be `user.uid`
-  const simulatedUserId = 'user1'; 
+  const { firestore, user, isUserLoading } = useFirebase();
 
   const storeQuery = useMemoFirebase(() => {
-      if (!firestore) return null;
-      // This is a placeholder for how we'd find the user's store.
-      // We'd ideally have an 'ownerId' field on the store document.
-      // For now, we'll just fetch all stores and take the first one as "the user's store"
-      // This is not robust and just for demonstration.
-      return query(collection(firestore, 'stores'));
-  }, [firestore]);
-  
+      if (!firestore || !user) return null;
+      return query(collection(firestore, 'stores'), where('ownerId', '==', user.uid));
+  }, [firestore, user]);
+
   const { data: stores, isLoading: isStoreLoading } = useCollection<Store>(storeQuery);
 
-  // For this demo, we assume the user owns the *first* store found.
   const myStore = stores?.[0];
 
   const form = useForm<StoreFormValues>({
@@ -244,18 +229,26 @@ export default function MyStorePage() {
   });
 
   const onSubmit = (data: StoreFormValues) => {
+    if (!user) {
+        toast({
+            variant: 'destructive',
+            title: 'Authentication Error',
+            description: 'You must be logged in to create a store.',
+        });
+        return;
+    }
+
     startTransition(async () => {
       const result = await createStoreAction({
         ...data,
-        imageId: `store-${Math.floor(Math.random() * 10)}`, // Assign a random image
-        // ownerId: simulatedUserId // In the future, we'd add this
+        ownerId: user.uid,
+        imageId: `store-${Math.floor(Math.random() * 10)}`,
       });
       if (result.success && result.store) {
         toast({
           title: 'Store Created!',
           description: `Your store "${result.store.name}" has been successfully created.`,
         });
-        // The page will now automatically switch to the management view because useCollection will update
       } else {
         toast({
           variant: 'destructive',
@@ -265,8 +258,8 @@ export default function MyStorePage() {
       }
     });
   };
-  
-  if (isStoreLoading) {
+
+  if (isUserLoading || isStoreLoading) {
     return <div className="container mx-auto py-12 px-4 md:px-6">Loading your store...</div>
   }
 
@@ -342,7 +335,7 @@ export default function MyStorePage() {
                 <Button
                   type="submit"
                   className="w-full bg-accent hover:bg-accent/90 text-accent-foreground"
-                  disabled={isPending}
+                  disabled={isPending || isUserLoading}
                 >
                   {isPending ? 'Creating...' : 'Create Store'}
                 </Button>

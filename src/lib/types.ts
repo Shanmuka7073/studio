@@ -6,6 +6,8 @@ export type Product = {
   price: number;
   imageId: string;
   storeId: string;
+  quantity?: number;
+  category?: string;
 };
 
 export type Store = {
@@ -14,7 +16,7 @@ export type Store = {
   description: string;
   address: string;
   imageId: string;
-  // ownerId?: string; // Add this later for multi-user support
+  ownerId: string;
 };
 
 export type CartItem = {

@@ -7,7 +7,7 @@ import {
 import { createStore, createProduct } from '@/lib/data';
 import type { Store, Product } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
-import { getSdks, initializeFirebase } from '@/firebase';
+import { initializeFirebase } from '@/firebase';
 
 export async function getRecommendationsAction(
   input: ProductRecommendationsInput
