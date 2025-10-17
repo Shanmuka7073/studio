@@ -20,6 +20,7 @@ export type Store = {
   ownerId: string;
   latitude: number;
   longitude: number;
+  distance?: number;
 };
 
 export type CartItem = {

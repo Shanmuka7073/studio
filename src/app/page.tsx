@@ -20,6 +20,7 @@ export default function Home() {
   const [nearbyStores, setNearbyStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [userLocation, setUserLocation] = useState<Coords | null>(null);
 
   useEffect(() => {
     async function fetchStoresAndLocation() {
@@ -35,23 +36,32 @@ export default function Home() {
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(
             (position) => {
-              const userLocation: Coords = {
+              const currentUserLocation: Coords = {
                 latitude: position.coords.latitude,
                 longitude: position.coords.longitude,
               };
+              setUserLocation(currentUserLocation);
               
-              const storesWithinRadius = stores.filter((store) => {
-                const storeLocation = { latitude: store.latitude, longitude: store.longitude };
-                const distanceInMeters = haversine(userLocation, storeLocation);
-                const distanceInKm = distanceInMeters / 1000;
-                return distanceInKm <= 3;
+              const storesWithDistance = stores.map(store => {
+                  const storeLocation = { latitude: store.latitude, longitude: store.longitude };
+                  const distanceInMeters = haversine(currentUserLocation, storeLocation);
+                  return { ...store, distance: distanceInMeters / 1000 }; // distance in km
               });
 
-              setNearbyStores(storesWithinRadius);
-              if (storesWithinRadius.length === 0) {
+              const storesWithinRadius = storesWithDistance.filter((store) => {
+                return store.distance! <= 3;
+              });
+              
+              // Sort by distance
+              storesWithinRadius.sort((a,b) => a.distance! - b.distance!);
+
+              if (storesWithinRadius.length > 0) {
+                 setNearbyStores(storesWithinRadius);
+              } else {
                 setLocationError("No stores found within a 3km radius. Showing all stores instead.");
                 setNearbyStores(stores); // Fallback to show all stores
               }
+
               setLoading(false);
             },
             (error) => {
@@ -137,7 +147,7 @@ export default function Home() {
               <p>Finding nearby stores...</p>
             ) : (
               nearbyStores.map((store) => (
-                <StoreCard key={store.id} store={store} />
+                <StoreCard key={store.id} store={store} userLocation={userLocation} />
               ))
             )}
           </div>
