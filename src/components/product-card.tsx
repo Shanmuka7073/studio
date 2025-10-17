@@ -25,14 +25,14 @@ export default function ProductCard({ product }: ProductCardProps) {
           data-ai-hint={image.imageHint}
           width={300}
           height={300}
-          className="w-full h-32 object-cover"
+          className="w-full h-28 object-cover"
         />
       </CardHeader>
-      <CardContent className="p-2 flex-1 text-center">
-        <CardTitle className="text-base font-headline mb-1 truncate">{product.name}</CardTitle>
-        <p className="text-xl font-bold text-primary">${product.price.toFixed(2)}</p>
+      <CardContent className="p-1 flex-1 text-center">
+        <CardTitle className="text-sm font-headline truncate">{product.name}</CardTitle>
+        <p className="text-lg font-bold text-primary">${product.price.toFixed(2)}</p>
       </CardContent>
-      <CardFooter className="p-2 pt-0">
+      <CardFooter className="p-1 pt-0">
         <Button
           onClick={() => addItem(product)}
           className="w-full bg-accent hover:bg-accent/90 text-accent-foreground text-xs h-9"
