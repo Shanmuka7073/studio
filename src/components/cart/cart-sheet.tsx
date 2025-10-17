@@ -9,6 +9,7 @@ import { Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { getProductImage } from '@/lib/data';
+import { Input } from '../ui/input';
 
 export function CartSheetContent() {
   const { cartItems, removeItem, updateQuantity, cartTotal, cartCount } = useCart();
@@ -24,7 +25,7 @@ export function CartSheetContent() {
             {cartItems.map(({ product, quantity }) => {
                 const image = getProductImage(product.imageId);
                 return(
-              <div key={product.id} className="flex items-center gap-4">
+              <div key={product.id} className="flex items-center gap-4 w-full">
                 <Image
                   src={image.imageUrl}
                   alt={product.name}
@@ -33,22 +34,23 @@ export function CartSheetContent() {
                   height={64}
                   className="rounded-md object-cover"
                 />
-                <div className="flex-1">
-                  <p className="font-medium">{product.name}</p>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span>Qty: {quantity}</span>
-                    <input
+                <div className="flex-1 grid gap-1.5">
+                  <p className="font-medium leading-tight">{product.name}</p>
+                  <div className="flex items-center gap-2">
+                    <Input
                       type="number"
                       min="1"
                       value={quantity}
-                      onChange={(e) => updateQuantity(product.id, parseInt(e.target.value))}
-                      className="w-14 rounded-md border border-input px-2 py-1"
+                      onChange={(e) => updateQuantity(product.id, parseInt(e.target.value) || 1)}
+                      className="w-16 h-8 text-center"
+                      aria-label={`Quantity for ${product.name}`}
                     />
+                     <p className="text-sm font-semibold">${(product.price * quantity).toFixed(2)}</p>
                   </div>
-                  <p className="text-sm font-semibold">${(product.price * quantity).toFixed(2)}</p>
                 </div>
                 <Button variant="ghost" size="icon" onClick={() => removeItem(product.id)}>
                   <Trash2 className="h-4 w-4" />
+                   <span className="sr-only">Remove {product.name}</span>
                 </Button>
               </div>
             )})}
