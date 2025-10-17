@@ -6,10 +6,14 @@ import { collection, query, where } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
+import { useState, useEffect } from 'react';
+import { getOrdersAction } from '@/app/actions';
 
 export default function OrdersDashboardPage() {
   const { firestore, user } = useFirebase();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [areOrdersLoading, setAreOrdersLoading] = useState(true);
 
   // 1. Get the current user's store
   const storeQuery = useMemoFirebase(() => {
@@ -19,12 +23,19 @@ export default function OrdersDashboardPage() {
   const { data: stores, isLoading: isStoreLoading } = useCollection<Store>(storeQuery);
   const myStore = stores?.[0];
 
-  // 2. Get orders for that store
-  const ordersQuery = useMemoFirebase(() => {
-    if (!firestore || !myStore) return null;
-    return query(collection(firestore, 'orders'), where('storeId', '==', myStore.id));
-  }, [firestore, myStore]);
-  const { data: orders, isLoading: areOrdersLoading } = useCollection<Order>(ordersQuery);
+  // 2. Get orders for that store using the server action
+  useEffect(() => {
+    async function fetchOrders() {
+      if (myStore) {
+        setAreOrdersLoading(true);
+        const fetchedOrders = await getOrdersAction({ by: 'storeId', value: myStore.id });
+        const ordersWithDates = fetchedOrders.map(o => ({...o, orderDate: parseISO(o.orderDate as any)}));
+        setOrders(ordersWithDates as any);
+        setAreOrdersLoading(false);
+      }
+    }
+    fetchOrders();
+  }, [myStore]);
 
   const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
     switch (status) {
@@ -69,7 +80,7 @@ export default function OrdersDashboardPage() {
                     <TableCell className="font-medium truncate max-w-[100px]">{order.id}</TableCell>
                     <TableCell>{order.customerName}</TableCell>
                     <TableCell>{order.deliveryAddress}</TableCell>
-                    <TableCell>{format(order.orderDate.toDate(), 'PPP')}</TableCell>
+                    <TableCell>{format(order.orderDate, 'PPP')}</TableCell>
                     <TableCell>
                       <Badge variant={getStatusVariant(order.status)}>{order.status}</Badge>
                     </TableCell>

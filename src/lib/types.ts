@@ -45,5 +45,5 @@ export type Order = {
   items: OrderItem[];
   totalAmount: number;
   status: 'Pending' | 'Processing' | 'Out for Delivery' | 'Delivered';
-  orderDate: Timestamp;
+  orderDate: Timestamp | Date | string; // Allow string for serialized format
 };

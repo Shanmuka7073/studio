@@ -1,29 +1,38 @@
 'use client';
 
-import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { Order } from '@/lib/types';
-import { collection, query, where, orderBy } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { useState, useEffect } from 'react';
+import { getOrdersAction } from '@/app/actions';
 
 export default function MyOrdersPage() {
-  const { firestore, user } = useFirebase();
+  const { user, isUserLoading } = useFirebase();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const ordersQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(
-        collection(firestore, 'orders'), 
-        where('userId', '==', user.uid),
-        orderBy('orderDate', 'desc')
-    );
-  }, [firestore, user]);
-  
-  const { data: orders, isLoading } = useCollection<Order>(ordersQuery);
+  useEffect(() => {
+    async function fetchOrders() {
+      if (user) {
+        setIsLoading(true);
+        const fetchedOrders = await getOrdersAction({ by: 'userId', value: user.uid });
+        // The dates from the server action will be ISO strings, so we convert them back to Date objects
+        const ordersWithDates = fetchedOrders.map(o => ({...o, orderDate: parseISO(o.orderDate as any)}));
+        setOrders(ordersWithDates as any);
+        setIsLoading(false);
+      }
+    }
+
+    if (!isUserLoading) {
+      fetchOrders();
+    }
+  }, [user, isUserLoading]);
 
   const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
     switch (status) {
@@ -35,6 +44,8 @@ export default function MyOrdersPage() {
     }
   }
 
+  const effectiveLoading = isLoading || isUserLoading;
+
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
       <h1 className="text-4xl font-bold mb-8 font-headline">My Orders</h1>
@@ -43,7 +54,7 @@ export default function MyOrdersPage() {
           <CardTitle>Your Order History</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {effectiveLoading ? (
             <p>Loading your orders...</p>
           ) : !orders || orders.length === 0 ? (
             <div className="text-center py-12">
@@ -60,7 +71,7 @@ export default function MyOrdersPage() {
                     <div className="flex justify-between w-full pr-4">
                         <div className="flex-1 text-left">
                             <p className="font-medium">Order #{order.id.substring(0, 7)}</p>
-                            <p className="text-sm text-muted-foreground">{format(order.orderDate.toDate(), 'PPP')}</p>
+                            <p className="text-sm text-muted-foreground">{format(order.orderDate, 'PPP')}</p>
                         </div>
                         <div className="flex-1 text-center">
                             <Badge variant={getStatusVariant(order.status)}>{order.status}</Badge>

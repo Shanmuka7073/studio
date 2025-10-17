@@ -1,25 +1,26 @@
 'use client';
 
-import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { Order } from '@/lib/types';
-import { collection, query, where } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { MapPin } from 'lucide-react';
-import Link from 'next/link';
+import { useState, useEffect } from 'react';
+import { getOrdersAction } from '@/app/actions';
 
 export default function DeliveriesPage() {
-  const { firestore } = useFirebase();
+  const [deliveries, setDeliveries] = useState<Order[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // For this example, we'll show orders that are "Out for Delivery"
-  // In a real app, you might have more complex logic to assign deliveries.
-  const deliveriesQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'orders'), where('status', '==', 'Out for Delivery'));
-  }, [firestore]);
-
-  const { data: deliveries, isLoading } = useCollection<Order>(deliveriesQuery);
+  useEffect(() => {
+    async function fetchDeliveries() {
+      setIsLoading(true);
+      const fetchedOrders = await getOrdersAction({ by: 'deliveryStatus', value: 'Out for Delivery' });
+      setDeliveries(fetchedOrders);
+      setIsLoading(false);
+    }
+    fetchDeliveries();
+  }, []);
 
   const openInGoogleMaps = (lat: number, lng: number) => {
     const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;

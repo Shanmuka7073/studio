@@ -4,7 +4,7 @@ import {
   getProductRecommendations,
   ProductRecommendationsInput,
 } from '@/ai/flows/product-recommendations';
-import type { Product } from '@/lib/types';
+import type { Order, Product } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
 
 export async function getRecommendationsAction(
@@ -78,6 +78,67 @@ export async function getProductsByIdsAction(productRefs: {productId: string, st
       return products;
   } catch (error) {
     console.error('Error fetching products by IDs:', error);
+    return [];
+  }
+}
+
+
+type GetOrdersParams = {
+  by: 'userId' | 'storeId' | 'deliveryStatus';
+  value: string;
+};
+
+export async function getOrdersAction({ by, value }: GetOrdersParams): Promise<Order[]> {
+  const { initializeApp, getApps, cert } = await import('firebase-admin/app');
+  const { getFirestore } = await import('firebase-admin/firestore');
+
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+    console.error('FIREBASE_SERVICE_ACCOUNT_KEY is not set.');
+    return [];
+  }
+
+  try {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY as string);
+    if (!getApps().length) {
+      initializeApp({ credential: cert(serviceAccount) });
+    }
+    const adminDb = getFirestore();
+
+    let querySnapshot;
+    const ordersCollection = adminDb.collection('orders');
+
+    switch (by) {
+      case 'userId':
+        querySnapshot = await ordersCollection.where('userId', '==', value).orderBy('orderDate', 'desc').get();
+        break;
+      case 'storeId':
+        querySnapshot = await ordersCollection.where('storeId', '==', value).orderBy('orderDate', 'desc').get();
+        break;
+      case 'deliveryStatus':
+         querySnapshot = await ordersCollection.where('status', '==', value).orderBy('orderDate', 'desc').get();
+        break;
+      default:
+        return [];
+    }
+
+    if (querySnapshot.empty) {
+      return [];
+    }
+
+    // Firestore Timestamps need to be converted to a serializable format (e.g., ISO string)
+    const orders = querySnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        ...data,
+        id: doc.id,
+        orderDate: (data.orderDate.toDate()).toISOString(), // Convert Timestamp to ISO string
+      } as Order;
+    });
+
+    return orders;
+
+  } catch (error) {
+    console.error('Error fetching orders:', error);
     return [];
   }
 }
