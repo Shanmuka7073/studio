@@ -1,3 +1,4 @@
+
 import type { Store, Product, Order } from './types';
 import placeholderData from './placeholder-images.json';
 

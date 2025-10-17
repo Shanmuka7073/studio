@@ -1,3 +1,4 @@
+
 import { getStores } from '@/lib/data';
 import StoreCard from '@/components/store-card';
 
