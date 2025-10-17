@@ -259,6 +259,21 @@
         "recommendationScore",
         "timestamp"
       ]
+    },
+    "SiteConfig": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SiteConfig",
+      "type": "object",
+      "description": "Stores global site configuration settings.",
+      "properties": {
+        "siteTitle": {
+          "type": "string",
+          "description": "The main title of the website."
+        }
+      },
+      "required": [
+        "siteTitle"
+      ]
     }
   },
   "auth": {
@@ -375,7 +390,19 @@
             }
           ]
         }
+      },
+      {
+        "path": "/config/site",
+        "definition": {
+          "entityName": "SiteConfig",
+          "schema": {
+            "$ref": "#/backend/entities/SiteConfig"
+          },
+          "description": "Stores global site configuration settings in a single document.",
+          "params": []
+        }
       }
     ]
   }
 }
+    
