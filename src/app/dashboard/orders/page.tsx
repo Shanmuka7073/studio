@@ -13,7 +13,7 @@ import { useCollection, useMemoFirebase } from '@/firebase';
 
 
 export default function OrdersDashboardPage() {
-  const { firestore, user } = useFirebase();
+  const { firestore, user, isUserLoading } = useFirebase();
   const [orders, setOrders] = useState<Order[]>([]);
   const [areOrdersLoading, setAreOrdersLoading] = useState(true);
 
@@ -27,17 +27,30 @@ export default function OrdersDashboardPage() {
 
   // 2. Get orders for that store using the server action
   useEffect(() => {
-    async function fetchOrders() {
-      if (myStore) {
-        setAreOrdersLoading(true);
-        const fetchedOrders = await getOrdersAction({ by: 'storeId', value: myStore.id });
-        const ordersWithDates = fetchedOrders.map(o => ({...o, orderDate: parseISO(o.orderDate as any)}));
-        setOrders(ordersWithDates as any);
-        setAreOrdersLoading(false);
-      }
+    // Only proceed if we have a store object.
+    if (myStore) {
+      setAreOrdersLoading(true);
+      getOrdersAction({ by: 'storeId', value: myStore.id })
+        .then(fetchedOrders => {
+          // Ensure dates are parsed correctly for display and sorting.
+          const ordersWithDates = fetchedOrders.map(o => ({
+            ...o,
+            orderDate: parseISO(o.orderDate as string), // Server action now returns ISO strings
+          }));
+          setOrders(ordersWithDates as any);
+        })
+        .catch(console.error) // Basic error logging
+        .finally(() => {
+          setAreOrdersLoading(false);
+        });
+    } else {
+        // If there's no store, we shouldn't be in a loading state for orders.
+        // This handles the case where a user without a store visits this page.
+        if (!isStoreLoading) {
+             setAreOrdersLoading(false);
+        }
     }
-    fetchOrders();
-  }, [myStore]);
+  }, [myStore, isStoreLoading]); // Re-run this effect when the store is found.
 
   const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
     switch (status) {
@@ -48,7 +61,8 @@ export default function OrdersDashboardPage() {
     }
   }
 
-  const isLoading = isStoreLoading || areOrdersLoading;
+  // Combine loading states for a clearer UI
+  const isLoading = isUserLoading || isStoreLoading || areOrdersLoading;
 
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
