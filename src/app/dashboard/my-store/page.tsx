@@ -23,10 +23,10 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { createStoreAction, createProductAction } from '@/app/actions';
+import { createProductAction, revalidateStorePaths } from '@/app/actions';
 import type { Store, Product } from '@/lib/types';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { collection, query, where, addDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 
 
@@ -238,7 +238,7 @@ export default function MyStorePage() {
   });
 
   const onSubmit = (data: StoreFormValues) => {
-    if (!user) {
+    if (!user || !firestore) {
         toast({
             variant: 'destructive',
             title: 'Authentication Error',
@@ -248,21 +248,27 @@ export default function MyStorePage() {
     }
 
     startTransition(async () => {
-      const result = await createStoreAction({
-        ...data,
-        ownerId: user.uid,
-        imageId: `store-${Math.floor(Math.random() * 10)}`,
-      });
-      if (result.success && result.store) {
+      try {
+        const storeData = {
+            ...data,
+            ownerId: user.uid,
+            imageId: `store-${Math.floor(Math.random() * 10)}`,
+        };
+        const storesCol = collection(firestore, 'stores');
+        await addDoc(storesCol, storeData);
+        
+        await revalidateStorePaths();
+
         toast({
           title: 'Store Created!',
-          description: `Your store "${result.store.name}" has been successfully created.`,
+          description: `Your store "${data.name}" has been successfully created.`,
         });
-      } else {
+      } catch (error) {
+        console.error("Error creating store: ", error)
         toast({
           variant: 'destructive',
           title: 'Error creating store',
-          description: result.error,
+          description: "Failed to create store.",
         });
       }
     });

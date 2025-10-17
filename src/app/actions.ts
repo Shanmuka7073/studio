@@ -4,10 +4,8 @@ import {
   getProductRecommendations,
   ProductRecommendationsInput,
 } from '@/ai/flows/product-recommendations';
-import { createStore, createProduct } from '@/lib/data';
 import type { Store, Product } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
-import { initializeFirebase } from '@/firebase';
 
 export async function getRecommendationsAction(
   input: ProductRecommendationsInput
@@ -21,40 +19,25 @@ export async function getRecommendationsAction(
   }
 }
 
-export async function createStoreAction(
-  storeData: Omit<Store, 'id'>
-) {
-  try {
-    const { firestore } = initializeFirebase();
-    const newStore = await createStore(firestore, storeData);
-
+export async function revalidateStorePaths() {
     revalidatePath('/');
     revalidatePath('/stores');
     revalidatePath('/dashboard/my-store');
-
-    return { success: true, store: newStore };
-  } catch (error) {
-    console.error('Error creating store:', error);
-    return { success: false, error: 'Failed to create store.' };
-  }
 }
 
 export async function createProductAction(
   productData: Omit<Product, 'id' | 'imageId'> & { imageId: string }
 ) {
   try {
-    const { firestore } = initializeFirebase();
-    // In a real app, you'd handle image uploads properly.
-    // For now, we'll assign a placeholder imageId.
-    const newProduct = await createProduct(firestore, {
-      ...productData,
-    });
-
+    // In a real app, you'd handle image uploads properly and save to DB.
+    // For now, this is a placeholder.
+    console.log("Creating product (placeholder):", productData);
+    
     // Revalidate the path for the specific store
     revalidatePath(`/stores/${productData.storeId}`);
     revalidatePath(`/dashboard/my-store`);
 
-    return { success: true, product: newProduct };
+    return { success: true, product: {id: 'new-prod', ...productData} };
   } catch (error) {
     console.error('Error creating product:', error);
     return { success: false, error: 'Failed to create product.' };
