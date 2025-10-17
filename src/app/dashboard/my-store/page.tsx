@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -29,8 +30,9 @@ type StoreFormValues = z.infer<typeof storeSchema>;
 
 export default function MyStorePage() {
   const { toast } = useToast();
-  // In a real app, you would check if the user already has a store.
-  const hasStore = false;
+  // In a real app, you would fetch this from a database.
+  // We use component state to simulate store creation for now.
+  const [hasStore, setHasStore] = useState(false);
 
   const form = useForm<StoreFormValues>({
     resolver: zodResolver(storeSchema),
@@ -48,16 +50,29 @@ export default function MyStorePage() {
       title: 'Store Created!',
       description: `Your store "${data.name}" has been successfully created.`,
     });
-    // You might want to redirect or update the UI state after submission.
+    setHasStore(true);
   };
   
   if (hasStore) {
     // Render the store management view if a store already exists.
-    // We can build this out next.
     return (
-        <div className="container mx-auto py-12">
+        <div className="container mx-auto py-12 px-4 md:px-6">
             <h1 className="text-4xl font-bold font-headline mb-8">Manage Your Store</h1>
-            <p>Here you will be able to edit your store details, add products, and view your orders.</p>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Welcome, Store Owner!</CardTitle>
+                    <CardDescription>This is your dashboard. You can add products, view orders, and edit your store details here.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <p>Coming soon:</p>
+                    <ul className="list-disc list-inside text-muted-foreground">
+                        <li>A form to add new products to your store.</li>
+                        <li>A table to view and manage your existing products.</li>
+                        <li>An overview of incoming orders.</li>
+                    </ul>
+                     <Button className="mt-4">Add a New Product</Button>
+                </CardContent>
+            </Card>
         </div>
     )
   }
