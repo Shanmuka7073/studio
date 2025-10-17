@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 export default function MyOrdersPage() {
   const { firestore, user } = useFirebase();
