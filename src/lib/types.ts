@@ -50,8 +50,4 @@ export type Order = {
   phone: string;
   email: string;
 };
-
-export type SiteConfig = {
-    siteTitle: string;
-}
     
