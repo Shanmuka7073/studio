@@ -41,6 +41,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Checkbox } from '@/components/ui/checkbox';
 import { MapPin } from 'lucide-react';
 import groceryData from '@/lib/grocery-data.json';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const storeSchema = z.object({
   name: z.string().min(3, 'Store name must be at least 3 characters'),
@@ -56,6 +57,7 @@ const productSchema = z.object({
   name: z.string().min(3, 'Product name is required'),
   price: z.coerce.number().positive('Price must be a positive number'),
   description: z.string().optional(),
+  category: z.string().min(1, "Category is required"),
 });
 
 type StoreFormValues = z.infer<typeof storeSchema>;
@@ -90,6 +92,7 @@ function ProductChecklist({ storeId, onProductsAdded }: { storeId: string; onPro
           const batch = writeBatch(firestore);
           productNames.forEach(name => {
             const newProductRef = doc(collection(firestore, 'stores', storeId, 'products'));
+            const category = groceryData.categories.find(c => c.items.includes(name))?.categoryName || 'Miscellaneous';
             batch.set(newProductRef, {
               name,
               price: 0.99, // Default price
@@ -97,6 +100,7 @@ function ProductChecklist({ storeId, onProductsAdded }: { storeId: string; onPro
               storeId: storeId,
               imageId: `prod-${Math.floor(Math.random() * 20)}`,
               quantity: 100, // Default quantity
+              category: category,
             });
           });
           await batch.commit();
@@ -169,7 +173,7 @@ function AddProductForm({ storeId }: { storeId: string }) {
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
-    defaultValues: { name: '', price: 0, description: '' },
+    defaultValues: { name: '', price: 0, description: '', category: '' },
   });
 
   const onSubmit = (data: ProductFormValues) => {
@@ -181,7 +185,6 @@ function AddProductForm({ storeId }: { storeId: string }) {
             storeId,
             imageId: `prod-${Math.floor(Math.random() * 20)}`,
             quantity: 1, // Default quantity
-            category: 'Uncategorized' // Default category
         };
         
         const productsCol = collection(firestore, 'stores', storeId, 'products');
@@ -234,6 +237,28 @@ function AddProductForm({ storeId }: { storeId: string }) {
                   <FormControl>
                     <Input type="number" step="0.01" {...field} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="category"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Category</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a category" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {groceryData.categories.map(cat => (
+                        <SelectItem key={cat.categoryName} value={cat.categoryName}>{cat.categoryName}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
@@ -298,6 +323,7 @@ function ManageStoreView({ store }: { store: Store }) {
                             <TableRow>
                                 <TableHead>Name</TableHead>
                                 <TableHead>Price</TableHead>
+                                <TableHead>Category</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -305,6 +331,7 @@ function ManageStoreView({ store }: { store: Store }) {
                                 <TableRow key={product.id}>
                                     <TableCell>{product.name}</TableCell>
                                     <TableCell>${product.price.toFixed(2)}</TableCell>
+                                    <TableCell>{product.category}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
@@ -414,13 +441,15 @@ function CreateStoreForm({ user }) {
           const batch = writeBatch(firestore);
           productNames.forEach(name => {
             const newProductRef = doc(collection(firestore, 'stores', storeRef.id, 'products'));
+            const category = groceryData.categories.find(c => c.items.includes(name))?.categoryName || 'Miscellaneous';
             batch.set(newProductRef, {
               name,
-              price: 0.99, // Default price
+              price: 0.99,
               description: '',
               storeId: storeRef.id,
               imageId: `prod-${Math.floor(Math.random() * 20)}`,
-              quantity: 100, // Default quantity
+              quantity: 100,
+              category: category,
             });
           });
           await batch.commit();

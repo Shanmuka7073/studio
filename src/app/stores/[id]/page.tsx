@@ -17,7 +17,7 @@ import { writeBatch, collection, doc } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { revalidateProductPaths } from '@/app/actions';
 import { PanelLeft } from 'lucide-react';
-
+import { Input } from '@/components/ui/input';
 
 function InventoryManager({ storeId, existingProducts, onProductsAdded }: { storeId: string; existingProducts: Product[], onProductsAdded: () => void }) {
   const { toast } = useToast();
@@ -26,10 +26,9 @@ function InventoryManager({ storeId, existingProducts, onProductsAdded }: { stor
   const [selectedProducts, setSelectedProducts] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    // Pre-select products that are already in the store's inventory
     const initialSelection: Record<string, boolean> = {};
     existingProducts.forEach(p => {
-      initialSelection[p.name] = true;
+      if (p.name) initialSelection[p.name] = true;
     });
     setSelectedProducts(initialSelection);
   }, [existingProducts]);
@@ -58,11 +57,12 @@ function InventoryManager({ storeId, existingProducts, onProductsAdded }: { stor
             const newProductRef = doc(collection(firestore, 'stores', storeId, 'products'));
             batch.set(newProductRef, {
               name,
-              price: 0.99, // Default price
+              price: 0.99,
               description: '',
               storeId: storeId,
-              imageId: `prod-${Math.floor(Math.random() * 15) + 1}`, // using existing placeholder IDs
-              quantity: 100, // Default quantity
+              imageId: `prod-${Math.floor(Math.random() * 15) + 1}`,
+              quantity: 100,
+              category: groceryData.categories.find(c => c.items.includes(name))?.categoryName || 'Miscellaneous'
             });
           });
           await batch.commit();
@@ -102,13 +102,13 @@ function InventoryManager({ storeId, existingProducts, onProductsAdded }: { stor
                   {category.items.map((item) => (
                     <div key={item} className="flex items-center space-x-2">
                       <Checkbox
-                        id={`${category.categoryName}-${item}`}
+                        id={`owner-${category.categoryName}-${item}`}
                         onCheckedChange={(checked) => handleProductSelection(item, !!checked)}
                         checked={selectedProducts[item] || false}
                       />
                       <label
-                        htmlFor={`${category.categoryName}-${item}`}
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        htmlFor={`owner-${category.categoryName}-${item}`}
+                        className="text-sm font-medium leading-none"
                       >
                         {item}
                       </label>
@@ -129,6 +129,64 @@ function InventoryManager({ storeId, existingProducts, onProductsAdded }: { stor
   );
 }
 
+function ProductFilterSidebar({ onFilterChange }: { onFilterChange: (filters: { categories: string[], searchTerm: string }) => void }) {
+  const [selectedCategories, setSelectedCategories] = useState<Record<string, boolean>>({});
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const handleCategorySelection = (categoryName: string, isChecked: boolean) => {
+    const newSelection = { ...selectedCategories, [categoryName]: isChecked };
+    setSelectedCategories(newSelection);
+    const activeCategories = Object.keys(newSelection).filter(key => newSelection[key]);
+    onFilterChange({ categories: activeCategories, searchTerm });
+  };
+
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const newSearchTerm = event.target.value;
+    setSearchTerm(newSearchTerm);
+    const activeCategories = Object.keys(selectedCategories).filter(key => selectedCategories[key]);
+    onFilterChange({ categories: activeCategories, searchTerm: newSearchTerm });
+  };
+
+  return (
+    <div className="h-full flex flex-col">
+      <CardHeader>
+        <CardTitle>Filter Products</CardTitle>
+        <CardDescription>Filter by category or search.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4 flex-1 overflow-y-auto">
+        <div className="px-1">
+          <Input 
+            placeholder="Search products..."
+            value={searchTerm}
+            onChange={handleSearchChange}
+          />
+        </div>
+        <Accordion type="multiple" className="w-full">
+          {groceryData.categories.map((category) => (
+            <AccordionItem value={category.categoryName} key={category.categoryName}>
+              <AccordionTrigger>
+                <div className="flex items-center gap-2">
+                   <Checkbox
+                        id={`filter-${category.categoryName}`}
+                        onCheckedChange={(checked) => handleCategorySelection(category.categoryName, !!checked)}
+                        checked={selectedCategories[category.categoryName] || false}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                  {category.categoryName}
+                </div>
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="grid grid-cols-1 gap-2 p-2">
+                   {category.items.map(item => <p key={item} className="text-sm text-muted-foreground ml-4">{item}</p>)}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
+      </CardContent>
+    </div>
+  );
+}
 
 export default function StoreDetailPage() {
   const params = useParams();
@@ -136,6 +194,7 @@ export default function StoreDetailPage() {
   const { firestore, user } = useFirebase();
   const [store, setStore] = useState<Store | null>(null);
   const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState<{ categories: string[], searchTerm: string }>({ categories: [], searchTerm: '' });
   
   const productsQuery = useMemoFirebase(() => {
     if (!firestore || !id) return null;
@@ -159,6 +218,32 @@ export default function StoreDetailPage() {
       fetchStoreData();
     }
   }, [firestore, id]);
+  
+  const handleFilterChange = (newFilters: { categories: string[], searchTerm: string }) => {
+    setFilters(newFilters);
+  };
+  
+  const filteredProducts = useMemo(() => {
+    if (!products) return [];
+    let tempProducts = [...products];
+
+    // Filter by search term
+    if (filters.searchTerm) {
+      tempProducts = tempProducts.filter(product =>
+        product.name.toLowerCase().includes(filters.searchTerm.toLowerCase())
+      );
+    }
+
+    // Filter by category
+    if (filters.categories.length > 0) {
+      tempProducts = tempProducts.filter(product =>
+        filters.categories.includes(product.category || 'Miscellaneous')
+      );
+    }
+
+    return tempProducts;
+  }, [products, filters]);
+
 
   const isStoreOwner = user && store && user.uid === store.ownerId;
 
@@ -171,14 +256,16 @@ export default function StoreDetailPage() {
   }
 
   const image = getStoreImage(store.imageId);
+  
+  const sidebarContent = isStoreOwner 
+    ? <InventoryManager storeId={store.id} existingProducts={products || []} onProductsAdded={() => revalidateProductPaths(store.id)} />
+    : <ProductFilterSidebar onFilterChange={handleFilterChange} />;
 
   return (
     <div className="flex">
-        {isStoreOwner && (
-            <div className="hidden lg:block w-96 border-r h-[calc(100vh-4rem)] sticky top-16">
-                 <InventoryManager storeId={store.id} existingProducts={products || []} onProductsAdded={() => revalidateProductPaths(store.id)} />
-            </div>
-        )}
+        <div className="hidden lg:block w-96 border-r h-[calc(100vh-4rem)] sticky top-16">
+             {sidebarContent}
+        </div>
     <div className="container mx-auto py-12 px-4 md:px-6 flex-1">
       <div className="flex flex-col md:flex-row gap-8 mb-12">
         <Image
@@ -192,31 +279,32 @@ export default function StoreDetailPage() {
         <div className="flex-1">
           <div className="flex items-center gap-4">
             <h1 className="text-4xl font-bold font-headline mb-2">{store.name}</h1>
-             {isStoreOwner && (
-                <Sheet>
-                    <SheetTrigger asChild>
-                        <Button variant="outline" className="lg:hidden">
-                            <PanelLeft className="mr-2 h-4 w-4" />
-                            Manage Inventory
-                        </Button>
-                    </SheetTrigger>
-                    <SheetContent side="left" className="p-0 w-full max-w-md">
-                        <InventoryManager storeId={store.id} existingProducts={products || []} onProductsAdded={() => revalidateProductPaths(store.id)} />
-                    </SheetContent>
-                </Sheet>
-             )}
+            <Sheet>
+                <SheetTrigger asChild>
+                    <Button variant="outline" className="lg:hidden">
+                        <PanelLeft className="mr-2 h-4 w-4" />
+                        {isStoreOwner ? 'Manage Inventory' : 'Filter Products'}
+                    </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="p-0 w-full max-w-md">
+                    {sidebarContent}
+                </SheetContent>
+            </Sheet>
           </div>
           <p className="text-lg text-muted-foreground mb-2">{store.address}</p>
           <p className="text-lg">{store.description}</p>
         </div>
       </div>
 
-      <h2 className="text-3xl font-bold font-headline mb-8">Products</h2>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-        {products && products.map((product) => (
+      <h2 className="text-3xl font-bold font-headline mb-8">Products ({filteredProducts.length})</h2>
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        {filteredProducts && filteredProducts.map((product) => (
           <ProductCard key={product.id} product={product} />
         ))}
       </div>
+      {filteredProducts.length === 0 && !productsLoading && (
+        <p className="text-muted-foreground">No products found matching your criteria.</p>
+      )}
     </div>
     </div>
   );
