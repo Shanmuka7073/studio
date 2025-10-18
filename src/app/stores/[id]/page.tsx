@@ -4,7 +4,7 @@ import Image from 'next/image';
 import ProductCard from '@/components/product-card';
 import { useFirebase, useCollection, useMemoFirebase, errorEmitter } from '@/firebase';
 import { Store, Product } from '@/lib/types';
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useState, useTransition, useMemo } from 'react';
 import { notFound, useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
