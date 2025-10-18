@@ -20,8 +20,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 import { getProductImage } from '@/lib/data';
-import { MapPin } from 'lucide-react';
-import { useState, useTransition } from 'react';
+import { useTransition } from 'react';
 import { useFirebase, errorEmitter } from '@/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -31,8 +30,6 @@ const checkoutSchema = z.object({
   address: z.string().min(10, 'Please enter a valid address'),
   phone: z.string().min(10, 'Please enter a valid phone number'),
   email: z.string().email('Please enter a valid email address'),
-  latitude: z.number().optional(),
-  longitude: z.number().optional(),
 });
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
@@ -41,7 +38,6 @@ export default function CheckoutPage() {
   const { cartItems, cartTotal, clearCart } = useCart();
   const router = useRouter();
   const { toast } = useToast();
-  const [isLocating, setIsLocating] = useState(false);
   const [isPlacingOrder, startTransition] = useTransition();
   const { firestore, user } = useFirebase();
 
@@ -54,46 +50,6 @@ export default function CheckoutPage() {
       email: '',
     },
   });
-
-  const handleGetCurrentLocation = () => {
-    if (navigator.geolocation) {
-      setIsLocating(true);
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          form.setValue('latitude', latitude);
-          form.setValue('longitude', longitude);
-          
-          // For now, we'll just use the coordinates for delivery.
-          // In a real app, you'd use a geocoding service to convert coords to an address.
-          if (!form.getValues('address')) {
-              form.setValue('address', `GPS: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`, { shouldValidate: true });
-          }
-
-          setIsLocating(false);
-          toast({
-            title: 'Location Found',
-            description: 'Your current location has been captured for delivery.',
-          });
-        },
-        (error) => {
-          console.error("Geolocation error:", error);
-          toast({
-            variant: "destructive",
-            title: 'Location Error',
-            description: 'Could not get your location. Please enter address manually.',
-          });
-          setIsLocating(false);
-        }
-      );
-    } else {
-       toast({
-        variant: "destructive",
-        title: 'Unsupported',
-        description: 'Geolocation is not supported by your browser.',
-      });
-    }
-  };
 
   const onSubmit = (data: CheckoutFormValues) => {
     if (!firestore || !user) {
@@ -114,8 +70,6 @@ export default function CheckoutPage() {
             storeId: storeId,
             customerName: data.name,
             deliveryAddress: data.address,
-            deliveryLat: data.latitude,
-            deliveryLng: data.longitude,
             phone: data.phone,
             email: data.email,
             orderDate: serverTimestamp(),
@@ -187,19 +141,7 @@ export default function CheckoutPage() {
                     name="address"
                     render={({ field }) => (
                       <FormItem>
-                        <div className="flex justify-between items-center">
-                          <FormLabel>Shipping Address</FormLabel>
-                          <Button 
-                            type="button" 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={handleGetCurrentLocation}
-                            disabled={isLocating}
-                          >
-                            <MapPin className="mr-2 h-4 w-4" />
-                            {isLocating ? 'Locating...' : 'Use Current Location'}
-                          </Button>
-                        </div>
+                        <FormLabel>Shipping Address</FormLabel>
                         <FormControl>
                           <Input placeholder="123 Green St, Springfield" {...field} />
                         </FormControl>

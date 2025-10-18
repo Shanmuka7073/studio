@@ -39,7 +39,6 @@ import {
 } from '@/components/ui/table';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Checkbox } from '@/components/ui/checkbox';
-import { MapPin } from 'lucide-react';
 import groceryData from '@/lib/grocery-data.json';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -49,8 +48,8 @@ const storeSchema = z.object({
     .string()
     .min(10, 'Description must be at least 10 characters'),
   address: z.string().min(10, 'Please enter a valid address'),
-  latitude: z.number(),
-  longitude: z.number(),
+  latitude: z.coerce.number().min(-90).max(90),
+  longitude: z.coerce.number().min(-180).max(180),
 });
 
 const productSchema = z.object({
@@ -353,7 +352,6 @@ function CreateStoreForm({ user }) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const { firestore } = useFirebase();
-  const [isLocating, setIsLocating] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<Record<string, boolean>>({});
 
   const form = useForm<StoreFormValues>({
@@ -371,39 +369,6 @@ function CreateStoreForm({ user }) {
     setSelectedProducts(prev => ({...prev, [productName]: isChecked}));
   }
 
-  const handleGetCurrentLocation = () => {
-    if (navigator.geolocation) {
-      setIsLocating(true);
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          form.setValue('latitude', position.coords.latitude);
-          form.setValue('longitude', position.coords.longitude);
-          setIsLocating(false);
-          toast({
-            title: 'Location Set!',
-            description: 'Your store\'s location has been set to your current position.',
-          });
-        },
-        (error) => {
-          console.error("Geolocation error:", error);
-          toast({
-            variant: "destructive",
-            title: 'Location Error',
-            description: 'Could not get your location.',
-          });
-          setIsLocating(false);
-        }
-      );
-    } else {
-       toast({
-        variant: "destructive",
-        title: 'Unsupported',
-        description: 'Geolocation is not supported by your browser.',
-      });
-    }
-  };
-
-
   const onSubmit = (data: StoreFormValues) => {
     if (!user || !firestore) {
         toast({
@@ -412,15 +377,6 @@ function CreateStoreForm({ user }) {
             description: 'You must be logged in to create a store.',
         });
         return;
-    }
-    
-    if (data.latitude === 0 && data.longitude === 0) {
-      toast({
-        variant: 'destructive',
-        title: 'Location Required',
-        description: 'Please set your store location before creating it.',
-      });
-      return;
     }
 
     startTransition(async () => {
@@ -533,24 +489,42 @@ function CreateStoreForm({ user }) {
                   </FormItem>
                 )}
               />
-               <FormItem>
-                  <FormLabel>Store Location</FormLabel>
-                  <div className="flex items-center gap-4">
-                      <Button 
-                      type="button" 
-                      variant="outline" 
-                      onClick={handleGetCurrentLocation}
-                      disabled={isLocating}
-                      >
-                      <MapPin className="mr-2 h-4 w-4" />
-                      {isLocating ? 'Locating...' : 'Set to My Current Location'}
-                      </Button>
-                      {(form.watch('latitude') !== 0 || form.watch('longitude') !== 0) && (
-                          <span className="text-sm text-muted-foreground">Location set!</span>
-                      )}
-                  </div>
-                   <FormMessage>{form.formState.errors.latitude?.message || form.formState.errors.longitude?.message}</FormMessage>
-              </FormItem>
+               <div className="grid grid-cols-2 gap-4">
+                 <FormField
+                    control={form.control}
+                    name="latitude"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Latitude</FormLabel>
+                        <FormControl>
+                        <Input
+                            type="number"
+                            placeholder="e.g., 19.0760"
+                            {...field}
+                        />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="longitude"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Longitude</FormLabel>
+                        <FormControl>
+                        <Input
+                            type="number"
+                            placeholder="e.g., 72.8777"
+                            {...field}
+                        />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+               </div>
 
               <div className="space-y-4">
                   <h3 className="text-lg font-medium">Select Your Initial Inventory</h3>
