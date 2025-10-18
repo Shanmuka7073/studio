@@ -6,18 +6,9 @@ import {
 } from '@/ai/flows/product-recommendations';
 import type { Order, Product } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
-import {
-  getFirestore,
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  where,
-  Timestamp,
-  Query,
-} from 'firebase/firestore';
-import { initializeServerFirebase } from '@/firebase/server-init';
+import { initializeAdminFirebase } from '@/firebase/server-init';
+import { Timestamp } from 'firebase-admin/firestore';
+import type { Query } from 'firebase-admin/firestore';
 
 export async function getRecommendationsAction(
   input: ProductRecommendationsInput
@@ -45,20 +36,16 @@ export async function revalidateProductPaths(storeId: string) {
 export async function getProductsByIdsAction(
   productRefs: { productId: string; storeId: string }[]
 ): Promise<Product[]> {
-  const { firestore } = initializeServerFirebase();
+  const { firestore } = initializeAdminFirebase();
   const products: Product[] = [];
 
   for (const { productId, storeId } of productRefs) {
     try {
-      const productDocRef = doc(
-        firestore,
-        'stores',
-        storeId,
-        'products',
-        productId
+      const productDocRef = firestore.doc(
+        `stores/${storeId}/products/${productId}`
       );
-      const productSnap = await getDoc(productDocRef);
-      if (productSnap.exists()) {
+      const productSnap = await productDocRef.get();
+      if (productSnap.exists) {
         products.push({
           id: productSnap.id,
           ...productSnap.data(),
@@ -83,19 +70,19 @@ export async function getOrdersAction({
   by,
   value,
 }: GetOrdersParams): Promise<Order[]> {
-  const { firestore } = initializeServerFirebase();
-  const ordersCollection = collection(firestore, 'orders');
+  const { firestore } = initializeAdminFirebase();
+  const ordersCollection = firestore.collection('orders');
   let q: Query;
 
   switch (by) {
     case 'userId':
-      q = query(ordersCollection, where('userId', '==', value));
+      q = ordersCollection.where('userId', '==', value);
       break;
     case 'storeId':
-      q = query(ordersCollection, where('storeId', '==', value));
+      q = ordersCollection.where('storeId', '==', value);
       break;
     case 'deliveryStatus':
-      q = query(ordersCollection, where('status', '==', value));
+      q = ordersCollection.where('status', '==', value);
       break;
     default:
       console.error(`Invalid 'by' parameter: ${by}`);
@@ -103,7 +90,7 @@ export async function getOrdersAction({
   }
 
   try {
-    const querySnapshot = await getDocs(q);
+    const querySnapshot = await q.get();
 
     if (querySnapshot.empty) {
       return [];
