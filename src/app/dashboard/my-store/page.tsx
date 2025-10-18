@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useTransition, useEffect } from 'react';
@@ -26,7 +27,7 @@ import { useToast } from '@/hooks/use-toast';
 import { revalidateStorePaths, revalidateProductPaths } from '@/app/actions';
 import type { Store, Product } from '@/lib/types';
 import { useFirebase, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, query, where, addDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, where, addDoc, writeBatch, doc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import {
   Table,
@@ -347,7 +348,7 @@ function CreateStoreForm({ user }) {
             Create Your Store
           </CardTitle>
           <CardDescription>
-            Fill out the details below to get your shop listed on mkservices.
+            Fill out the details below to get your shop listed on LocalBasket.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -503,3 +504,5 @@ export default function MyStorePage() {
     </div>
   );
 }
+
+    
