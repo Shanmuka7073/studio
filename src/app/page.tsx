@@ -17,7 +17,7 @@ type Coords = {
 export default function Home() {
   const { firestore } = useFirebase();
   const [allStores, setAllStores] = useState<Store[]>([]);
-  const [nearbyStores, setNearbyStores] = useState<Store[]>([]);
+  const [displayedStores, setDisplayedStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<Coords | null>(null);
@@ -52,14 +52,13 @@ export default function Home() {
                 return store.distance! <= 3;
               });
               
-              // Sort by distance
               storesWithinRadius.sort((a,b) => a.distance! - b.distance!);
 
               if (storesWithinRadius.length > 0) {
-                 setNearbyStores(storesWithinRadius);
+                 setDisplayedStores(storesWithinRadius);
               } else {
                 setLocationError("No stores found within a 3km radius. Showing all stores instead.");
-                setNearbyStores(stores); // Fallback to show all stores
+                setDisplayedStores(stores); // Fallback to show all stores
               }
 
               setLoading(false);
@@ -67,18 +66,19 @@ export default function Home() {
             (error) => {
               console.error("Geolocation error:", error);
               setLocationError("Could not get your location. Showing all available stores.");
-              setNearbyStores(stores); // Fallback to show all stores
+              setDisplayedStores(stores); // Fallback to show all stores
               setLoading(false);
             }
           );
         } else {
           setLocationError("Geolocation is not supported by your browser. Showing all stores.");
-          setNearbyStores(stores); // Fallback to show all stores
+          setDisplayedStores(stores); // Fallback to show all stores
           setLoading(false);
         }
       } catch (err) {
         console.error(err);
         setLocationError("Failed to load stores.");
+        setDisplayedStores([]); // Clear stores on error
         setLoading(false);
       }
     }
@@ -95,7 +95,7 @@ export default function Home() {
             <div className="flex flex-col justify-center space-y-4">
               <div className="space-y-2">
                 <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none font-headline">
-                  Shop Fresh, Shop Local with mkservices
+                  Shop Fresh, Shop Local with LocalBasket
                 </h1>
                 <p className="max-w-[600px] text-foreground/80 md:text-xl">
                   Discover the best groceries from your neighborhood stores. We connect you with local vendors for fresh produce, everyday essentials, and more, all delivered to your door.
@@ -146,7 +146,7 @@ export default function Home() {
             {loading ? (
               <p>Finding nearby stores...</p>
             ) : (
-              nearbyStores.map((store) => (
+              displayedStores.map((store) => (
                 <StoreCard key={store.id} store={store} userLocation={userLocation} />
               ))
             )}
