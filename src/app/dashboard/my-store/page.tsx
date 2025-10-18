@@ -61,6 +61,107 @@ const productSchema = z.object({
 type StoreFormValues = z.infer<typeof storeSchema>;
 type ProductFormValues = z.infer<typeof productSchema>;
 
+function ProductChecklist({ storeId, onProductsAdded }: { storeId: string; onProductsAdded: () => void }) {
+  const { toast } = useToast();
+  const [isAdding, startTransition] = useTransition();
+  const { firestore } = useFirebase();
+  const [selectedProducts, setSelectedProducts] = useState<Record<string, boolean>>({});
+
+  const handleProductSelection = (productName: string, isChecked: boolean) => {
+    setSelectedProducts(prev => ({ ...prev, [productName]: isChecked }));
+  };
+  
+  const handleAddSelectedProducts = () => {
+    if (!firestore || !storeId) return;
+
+    const productNames = Object.keys(selectedProducts).filter(key => selectedProducts[key]);
+    
+    if (productNames.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'No products selected',
+        description: 'Please select at least one product to add.',
+      });
+      return;
+    }
+    
+    startTransition(async () => {
+       try {
+          const batch = writeBatch(firestore);
+          productNames.forEach(name => {
+            const newProductRef = doc(collection(firestore, 'stores', storeId, 'products'));
+            batch.set(newProductRef, {
+              name,
+              price: 0.99, // Default price
+              description: '',
+              storeId: storeId,
+              imageId: `prod-${Math.floor(Math.random() * 20)}`,
+              quantity: 100, // Default quantity
+            });
+          });
+          await batch.commit();
+          toast({
+            title: `${productNames.length} Products Added!`,
+            description: 'The selected products have been added to your inventory.',
+          });
+          setSelectedProducts({});
+          onProductsAdded(); // Revalidate paths
+       } catch (serverError) {
+         console.error("Failed to add products:", serverError);
+          const permissionError = new FirestorePermissionError({
+            path: `stores/${storeId}/products`,
+            operation: 'create',
+            requestResourceData: { names: productNames },
+          });
+          errorEmitter.emit('permission-error', permissionError);
+       }
+    });
+  };
+
+  const selectedCount = Object.values(selectedProducts).filter(Boolean).length;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Bulk Add Products</CardTitle>
+        <CardDescription>Select from a master list of grocery items to quickly add to your store.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <Accordion type="multiple" className="w-full">
+          {groceryData.categories.map((category) => (
+            <AccordionItem value={category.categoryName} key={category.categoryName}>
+              <AccordionTrigger>{category.categoryName} ({category.items.filter(item => selectedProducts[item]).length}/{category.items.length})</AccordionTrigger>
+              <AccordionContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4">
+                  {category.items.map((item) => (
+                    <div key={item} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`${category.categoryName}-${item}`}
+                        onCheckedChange={(checked) => handleProductSelection(item, !!checked)}
+                        checked={selectedProducts[item] || false}
+                      />
+                      <label
+                        htmlFor={`${category.categoryName}-${item}`}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        {item}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
+        <Button onClick={handleAddSelectedProducts} disabled={isAdding || selectedCount === 0} className="w-full">
+            {isAdding ? 'Adding...' : `Add ${selectedCount} Selected Products`}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+
 function AddProductForm({ storeId }: { storeId: string }) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
@@ -171,22 +272,20 @@ function ManageStoreView({ store }: { store: Store }) {
     const { data: products, isLoading } = useCollection<Product>(productsQuery);
 
     return (
+      <div className="space-y-8">
         <div className="grid md:grid-cols-2 gap-8">
-          <div>
             <Card>
                 <CardHeader>
                     <CardTitle>Manage {store.name}</CardTitle>
                     <CardDescription>
-                        Add new products and view your existing inventory.
+                        View your existing inventory below and add new products.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
                    <AddProductForm storeId={store.id} />
                 </CardContent>
             </Card>
-          </div>
-          <div>
-            <Card>
+             <Card>
                 <CardHeader>
                     <CardTitle>Your Products</CardTitle>
                 </CardHeader>
@@ -215,8 +314,11 @@ function ManageStoreView({ store }: { store: Store }) {
                    )}
                 </CardContent>
             </Card>
-          </div>
         </div>
+        <div>
+            <ProductChecklist storeId={store.id} onProductsAdded={() => revalidateProductPaths(store.id)} />
+        </div>
+      </div>
     )
 }
 
@@ -504,5 +606,3 @@ export default function MyStorePage() {
     </div>
   );
 }
-
-    
