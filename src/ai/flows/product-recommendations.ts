@@ -57,8 +57,8 @@ const prompt = ai.definePrompt({
   If the optimal time is 'During Checkout', recommend products that are frequently bought together with the items in the cart.
   If the optimal time is 'After Checkout', recommend products that are similar to the items in the past purchases.
 
-  Past Purchases: {{#if pastPurchases}}{{jsonStringify pastPurchases}}{{else}}None{{/if}}
-  Current Cart Items: {{#if currentCartItems}}{{jsonStringify currentCartItems}}{{else}}None{{/if}}
+  Past Purchases: ${JSON.stringify('{{{pastPurchases}}}')}
+  Current Cart Items: ${JSON.stringify('{{{currentCartItems}}}')}
   Optimal Display Time: {{{optimalDisplayTime}}}
 
   Based on this information, recommend products to the user. Return a list of product IDs and their corresponding store IDs in the recommendedProducts field and a reason why these products are recommended in the reason field.
@@ -73,6 +73,6 @@ const productRecommendationsFlow = ai.defineFlow(
   },
   async input => {
     const {output} = await prompt(input);
-    return output!;
+    return output || { recommendedProducts: [], reason: '' };
   }
 );
