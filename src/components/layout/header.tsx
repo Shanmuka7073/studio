@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Package2, Menu, UserCircle, Store, ShoppingBag, Truck, Code, Settings, ShieldCheck } from 'lucide-react';
+import { Package2, Menu, UserCircle, Store, ShoppingBag, Truck, Settings, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -46,7 +46,6 @@ const deliveryLinks = [
 ]
 
 const educationalLinks = [
-    { href: '/dashboard/live-editor', label: 'Live Editor', icon: Code },
     { href: '/dashboard/site-config', label: 'Site Config', icon: Settings },
     { href: '/dashboard/firebase-checker', label: 'Firebase Checker', icon: ShieldCheck },
 ]
@@ -213,5 +212,3 @@ export function Header() {
     </header>
   );
 }
-
-    
