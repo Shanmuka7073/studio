@@ -1,6 +1,6 @@
 'use client';
 
-import { useFirebase } from '@/firebase';
+import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { Order } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,39 +9,23 @@ import { format, parseISO } from 'date-fns';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { useState, useEffect } from 'react';
-import { getOrdersAction } from '@/app/actions';
+import { collection, query, where, orderBy } from 'firebase/firestore';
+
 
 export default function MyOrdersPage() {
-  const { user, isUserLoading } = useFirebase();
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { user, isUserLoading, firestore } = useFirebase();
 
-  useEffect(() => {
-    async function fetchOrders() {
-      if (user) {
-        setIsLoading(true);
-        try {
-            const fetchedOrders = await getOrdersAction({ by: 'userId', value: user.uid });
-            setOrders(fetchedOrders);
-        } catch (error) {
-            console.error("Failed to fetch user orders:", error);
-            setOrders([]); // Clear orders on error
-        } finally {
-            setIsLoading(false);
-        }
-      }
-    }
-    
-    // Only fetch orders when the user object is available and not loading.
-    if (!isUserLoading && user) {
-        fetchOrders();
-    } else if (!isUserLoading && !user) {
-        // If not loading and no user, no orders to fetch.
-        setIsLoading(false);
-    }
+  const ordersQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return query(
+        collection(firestore, 'orders'), 
+        where('userId', '==', user.uid),
+        orderBy('orderDate', 'desc')
+    );
+  }, [firestore, user]);
 
-  }, [user, isUserLoading]);
+  const { data: orders, isLoading: areOrdersLoading } = useCollection<Order>(ordersQuery);
+ 
 
   const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
     switch (status) {
@@ -54,7 +38,17 @@ export default function MyOrdersPage() {
   }
 
   // The page is loading if the user state is loading OR if we are fetching orders.
-  const effectiveLoading = isLoading || isUserLoading;
+  const effectiveLoading = areOrdersLoading || isUserLoading;
+
+  const formatDate = (date: any) => {
+    if (!date) return 'N/A';
+    // Firebase Timestamps may be objects with seconds/nanoseconds
+    if (date.seconds) {
+      return format(new Date(date.seconds * 1000), 'PPP');
+    }
+    // Or they may be ISO strings from older data
+    return format(parseISO(date as string), 'PPP');
+  }
 
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
@@ -73,7 +67,7 @@ export default function MyOrdersPage() {
                     <Link href="/login">Login</Link>
                 </Button>
             </div>
-          ) : orders.length === 0 ? (
+          ) : orders && orders.length === 0 ? (
             <div className="text-center py-12">
                 <p className="text-muted-foreground mb-4">You haven't placed any orders yet.</p>
                 <Button asChild>
@@ -82,13 +76,13 @@ export default function MyOrdersPage() {
             </div>
           ) : (
             <Accordion type="single" collapsible className="w-full">
-              {orders.map((order) => (
+              {orders && orders.map((order) => (
                 <AccordionItem value={order.id} key={order.id}>
                   <AccordionTrigger>
                     <div className="flex justify-between w-full pr-4">
                         <div className="flex-1 text-left">
                             <p className="font-medium">Order #{order.id.substring(0, 7)}</p>
-                            <p className="text-sm text-muted-foreground">{format(parseISO(order.orderDate as string), 'PPP')}</p>
+                            <p className="text-sm text-muted-foreground">{formatDate(order.orderDate)}</p>
                         </div>
                         <div className="flex-1 text-center">
                             <Badge variant={getStatusVariant(order.status)}>{order.status}</Badge>

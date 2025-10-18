@@ -2,13 +2,11 @@
 
 import { useFirebase } from '@/firebase';
 import { Order, Store } from '@/lib/types';
-import { collection, query, where } from 'firebase/firestore';
+import { collection, query, where, orderBy } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO } from 'date-fns';
-import { useState, useEffect } from 'react';
-import { getOrdersAction } from '@/app/actions';
 import { useCollection, useMemoFirebase } from '@/firebase';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -16,8 +14,6 @@ import { Button } from '@/components/ui/button';
 
 export default function OrdersDashboardPage() {
   const { firestore, user, isUserLoading } = useFirebase();
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [areOrdersLoading, setAreOrdersLoading] = useState(true);
 
   // 1. Get the current user's store
   const storeQuery = useMemoFirebase(() => {
@@ -27,32 +23,17 @@ export default function OrdersDashboardPage() {
   const { data: stores, isLoading: isStoreLoading } = useCollection<Store>(storeQuery);
   const myStore = stores?.[0];
 
-  // 2. Get orders for that store using the server action
-  useEffect(() => {
-    async function fetchOrdersForStore() {
-        if (myStore) {
-            setAreOrdersLoading(true);
-            try {
-                const fetchedOrders = await getOrdersAction({ by: 'storeId', value: myStore.id });
-                setOrders(fetchedOrders);
-            } catch (error) {
-                console.error("Failed to fetch store orders:", error);
-                setOrders([]);
-            } finally {
-                setAreOrdersLoading(false);
-            }
-        }
-    }
-    
-    // This effect runs when the store is found.
-    if (!isStoreLoading && myStore) {
-        fetchOrdersForStore();
-    } else if (!isStoreLoading && !myStore) {
-        // If not loading and no store, no orders to fetch.
-        setAreOrdersLoading(false);
-    }
+  // 2. Get orders for that store using a client-side listener
+  const ordersQuery = useMemoFirebase(() => {
+    if (!firestore || !myStore) return null;
+    return query(
+        collection(firestore, 'orders'), 
+        where('storeId', '==', myStore.id),
+        orderBy('orderDate', 'desc')
+    );
+  }, [firestore, myStore]);
+  const { data: orders, isLoading: areOrdersLoading } = useCollection<Order>(ordersQuery);
 
-  }, [myStore, isStoreLoading]);
 
   const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
     switch (status) {
@@ -61,6 +42,14 @@ export default function OrdersDashboardPage() {
         case 'Out for Delivery': return 'outline';
         default: return 'secondary';
     }
+  }
+
+  const formatDate = (date: any) => {
+    if (!date) return 'N/A';
+    if (date.seconds) {
+      return format(new Date(date.seconds * 1000), 'PPP');
+    }
+    return format(parseISO(date as string), 'PPP');
   }
 
   // Combine loading states for a clearer UI
@@ -83,7 +72,7 @@ export default function OrdersDashboardPage() {
                 <Link href="/dashboard/my-store">Create Store</Link>
               </Button>
             </div>
-          ) : orders.length === 0 ? (
+          ) : orders && orders.length === 0 ? (
             <p className="text-muted-foreground">No orders found.</p>
           ) : (
             <Table>
@@ -98,12 +87,12 @@ export default function OrdersDashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {orders.map((order) => (
+                {orders && orders.map((order) => (
                   <TableRow key={order.id}>
                     <TableCell className="font-medium truncate max-w-[100px]">{order.id}</TableCell>
                     <TableCell>{order.customerName}</TableCell>
                     <TableCell>{order.deliveryAddress}</TableCell>
-                    <TableCell>{format(parseISO(order.orderDate as string), 'PPP')}</TableCell>
+                    <TableCell>{formatDate(order.orderDate)}</TableCell>
                     <TableCell>
                       <Badge variant={getStatusVariant(order.status)}>{order.status}</Badge>
                     </TableCell>

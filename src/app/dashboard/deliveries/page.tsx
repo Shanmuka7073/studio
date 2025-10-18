@@ -5,23 +5,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { MapPin } from 'lucide-react';
-import { useState, useEffect } from 'react';
-import { getOrdersAction } from '@/app/actions';
+import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, where } from 'firebase/firestore';
 
 export default function DeliveriesPage() {
-  const [deliveries, setDeliveries] = useState<Order[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { firestore } = useFirebase();
 
-  useEffect(() => {
-    async function fetchDeliveries() {
-      setIsLoading(true);
-      // Fetch pending orders for delivery partners
-      const fetchedOrders = await getOrdersAction({ by: 'deliveryStatus', value: 'Pending' });
-      setDeliveries(fetchedOrders);
-      setIsLoading(false);
-    }
-    fetchDeliveries();
-  }, []);
+  const deliveriesQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'orders'), where('status', '==', 'Pending'));
+  }, [firestore]);
+
+  const { data: deliveries, isLoading } = useCollection<Order>(deliveriesQuery);
 
   const openInGoogleMaps = (lat: number, lng: number) => {
     const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
