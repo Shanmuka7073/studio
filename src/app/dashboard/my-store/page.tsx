@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useTransition, useEffect } from 'react';
+import { useState, useTransition, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -87,37 +87,37 @@ function ProductChecklist({ storeId, onProductsAdded }: { storeId: string; onPro
     }
     
     startTransition(async () => {
-       try {
-          const batch = writeBatch(firestore);
-          productNames.forEach(name => {
-            const newProductRef = doc(collection(firestore, 'stores', storeId, 'products'));
-            const category = groceryData.categories.find(c => c.items.includes(name))?.categoryName || 'Miscellaneous';
-            batch.set(newProductRef, {
-              name,
-              price: 0.99, // Default price
-              description: '',
-              storeId: storeId,
-              imageId: `prod-${Math.floor(Math.random() * 20)}`,
-              quantity: 100, // Default quantity
-              category: category,
-            });
+       const batch = writeBatch(firestore);
+        productNames.forEach(name => {
+          const newProductRef = doc(collection(firestore, 'stores', storeId, 'products'));
+          const category = groceryData.categories.find(c => c.items.includes(name))?.categoryName || 'Miscellaneous';
+          batch.set(newProductRef, {
+            name,
+            price: 0.99, // Default price
+            description: '',
+            storeId: storeId,
+            imageId: `prod-${Math.floor(Math.random() * 20)}`,
+            quantity: 100, // Default quantity
+            category: category,
           });
-          await batch.commit();
+        });
+        
+        batch.commit().then(() => {
           toast({
             title: `${productNames.length} Products Added!`,
             description: 'The selected products have been added to your inventory.',
           });
           setSelectedProducts({});
           onProductsAdded(); // Revalidate paths
-       } catch (serverError) {
-         console.error("Failed to add products:", serverError);
+        }).catch((serverError) => {
+          console.error("Failed to add products:", serverError);
           const permissionError = new FirestorePermissionError({
             path: `stores/${storeId}/products`,
             operation: 'create',
             requestResourceData: { names: productNames },
           });
           errorEmitter.emit('permission-error', permissionError);
-       }
+        });
     });
   };
 
@@ -380,7 +380,6 @@ function CreateStoreForm({ user }) {
     }
 
     startTransition(async () => {
-      try {
         const storeData = {
             ...data,
             ownerId: user.uid,
@@ -388,43 +387,43 @@ function CreateStoreForm({ user }) {
         };
         const storesCol = collection(firestore, 'stores');
         
-        const storeRef = await addDoc(storesCol, storeData);
-        await revalidateStorePaths();
+        try {
+            const storeRef = await addDoc(storesCol, storeData);
+            await revalidateStorePaths();
 
-        const productNames = Object.keys(selectedProducts).filter(key => selectedProducts[key]);
-        
-        if (productNames.length > 0) {
-          const batch = writeBatch(firestore);
-          productNames.forEach(name => {
-            const newProductRef = doc(collection(firestore, 'stores', storeRef.id, 'products'));
-            const category = groceryData.categories.find(c => c.items.includes(name))?.categoryName || 'Miscellaneous';
-            batch.set(newProductRef, {
-              name,
-              price: 0.99,
-              description: '',
-              storeId: storeRef.id,
-              imageId: `prod-${Math.floor(Math.random() * 20)}`,
-              quantity: 100,
-              category: category,
+            const productNames = Object.keys(selectedProducts).filter(key => selectedProducts[key]);
+            
+            if (productNames.length > 0) {
+                const batch = writeBatch(firestore);
+                productNames.forEach(name => {
+                    const newProductRef = doc(collection(firestore, 'stores', storeRef.id, 'products'));
+                    const category = groceryData.categories.find(c => c.items.includes(name))?.categoryName || 'Miscellaneous';
+                    batch.set(newProductRef, {
+                    name,
+                    price: 0.99,
+                    description: '',
+                    storeId: storeRef.id,
+                    imageId: `prod-${Math.floor(Math.random() * 20)}`,
+                    quantity: 100,
+                    category: category,
+                    });
+                });
+                await batch.commit();
+            }
+
+            toast({
+                title: 'Store Created!',
+                description: `Your store "${data.name}" has been successfully created.`,
             });
-          });
-          await batch.commit();
+        } catch (serverError) {
+            console.error("Failed to create store or products:", serverError);
+            const permissionError = new FirestorePermissionError({
+                path: 'stores or subcollections',
+                operation: 'create',
+                requestResourceData: data,
+            });
+            errorEmitter.emit('permission-error', permissionError);
         }
-
-        toast({
-          title: 'Store Created!',
-          description: `Your store "${data.name}" has been successfully created.`,
-        });
-
-      } catch (serverError) {
-        console.error("Failed to create store or products:", serverError);
-        const permissionError = new FirestorePermissionError({
-          path: 'stores or subcollections',
-          operation: 'create',
-          requestResourceData: data,
-        });
-        errorEmitter.emit('permission-error', permissionError);
-      }
     });
   };
 

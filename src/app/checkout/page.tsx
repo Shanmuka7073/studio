@@ -64,7 +64,7 @@ export default function CheckoutPage() {
         return;
     }
 
-    startTransition(async () => {
+    startTransition(() => {
         const orderData = {
             userId: user.uid,
             storeId: storeId,
@@ -98,6 +98,7 @@ export default function CheckoutPage() {
                 operation: 'create',
                 requestResourceData: orderData
             }));
+             return Promise.reject(e);
         });
     });
   };
