@@ -9,13 +9,10 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { getProductImage } from '@/lib/data';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import ProductSuggestions from '@/components/product-suggestions';
-import { useFirebase } from '@/firebase';
 
 export default function CartPage() {
   const { cartItems, removeItem, updateQuantity, cartTotal, cartCount } = useCart();
-  const cartProductRefs = cartItems.map(item => ({ productId: item.product.id, storeId: item.product.storeId }));
-
+  
   if (cartCount === 0) {
     return (
       <div className="container mx-auto py-24 text-center">
@@ -112,10 +109,6 @@ export default function CartPage() {
                     </Button>
                 </CardContent>
             </Card>
-            <ProductSuggestions
-              currentCartItems={cartProductRefs}
-              optimalDisplayTime="During Checkout"
-            />
         </div>
       </div>
     </div>

@@ -1,26 +1,10 @@
 'use server';
 
-import {
-  getProductRecommendations,
-  ProductRecommendationsInput,
-} from '@/ai/flows/product-recommendations';
 import type { Order, Product } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
 import { initializeAdminFirebase } from '@/firebase/server-init';
 import { Timestamp } from 'firebase-admin/firestore';
 import type { Query } from 'firebase-admin/firestore';
-
-export async function getRecommendationsAction(
-  input: ProductRecommendationsInput
-) {
-  try {
-    const recommendations = await getProductRecommendations(input);
-    return recommendations;
-  } catch (error) {
-    console.error('Error getting AI recommendations:', error);
-    return { error: 'Failed to get recommendations.' };
-  }
-}
 
 export async function revalidateStorePaths() {
   revalidatePath('/');
@@ -31,34 +15,6 @@ export async function revalidateStorePaths() {
 export async function revalidateProductPaths(storeId: string) {
   revalidatePath(`/stores/${storeId}`);
   revalidatePath(`/dashboard/my-store`);
-}
-
-export async function getProductsByIdsAction(
-  productRefs: { productId: string; storeId: string }[]
-): Promise<Product[]> {
-  const { firestore } = initializeAdminFirebase();
-  const products: Product[] = [];
-
-  for (const { productId, storeId } of productRefs) {
-    try {
-      const productDocRef = firestore.doc(
-        `stores/${storeId}/products/${productId}`
-      );
-      const productSnap = await productDocRef.get();
-      if (productSnap.exists) {
-        products.push({
-          id: productSnap.id,
-          ...productSnap.data(),
-        } as Product);
-      }
-    } catch (error) {
-      console.error(
-        `Failed to fetch product ${productId} from store ${storeId}`,
-        error
-      );
-    }
-  }
-  return products;
 }
 
 type GetOrdersParams = {
