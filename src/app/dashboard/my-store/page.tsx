@@ -26,7 +26,7 @@ import { useToast } from '@/hooks/use-toast';
 import { revalidateStorePaths, revalidateProductPaths } from '@/app/actions';
 import type { Store, Product } from '@/lib/types';
 import { useFirebase, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, query, where, addDoc } from 'firebase/firestore';
+import { collection, query, where, addDoc, writeBatch } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import {
   Table,
@@ -36,7 +36,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Checkbox } from '@/components/ui/checkbox';
 import { MapPin } from 'lucide-react';
+import groceryData from '@/lib/grocery-data.json';
 
 const storeSchema = z.object({
   name: z.string().min(3, 'Store name must be at least 3 characters'),
@@ -216,27 +219,12 @@ function ManageStoreView({ store }: { store: Store }) {
     )
 }
 
-export default function MyStorePage() {
+function CreateStoreForm({ user }) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
-  const { firestore, user, isUserLoading } = useFirebase();
-  const router = useRouter();
+  const { firestore } = useFirebase();
   const [isLocating, setIsLocating] = useState(false);
-
-  useEffect(() => {
-    if (!isUserLoading && !user) {
-      router.push('/login?redirectTo=/dashboard/my-store');
-    }
-  }, [isUserLoading, user, router]);
-
-  const storeQuery = useMemoFirebase(() => {
-      if (!firestore || !user) return null;
-      return query(collection(firestore, 'stores'), where('ownerId', '==', user.uid));
-  }, [firestore, user]);
-
-  const { data: stores, isLoading: isStoreLoading } = useCollection<Store>(storeQuery);
-
-  const myStore = stores?.[0];
+  const [selectedProducts, setSelectedProducts] = useState<Record<string, boolean>>({});
 
   const form = useForm<StoreFormValues>({
     resolver: zodResolver(storeSchema),
@@ -248,6 +236,10 @@ export default function MyStorePage() {
       longitude: 0,
     },
   });
+
+  const handleProductSelection = (productName: string, isChecked: boolean) => {
+    setSelectedProducts(prev => ({...prev, [productName]: isChecked}));
+  }
 
   const handleGetCurrentLocation = () => {
     if (navigator.geolocation) {
@@ -301,7 +293,8 @@ export default function MyStorePage() {
       return;
     }
 
-    startTransition(() => {
+    startTransition(async () => {
+      try {
         const storeData = {
             ...data,
             ownerId: user.uid,
@@ -309,27 +302,193 @@ export default function MyStorePage() {
         };
         const storesCol = collection(firestore, 'stores');
         
-        addDoc(storesCol, storeData).then(async () => {
-            await revalidateStorePaths();
-            toast({
-              title: 'Store Created!',
-              description: `Your store "${data.name}" has been successfully created.`,
+        const storeRef = await addDoc(storesCol, storeData);
+        await revalidateStorePaths();
+
+        const productNames = Object.keys(selectedProducts).filter(key => selectedProducts[key]);
+        
+        if (productNames.length > 0) {
+          const batch = writeBatch(firestore);
+          productNames.forEach(name => {
+            const newProductRef = doc(collection(firestore, 'stores', storeRef.id, 'products'));
+            batch.set(newProductRef, {
+              name,
+              price: 0.99, // Default price
+              description: '',
+              storeId: storeRef.id,
+              imageId: `prod-${Math.floor(Math.random() * 20)}`,
+              quantity: 100, // Default quantity
             });
-        }).catch(async (serverError) => {
-            const permissionError = new FirestorePermissionError({
-              path: storesCol.path,
-              operation: 'create',
-              requestResourceData: storeData,
-            });
-            errorEmitter.emit('permission-error', permissionError);
+          });
+          await batch.commit();
+        }
+
+        toast({
+          title: 'Store Created!',
+          description: `Your store "${data.name}" has been successfully created.`,
         });
+
+      } catch (serverError) {
+        console.error("Failed to create store or products:", serverError);
+        const permissionError = new FirestorePermissionError({
+          path: 'stores or subcollections',
+          operation: 'create',
+          requestResourceData: data,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      }
     });
   };
+
+  return (
+      <Card className="max-w-3xl mx-auto">
+        <CardHeader>
+          <CardTitle className="text-3xl font-headline">
+            Create Your Store
+          </CardTitle>
+          <CardDescription>
+            Fill out the details below to get your shop listed on mkservices.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Store Name</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="e.g., Patel Kirana Store"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Store Description</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Describe what makes your store special."
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Full Store Address</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="123 Market Street, Mumbai"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormItem>
+                  <FormLabel>Store Location</FormLabel>
+                  <div className="flex items-center gap-4">
+                      <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={handleGetCurrentLocation}
+                      disabled={isLocating}
+                      >
+                      <MapPin className="mr-2 h-4 w-4" />
+                      {isLocating ? 'Locating...' : 'Set to My Current Location'}
+                      </Button>
+                      {(form.watch('latitude') !== 0 || form.watch('longitude') !== 0) && (
+                          <span className="text-sm text-muted-foreground">Location set!</span>
+                      )}
+                  </div>
+                   <FormMessage>{form.formState.errors.latitude?.message || form.formState.errors.longitude?.message}</FormMessage>
+              </FormItem>
+
+              <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Select Your Initial Inventory</h3>
+                  <Accordion type="multiple" className="w-full">
+                    {groceryData.categories.map((category) => (
+                      <AccordionItem value={category.categoryName} key={category.categoryName}>
+                        <AccordionTrigger>{category.categoryName} ({category.items.filter(item => selectedProducts[item]).length}/{category.items.length})</AccordionTrigger>
+                        <AccordionContent>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4">
+                            {category.items.map((item) => (
+                              <div key={item} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`${category.categoryName}-${item}`}
+                                  onCheckedChange={(checked) => handleProductSelection(item, !!checked)}
+                                  checked={selectedProducts[item] || false}
+                                />
+                                <label
+                                  htmlFor={`${category.categoryName}-${item}`}
+                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                >
+                                  {item}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full bg-accent hover:bg-accent/90 text-accent-foreground"
+                disabled={isPending || !user}
+              >
+                {isPending ? 'Creating...' : 'Create Store'}
+              </Button>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+  );
+}
+
+
+export default function MyStorePage() {
+  const { user, isUserLoading } = useFirebase();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.push('/login?redirectTo=/dashboard/my-store');
+    }
+  }, [isUserLoading, user, router]);
+
+  const { firestore } = useFirebase();
+  const storeQuery = useMemoFirebase(() => {
+      if (!firestore || !user) return null;
+      return query(collection(firestore, 'stores'), where('ownerId', '==', user.uid));
+  }, [firestore, user]);
+
+  const { data: stores, isLoading: isStoreLoading } = useCollection<Store>(storeQuery);
+
+  const myStore = stores?.[0];
 
   if (isUserLoading || isStoreLoading) {
     return <div className="container mx-auto py-12 px-4 md:px-6">Loading your store...</div>
   }
-
+  
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
       <h1 className="text-4xl font-bold font-headline mb-8">
@@ -339,96 +498,7 @@ export default function MyStorePage() {
       {myStore ? (
         <ManageStoreView store={myStore} />
       ) : (
-        <Card className="max-w-3xl mx-auto">
-          <CardHeader>
-            <CardTitle className="text-3xl font-headline">
-              Create Your Store
-            </CardTitle>
-            <CardDescription>
-              Fill out the details below to get your shop listed on mkservices.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Store Name</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="e.g., Patel Kirana Store"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Store Description</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Describe what makes your store special."
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="address"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Full Store Address</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="123 Market Street, Mumbai"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <FormItem>
-                    <FormLabel>Store Location</FormLabel>
-                    <div className="flex items-center gap-4">
-                        <Button 
-                        type="button" 
-                        variant="outline" 
-                        onClick={handleGetCurrentLocation}
-                        disabled={isLocating}
-                        >
-                        <MapPin className="mr-2 h-4 w-4" />
-                        {isLocating ? 'Locating...' : 'Set to My Current Location'}
-                        </Button>
-                        {(form.watch('latitude') !== 0 || form.watch('longitude') !== 0) && (
-                            <span className="text-sm text-muted-foreground">Location set!</span>
-                        )}
-                    </div>
-                     <FormMessage>{form.formState.errors.latitude?.message || form.formState.errors.longitude?.message}</FormMessage>
-                </FormItem>
-
-                <Button
-                  type="submit"
-                  className="w-full bg-accent hover:bg-accent/90 text-accent-foreground"
-                  disabled={isPending || isUserLoading}
-                >
-                  {isPending ? 'Creating...' : 'Create Store'}
-                </Button>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
+        <CreateStoreForm user={user} />
       )}
     </div>
   );

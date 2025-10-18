@@ -1,0 +1,130 @@
+{
+    "categories": [
+        {
+            "categoryName": "Vegetables",
+            "items": [
+                "Potatoes", "Onions", "Tomatoes", "Carrots", "Cabbage", "Cauliflower", 
+                "Capsicum (Bell Pepper)", "Green Chilies", "Ginger", "Garlic", "Beans", 
+                "Peas", "Brinjal (Eggplant)", "Okra (Lady’s Finger)", "Spinach", 
+                "Coriander Leaves", "Mint Leaves", "Drumstick", "Radish", "Beetroot", 
+                "Bottle Gourd", "Ridge Gourd", "Bitter Gourd", "Pumpkin", "Cucumber", 
+                "Raw Banana", "Yam", "Sweet Potato", "Broccoli", "Zucchini"
+            ]
+        },
+        {
+            "categoryName": "Fruits",
+            "items": [
+                "Apples", "Bananas", "Oranges", "Grapes", "Mangoes", "Papaya", 
+                "Pineapple", "Watermelon", "Muskmelon", "Guava", "Pomegranate", 
+                "Chikoo (Sapota)", "Strawberries", "Kiwi", "Pears", "Plums", 
+                "Dates", "Dry Figs", "Coconut", "Lemons"
+            ]
+        },
+        {
+            "categoryName": "Grains & Cereals",
+            "items": [
+                "Rice (Raw, Boiled, Basmati, Brown, etc.)", "Wheat", "Maida (Refined Flour)", 
+                "Suji / Rava (Semolina)", "Poha (Flattened Rice)", "Oats", "Cornflakes", 
+                "Millets (Jowar, Bajra, Ragi, Foxtail, etc.)", "Broken Wheat (Dalia)"
+            ]
+        },
+        {
+            "categoryName": "Pulses & Lentils",
+            "items": [
+                "Toor Dal (Arhar Dal)", "Moong Dal (Yellow Split)", "Masoor Dal (Red Lentil)", 
+                "Chana Dal", "Urad Dal", "Rajma (Kidney Beans)", "Kabuli Chana (White Chickpeas)", 
+                "Kala Chana (Black Chickpeas)", "Green Gram", "Lobia (Black-eyed Peas)", 
+                "Soya Chunks", "Horse Gram"
+            ]
+        },
+        {
+            "categoryName": "Spices & Masala",
+            "items": [
+                "Salt", "Turmeric Powder", "Red Chili Powder", "Coriander Powder", 
+                "Cumin Seeds", "Mustard Seeds", "Fenugreek Seeds", "Garam Masala", 
+                "Black Pepper", "Cloves", "Cardamom", "Cinnamon", "Bay Leaf", 
+                "Fennel Seeds (Saunf)", "Curry Leaves", "Hing (Asafoetida)", 
+                "Kasuri Methi (Dried Fenugreek)", "Tamarind", "Dry Red Chilies"
+            ]
+        },
+        {
+            "categoryName": "Oils & Ghee",
+            "items": [
+                "Sunflower Oil", "Groundnut Oil", "Mustard Oil", "Coconut Oil", 
+                "Olive Oil", "Rice Bran Oil", "Ghee (Clarified Butter)", "Butter"
+            ]
+        },
+        {
+            "categoryName": "Condiments & Sauces",
+            "items": [
+                "Tomato Ketchup", "Soy Sauce", "Vinegar", "Green Chili Sauce", 
+                "Red Chili Sauce", "Mustard Sauce", "Mayonnaise", 
+                "Pickles (Mango, Lime, Mixed, etc.)", "Chutneys (Coconut, Mint, Tamarind)"
+            ]
+        },
+        {
+            "categoryName": "Dairy & Refrigerated Items",
+            "items": ["Milk", "Curd (Yogurt)", "Paneer (Cottage Cheese)", "Cheese", "Butter", "Ghee", "Fresh Cream"]
+        },
+        {
+            "categoryName": "Bakery & Breakfast Items",
+            "items": [
+                "Bread (White, Brown, Multigrain)", "Buns", "Pav", "Biscuits", "Rusks", 
+                "Cakes", "Muffins", "Pancake Mix", "Wafers", "Breakfast Cereals"
+            ]
+        },
+        {
+            "categoryName": "Beverages",
+            "items": [
+                "Tea Powder", "Coffee Powder", "Green Tea", "Milk Powder", "Soft Drinks", 
+                "Juices", "Coconut Water", "Energy Drinks"
+            ]
+        },
+        {
+            "categoryName": "Non-Veg & Frozen Items",
+            "items": [
+                "Chicken", "Mutton", "Fish", "Eggs", "Prawns", "Frozen Parathas", 
+                "Frozen Vegetables", "Nuggets / Cutlets", "Sausages"
+            ]
+        },
+        {
+            "categoryName": "Ready-to-Cook / Instant Items",
+            "items": [
+                "Maggi / Noodles", "Pasta", "Vermicelli", "Soup Packets", 
+                "Instant Upma / Poha Mix", "Instant Rice", "Frozen Pizzas", "Ready Curries / Gravies"
+            ]
+        },
+        {
+            "categoryName": "Cleaning & Household",
+            "items": [
+                "Dishwashing Liquid", "Detergent Powder", "Floor Cleaner", "Toilet Cleaner", 
+                "Scrub Pads", "Mop", "Broom", "Garbage Bags", "Room Freshener"
+            ]
+        },
+        {
+            "categoryName": "Personal Care",
+            "items": [
+                "Soap", "Shampoo", "Toothpaste", "Toothbrush", "Hair Oil", "Face Wash", 
+                "Moisturizer", "Shaving Cream / Razor", "Sanitary Pads", "Hand Wash"
+            ]
+        },
+        {
+            "categoryName": "Pooja / Religious Items",
+            "items": [
+                "Agarbatti (Incense Sticks)", "Camphor", "Cotton Wicks", "Kumkum", 
+                "Turmeric Powder", "Matchbox / Candle"
+            ]
+        },
+        {
+            "categoryName": "Pet Supplies (Optional)",
+            "items": ["Dog Food / Cat Food", "Pet Shampoo", "Feeding Bowl"]
+        },
+        {
+            "categoryName": "Miscellaneous",
+            "items": [
+                "Aluminium Foil", "Tissue Paper", "Plastic Covers", "Ziplock Bags", 
+                "Matchbox", "Batteries", "Lighter"
+            ]
+        }
+    ]
+}
