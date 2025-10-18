@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Package2, Menu, UserCircle, Store, ShoppingBag, Truck, Settings, ShieldCheck } from 'lucide-react';
+import { Package2, Menu, UserCircle, Store, ShoppingBag, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { getAuth, signOut } from 'firebase/auth';
 import { useState } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const navLinks = [
   { href: '/', label: 'Home' },
@@ -44,12 +45,6 @@ const ownerLinks = [
 const deliveryLinks = [
     { href: '/dashboard/deliveries', label: 'Deliveries', icon: Truck },
 ]
-
-const educationalLinks = [
-    { href: '/dashboard/site-config', label: 'Site Config', icon: Settings },
-    { href: '/dashboard/firebase-checker', label: 'Firebase Checker', icon: ShieldCheck },
-]
-
 
 function UserMenu() {
   const { user, isUserLoading } = useFirebase();
@@ -103,27 +98,11 @@ function UserMenu() {
              </Link>
         ))}
         <DropdownMenuSeparator />
-         <DropdownMenuLabel>Educational</DropdownMenuLabel>
-         {educationalLinks.map(({ href, label, icon: Icon }) => (
-              <Link key={href} href={href} passHref>
-                  <DropdownMenuItem>
-                      <Icon className="mr-2 h-4 w-4" />
-                      <span>{label}</span>
-                  </DropdownMenuItem>
-              </Link>
-          ))}
-        <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
 }
-
-// Add Skeleton component for loading state
-function Skeleton({ className }: { className?: string }) {
-  return <div className={cn('animate-pulse rounded-md bg-muted', className)} />;
-}
-
 
 export function Header() {
   const pathname = usePathname();
@@ -189,7 +168,7 @@ export function Header() {
             <div className="border-t pt-4">
                 <p className="px-3 text-sm font-medium text-muted-foreground mb-2">Dashboard</p>
                 <div className="grid gap-2">
-                    {[...customerLinks, ...ownerLinks, ...deliveryLinks, ...educationalLinks].map(({ href, label, icon: Icon }) => (
+                    {[...customerLinks, ...ownerLinks, ...deliveryLinks].map(({ href, label, icon: Icon }) => (
                     <SheetClose asChild key={href}>
                         <Link
                             href={href}
