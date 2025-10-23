@@ -70,15 +70,22 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const startListening = useCallback(() => {
-    if (status !== 'idle' || !user) return; // Guard clause
+    // This guard is essential to prevent the "already started" error.
+    if (status !== 'idle' || !user) return;
 
     if (speechRecognition.current) {
       try {
         speechRecognition.current.start();
         setStatus('listening');
       } catch (e) {
-        console.error("Speech recognition start error: ", e);
-        setStatus('idle');
+        // This can happen if the component tries to start recognition
+        // again before the 'onstart' event has fired and updated the status.
+        if (e instanceof DOMException && e.name === 'InvalidStateError') {
+          console.warn('Speech recognition already starting. Ignoring redundant call.');
+        } else {
+          console.error("Speech recognition start error: ", e);
+          setStatus('idle');
+        }
       }
     }
   }, [status, user]);
@@ -292,7 +299,8 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         }
         welcome();
      }
-  }, [user, isUserLoading, speak])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, isUserLoading])
 
 
   const value = {
@@ -316,3 +324,5 @@ export function useAssistant() {
   }
   return context;
 }
+
+    
