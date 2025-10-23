@@ -27,7 +27,7 @@ const interpretedCommandSchema = z.object({
   entities: z.object({
     productName: z.string().optional().describe('The name of a product.'),
     storeName: z.string().optional().describe('The name of a store.'),
-    pageName: z.string().optional().describe('The name of a page to navigate to (e.g., home, stores, cart, my orders).'),
+    pageName: z.string().optional().describe("The name of a page to navigate to (e.g., home, stores, cart, my orders, my store, deliveries)."),
   }).describe('Key entities extracted from the user command.'),
   originalText: z.string().describe('The original text from the user.'),
 });
@@ -60,7 +60,7 @@ const nluPrompt = ai.definePrompt({
     **Entities:**
     - productName: The name of the grocery item.
     - storeName: The name of the store.
-    - pageName: The destination page. Examples: 'home', 'stores', 'cart', 'my orders', 'my store'.
+    - pageName: The destination page. Examples: 'home', 'stores', 'cart' or 'shopping cart', 'my orders', 'my store', 'store orders', 'deliveries'.
 
     **Examples:**
     - "Find apples in Patel Kirana Store" -> intent: findProduct, entities: { productName: "apples", storeName: "Patel Kirana Store" }
@@ -69,6 +69,9 @@ const nluPrompt = ai.definePrompt({
     - "go to my cart" -> intent: navigateTo, entities: { pageName: "cart" }
     - "go to my orders" -> intent: navigateTo, entities: { pageName: "my orders" }
     - "take me home" -> intent: navigateTo, entities: { pageName: "home" }
+    - "go to my store" -> intent: navigateTo, entities: { pageName: "my store" }
+    - "show me the store orders" -> intent: navigateTo, entities: { pageName: "store orders" }
+    - "open the deliveries page" -> intent: navigateTo, entities: { pageName: "deliveries" }
     - "what's the weather like" -> intent: unknown, entities: {}
 
     **Command to interpret:**

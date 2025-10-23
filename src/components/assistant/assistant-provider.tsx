@@ -119,9 +119,11 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         } else if (page) {
             if (page?.includes('home')) path = '/';
             else if (page?.includes('stores')) path = '/stores';
-            else if (page?.includes('cart')) path = '/cart';
+            else if (page?.includes('cart') || page?.includes('shopping cart')) path = '/cart';
             else if (page?.includes('my orders')) path = '/dashboard/my-orders';
             else if (page?.includes('my store')) path = '/dashboard/my-store';
+            else if (page?.includes('store orders')) path = '/dashboard/orders';
+            else if (page?.includes('deliveries')) path = '/dashboard/deliveries';
             else {
                 await speak(`Sorry, I don't know how to navigate to ${page}.`);
                 break;
@@ -147,7 +149,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         let storeId: string | null = null;
 
         const pathSegments = pathname.split('/').filter(Boolean);
-        if (pathSegments[0] === 'stores' && pathSegments[1]) {
+        if (pathSegments[0] === 'stores' && pathSegments.length > 1) {
             storeId = pathSegments[1];
         } else if (findStoreName) {
             const storesSnapshot = await getDocs(query(collection(firestore, 'stores'), where('name', '==', findStoreName)));
@@ -179,15 +181,44 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       case 'unknown':
          await speak("Sorry, I didn't understand that. Can you please rephrase?");
          break;
-      default:
-        // This handles confirm/cancel when there's no pending action.
+      case 'confirm':
+      case 'cancel':
         await speak("Sorry, there's nothing for me to confirm or cancel right now.");
+        break;
+      default:
+        setIsThinking(false);
         break;
     }
   }, [firestore, pathname, router, speak, pendingAction, addItemToCart]);
 
+  const stopListening = useCallback(() => {
+    if (speechRecognition.current) {
+      try {
+        speechRecognition.current.stop();
+      } catch (e) {
+        console.error("Speech recognition stop error: ", e);
+      } finally {
+        setIsListening(false);
+      }
+    }
+  }, []);
+
+  const startListening = useCallback(() => {
+    if (speechRecognition.current && !isListening && !isSpeaking) {
+      try {
+        speechRecognition.current.start();
+        setIsListening(true);
+      } catch (e) {
+         // This can happen if start() is called while it's already starting.
+         console.error("Speech recognition start error: ", e);
+         setIsListening(false); // Reset state
+      }
+    }
+  }, [isListening, isSpeaking]);
+
   const processTranscript = useCallback(async (transcript: string) => {
     if (isThinking || isSpeaking) return;
+    stopListening();
     setIsListening(false);
     setIsThinking(true);
     try {
@@ -196,34 +227,23 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     } catch(e) {
         console.error("Error interpreting command:", e);
         await speak("Sorry, I had trouble understanding that.");
-    } finally {
-        setIsThinking(false);
     }
 
-  }, [isThinking, isSpeaking, handleCommand, speak]);
+  }, [isThinking, isSpeaking, handleCommand, speak, stopListening]);
 
-  const startListening = useCallback(() => {
-    if (speechRecognition.current && !isListening && !isSpeaking) {
-      speechRecognition.current.start();
-    }
-  }, [isListening, isSpeaking]);
-
-  const stopListening = useCallback(() => {
-    if (speechRecognition.current) {
-      speechRecognition.current.stop();
-    }
-  }, []);
 
   const toggleAssistant = useCallback(() => {
-    if (isAssistantOpen) {
-      stopListening();
-      audio.current?.pause();
-      setIsAssistantOpen(false);
-    } else {
-      setIsAssistantOpen(true);
-      startListening();
-    }
-  }, [isAssistantOpen, startListening, stopListening]);
+    setIsAssistantOpen(prev => {
+        const newIsOpen = !prev;
+        if (newIsOpen) {
+            startListening();
+        } else {
+            stopListening();
+            audio.current?.pause();
+        }
+        return newIsOpen;
+    });
+  }, [startListening, stopListening]);
 
    useEffect(() => {
     if (!isUserLoading && user && !hasWelcomed && !isAssistantOpen) {
@@ -237,8 +257,11 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     // If user logs out, reset the welcome flag
     if (!user) {
       setHasWelcomed(false);
+      if (isAssistantOpen) {
+        toggleAssistant(); // Turn off assistant on logout
+      }
     }
-   }, [user, isUserLoading, hasWelcomed, isAssistantOpen, speak])
+   }, [user, isUserLoading, hasWelcomed, isAssistantOpen, speak, toggleAssistant])
 
 
   useEffect(() => {
@@ -275,17 +298,22 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     
     recognition.onend = () => {
         setIsListening(false);
+        // Automatically restart listening if the session is supposed to be open
+        // and we aren't currently speaking or thinking.
         if (isAssistantOpen && !isSpeaking && !isThinking) {
-           startListening(); // Always try to restart if session is open
+           startListening(); 
         }
     };
 
     recognition.onerror = (event) => {
+        setIsListening(false); // Always set listening to false on error
         if(event.error === 'no-speech') {
-            // After 2 seconds of no speech, prompt the user
-            silenceTimer.current = setTimeout(async () => {
-               await speak("I'm listening. Just tell me what you need.");
-            }, 2000);
+            // If the session is open, re-prompt the user.
+            if(isAssistantOpen) {
+                silenceTimer.current = setTimeout(async () => {
+                   await speak("I'm listening. Just tell me what you need.");
+                }, 2000);
+            }
         } else if (event.error !== 'aborted') {
             console.error('Speech recognition error:', event.error);
         }
@@ -297,20 +325,25 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         finalTranscript += event.results[i][0].transcript;
       }
       if (finalTranscript.trim()) {
-        stopListening(); 
         processTranscript(finalTranscript.trim());
       }
     };
 
     return () => {
-        stopListening();
+        if (speechRecognition.current) {
+          speechRecognition.current.onresult = null;
+          speechRecognition.current.onerror = null;
+          speechRecognition.current.onstart = null;
+          speechRecognition.current.onend = null;
+          stopListening();
+        }
         if (audio.current) {
             audio.current.onended = null;
+            audio.current.pause();
         }
-         if (silenceTimer.current) clearTimeout(silenceTimer.current);
+        if (silenceTimer.current) clearTimeout(silenceTimer.current);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [processTranscript, isAssistantOpen, isSpeaking, isThinking]);
+  }, [processTranscript, isAssistantOpen, isSpeaking, isThinking, startListening, stopListening, speak]);
 
 
   const value = {
@@ -336,5 +369,3 @@ export function useAssistant() {
   }
   return context;
 }
-
-    
