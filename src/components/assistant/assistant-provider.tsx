@@ -204,6 +204,12 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     if(typeof window === 'undefined') return;
 
     audio.current = new Audio();
+    audio.current.onended = () => {
+      setIsSpeaking(false);
+      if (isAssistantOpen) {
+        speechRecognition.current?.start();
+      }
+    };
 
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognitionAPI) {
@@ -216,7 +222,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     }
 
     const recognition = new SpeechRecognitionAPI();
-    recognition.continuous = true; // Keep listening even after a pause
+    recognition.continuous = true; 
     recognition.interimResults = false;
     speechRecognition.current = recognition;
 
@@ -234,6 +240,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         finalTranscript += event.results[i][0].transcript;
       }
       if (finalTranscript.trim()) {
+        recognition.stop();
         processTranscript(finalTranscript.trim());
       }
     };
@@ -241,7 +248,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     return () => {
         speechRecognition.current?.stop();
     }
-  }, [processTranscript, toast]);
+  }, [processTranscript, toast, isAssistantOpen]);
 
 
   const value = {
