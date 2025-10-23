@@ -205,6 +205,8 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       audio.current?.pause();
       setIsAssistantOpen(false);
       setIsListening(false);
+      setIsThinking(false);
+      setIsSpeaking(false);
     } else { // If it's off, turn it on
       setConversation([]);
       setIsAssistantOpen(true);
@@ -244,8 +246,8 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     
     recognition.onend = () => {
         setIsListening(false);
-        // Auto-restart listening if the session is still active and we are not speaking
-        if (isAssistantOpen && !isSpeaking) {
+        // Auto-restart listening if the session is still active and we are not speaking or thinking
+        if (isAssistantOpen && !isSpeaking && !isThinking) {
             recognition.start();
         }
     };
@@ -257,7 +259,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
             console.error('Speech recognition error:', event.error);
         }
         // Always try to restart if the session is supposed to be open.
-         if (isAssistantOpen && !isSpeaking) {
+         if (isAssistantOpen && !isSpeaking && !isThinking) {
             recognition.start();
         }
     };
@@ -276,7 +278,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     return () => {
         speechRecognition.current?.stop();
     }
-  }, [processTranscript, toast, isAssistantOpen, isSpeaking]);
+  }, [processTranscript, toast, isAssistantOpen, isSpeaking, isThinking]);
 
 
   const value = {
