@@ -45,7 +45,7 @@ export default function RootLayout({
             <AssistantProvider>
               <div className="relative flex min-h-dvh flex-col bg-background">
                 <Header />
-                <main className="flex-1">{children}</main>
+                <main className="flex-1 pb-10">{/* Add padding to bottom to avoid overlap with status bar */}</main>
                 <Footer />
               </div>
               <Toaster />

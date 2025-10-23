@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Package2, Menu, UserCircle, Store, ShoppingBag, Truck, Mic, Bot } from 'lucide-react';
+import { Package2, Menu, UserCircle, Store, ShoppingBag, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -28,7 +28,6 @@ import {
 import { getAuth, signOut } from 'firebase/auth';
 import { useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useAssistant } from '../assistant/assistant-provider';
 
 const navLinks = [
   { href: '/', label: 'Home' },
@@ -47,35 +46,6 @@ const ownerLinks = [
 const deliveryLinks = [
     { href: '/dashboard/deliveries', label: 'Deliveries', icon: Truck },
 ]
-
-function AssistantToggleButton() {
-    const { isListening, isThinking, isSpeaking, isAssistantOpen, toggleAssistant } = useAssistant();
-
-    let Icon = Mic;
-    let variant: "outline" | "secondary" | "destructive" = "outline";
-    let title = "Turn on voice assistant";
-
-    if (isAssistantOpen) {
-        title = "Turn off voice assistant";
-        variant = "secondary";
-        if (isListening) {
-           Icon = Mic;
-           variant = "destructive";
-           title = "Listening... (Click to stop)";
-        } else if (isThinking) {
-            Icon = Bot;
-        } else if (isSpeaking) {
-            Icon = Bot;
-        }
-    }
-    
-    return (
-        <Button onClick={toggleAssistant} variant={variant} size="icon" className="rounded-full" title={title}>
-            <Icon className={cn("h-5 w-5", isListening && "animate-pulse")} />
-            <span className="sr-only">{title}</span>
-        </Button>
-    )
-}
 
 function UserMenu() {
   const { user, isUserLoading } = useFirebase();
@@ -217,7 +187,6 @@ export function Header() {
       </Sheet>
       
       <div className="flex w-full items-center justify-end gap-4 md:ml-auto md:gap-2 lg:gap-4">
-        <AssistantToggleButton />
         <CartIcon />
         <UserMenu />
       </div>

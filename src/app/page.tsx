@@ -6,16 +6,13 @@ import StoreCard from '@/components/store-card';
 import { useFirebase } from '@/firebase';
 import { Store } from '@/lib/types';
 import { useEffect, useState, useMemo } from 'react';
-import { Mic } from 'lucide-react';
-import { useAssistant } from '@/components/assistant/assistant-provider';
+import Link from 'next/link';
 
 
 export default function Home() {
   const { firestore } = useFirebase();
   const [allStores, setAllStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
-  const { toggleAssistant, isAssistantOpen } = useAssistant();
-
 
   useEffect(() => {
     async function fetchStores() {
@@ -48,10 +45,13 @@ export default function Home() {
                 Shop Fresh, Shop Local, Just by Voice
               </h1>
               <p className="max-w-[600px] text-foreground/80 md:text-xl">
-                Your hands-free shopping assistant. Click the mic icon in the header to start a conversation.
+                Your hands-free shopping assistant. Log in and start speaking to control the app.
               </p>
             </div>
             <div className="w-full max-w-sm space-y-4">
+                 <Button asChild>
+                    <Link href="/stores">Browse All Stores</Link>
+                 </Button>
                  <p className="text-sm text-foreground/60 text-center">
                   Try saying "Find bananas" or "Go to my orders".
                 </p>
