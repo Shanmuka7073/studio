@@ -1,6 +1,7 @@
+
 'use client';
 
-import { Mic, Loader, Bot, User } from 'lucide-react';
+import { Mic, Loader, Bot, User, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -30,16 +31,6 @@ export function AssistantDialog() {
   };
 
   return (
-    <>
-      <Button
-        onClick={toggleAssistant}
-        variant={isAssistantOpen ? 'default' : 'outline'}
-        size="icon"
-        className="rounded-full w-10 h-10 bg-accent text-accent-foreground hover:bg-accent/90"
-      >
-        <Mic className="h-5 w-5" />
-        <span className="sr-only">Toggle AI Assistant</span>
-      </Button>
       <Dialog open={isAssistantOpen} onOpenChange={toggleAssistant}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -50,7 +41,7 @@ export function AssistantDialog() {
           </DialogHeader>
           <div className="space-y-4">
             <div
-              className={`text-center p-4 rounded-lg ${
+              className={`text-center p-4 rounded-lg transition-colors duration-300 ${
                 isListening ? 'bg-destructive/20' : 'bg-muted'
               }`}
             >
@@ -71,17 +62,25 @@ export function AssistantDialog() {
                 </div>
             </ScrollArea>
           </div>
-          <DialogFooter>
+          <DialogFooter className="justify-center">
             <Button
               onClick={toggleAssistant}
-              variant="outline"
+              variant={isListening ? 'destructive': 'outline'}
+              className="w-24"
               disabled={isSpeaking || isThinking}
             >
-              {isListening ? 'Stop Listening' : 'Close'}
+              {isListening ? (
+                <>
+                  <Mic className="mr-2 h-5 w-5" /> Stop
+                </>
+              ) : (
+                <>
+                  <X className="mr-2 h-5 w-5" /> Close
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
   );
 }

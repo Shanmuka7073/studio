@@ -1,19 +1,21 @@
+
 'use client';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { getStores } from '@/lib/data';
-import { Search } from 'lucide-react';
 import StoreCard from '@/components/store-card';
 import { useFirebase } from '@/firebase';
 import { Store } from '@/lib/types';
 import { useEffect, useState, useMemo } from 'react';
+import { Mic } from 'lucide-react';
+import { useAssistant } from '@/components/assistant/assistant-provider';
 
 
 export default function Home() {
   const { firestore } = useFirebase();
   const [allStores, setAllStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const { toggleAssistant } = useAssistant();
+
 
   useEffect(() => {
     async function fetchStores() {
@@ -32,57 +34,32 @@ export default function Home() {
   }, [firestore]);
 
   const displayedStores = useMemo(() => {
-    if (!searchTerm) {
-      return allStores;
-    }
-    return allStores.filter(store => 
-        store.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        store.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        store.address.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [allStores, searchTerm]);
+    return allStores.slice(0, 3);
+  }, [allStores]);
 
 
   return (
     <div className="flex flex-col">
       <section className="w-full py-12 md:py-24 lg:py-32 bg-primary/10">
         <div className="container px-4 md:px-6">
-          <div className="grid gap-6 lg:grid-cols-[1fr_400px] lg:gap-12 xl:grid-cols-[1fr_600px]">
-            <div className="flex flex-col justify-center space-y-4">
-              <div className="space-y-2">
-                <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none font-headline">
-                  Shop Fresh, Shop Local with LocalBasket
-                </h1>
-                <p className="max-w-[600px] text-foreground/80 md:text-xl">
-                  Discover the best groceries from your neighborhood stores. We connect you with local vendors for fresh produce, everyday essentials, and more, all delivered to your door.
-                </p>
-              </div>
-              <div className="w-full max-w-sm space-y-2">
-                <div className="flex space-x-2">
-                  <Input
-                    type="text"
-                    placeholder="Search for stores by name or area..."
-                    className="max-w-lg flex-1"
-                    aria-label="Search Stores"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                  <Button variant="default" className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                    <Search className="mr-2 h-4 w-4" />
-                    Search
-                  </Button>
-                </div>
-                <p className="text-xs text-foreground/60">
-                  Find your favorite local shops.
-                </p>
-              </div>
+          <div className="flex flex-col items-center space-y-8">
+            <div className="space-y-4 text-center">
+              <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none font-headline">
+                Shop Fresh, Shop Local, Just by Voice
+              </h1>
+              <p className="max-w-[600px] text-foreground/80 md:text-xl">
+                Press the button and start your shopping list. Navigate, find products, and checkout, all without typing.
+              </p>
             </div>
-             <img
-                src="https://picsum.photos/seed/hero-basket/600/400"
-                alt="Hero"
-                data-ai-hint="grocery basket"
-                className="mx-auto aspect-video overflow-hidden rounded-xl object-cover sm:w-full lg:order-last lg:aspect-square"
-              />
+            <div className="w-full max-w-sm space-y-4">
+               <Button onClick={toggleAssistant} size="lg" className="w-full h-16 text-lg bg-accent hover:bg-accent/90 text-accent-foreground">
+                  <Mic className="mr-4 h-8 w-8" />
+                  Tap to Start Shopping
+                </Button>
+                 <p className="text-xs text-foreground/60 text-center">
+                  Try "Find bananas" or "Go to my orders".
+                </p>
+            </div>
           </div>
         </div>
       </section>
@@ -92,7 +69,7 @@ export default function Home() {
           <div className="flex flex-col items-center justify-center space-y-4 text-center">
             <div className="space-y-2">
               <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl font-headline">
-                {searchTerm ? `Results for "${searchTerm}"` : 'Or Browse Featured Stores'}
+                Or Browse Featured Stores
               </h2>
               <p className="max-w-[900px] text-foreground/80 md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
                 Explore top-rated local stores right in your neighborhood.
