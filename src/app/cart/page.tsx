@@ -4,11 +4,11 @@ import { useCart } from '@/lib/cart';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Mic } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { getProductImage } from '@/lib/data';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 export default function CartPage() {
   const { cartItems, removeItem, updateQuantity, cartTotal, cartCount } = useCart();
@@ -18,9 +18,18 @@ export default function CartPage() {
       <div className="container mx-auto py-24 text-center">
         <h1 className="text-4xl font-bold mb-4 font-headline">Your Cart is Empty</h1>
         <p className="text-muted-foreground mb-8">Looks like you haven't added anything to your cart yet.</p>
-        <Button asChild>
-          <Link href="/stores">Start Shopping</Link>
-        </Button>
+        <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
+          <Button asChild size="lg">
+            <Link href="/stores">Browse Items</Link>
+          </Button>
+          <span className="text-muted-foreground font-medium">OR</span>
+           <Button asChild variant="outline" size="lg">
+              <Link href="/checkout">
+                <Mic className="mr-2 h-5 w-5" />
+                Record Your Shopping List
+              </Link>
+            </Button>
+        </div>
       </div>
     );
   }
