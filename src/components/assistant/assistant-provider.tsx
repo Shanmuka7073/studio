@@ -13,7 +13,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { textToSpeech } from '@/ai/flows/tts-flow';
 import { interpretCommand, InterpretedCommand } from '@/ai/flows/nlu-flow';
 import { useFirebase } from '@/firebase';
-import { getDocs, collection } from 'firebase/firestore';
+import { getDocs, collection, query, where } from 'firebase/firestore';
 import type { Product, Store } from '@/lib/types';
 import { useCart } from '@/lib/cart';
 import { useToast } from '@/hooks/use-toast';
@@ -55,6 +55,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
 
   const speechRecognition = useRef<SpeechRecognition | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
+  const wasManuallyStopped = useRef(false);
 
   const addToConversation = (entry: ConversationEntry) => {
     setConversation(prev => [...prev, entry]);
@@ -73,17 +74,15 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       }
     } catch (error) {
       console.error('TTS Error:', error);
-    } finally {
-      setIsThinking(false);
-      setIsSpeaking(false);
-    }
+       setIsThinking(false);
+       setIsSpeaking(false);
+    } 
   }, []);
 
   const handleCommand = useCallback(async (command: InterpretedCommand) => {
     setIsThinking(true);
     addToConversation({ speaker: 'user', text: command.originalText });
 
-    // Handle confirmation for a pending action
     if (pendingAction && (command.intent === 'confirm' || command.intent === 'cancel')) {
         if (command.intent === 'confirm') {
             if (pendingAction.intent === 'addProductToCart') {
@@ -102,19 +101,36 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     switch (command.intent) {
       case 'navigateTo':
         const page = command.entities.pageName?.toLowerCase();
+        const storeName = command.entities.storeName;
         let path = '/';
-        if (page?.includes('home')) path = '/';
-        else if (page?.includes('stores')) path = '/stores';
-        else if (page?.includes('cart')) path = '/cart';
-        else if (page?.includes('my orders')) path = '/dashboard/my-orders';
-        else if (page?.includes('my store')) path = '/dashboard/my-store';
-        else {
-            await speak(`Sorry, I don't know how to navigate to ${page}.`);
-            break;
+
+        if (storeName && firestore) {
+            const storesSnapshot = await getDocs(query(collection(firestore, 'stores'), where('name', '==', storeName)));
+            if (!storesSnapshot.empty) {
+                const store = storesSnapshot.docs[0];
+                path = `/stores/${store.id}`;
+                router.push(path);
+                await speak(`Navigating to ${storeName}.`);
+                setIsAssistantOpen(false);
+            } else {
+                 await speak(`Sorry, I could not find a store named ${storeName}.`);
+            }
+        } else if (page) {
+            if (page?.includes('home')) path = '/';
+            else if (page?.includes('stores')) path = '/stores';
+            else if (page?.includes('cart')) path = '/cart';
+            else if (page?.includes('my orders')) path = '/dashboard/my-orders';
+            else if (page?.includes('my store')) path = '/dashboard/my-store';
+            else {
+                await speak(`Sorry, I don't know how to navigate to ${page}.`);
+                break;
+            }
+            router.push(path);
+            await speak(`Navigating to ${page}.`);
+            setIsAssistantOpen(false);
+        } else {
+             await speak("I'm not sure where you want to go. Please specify a page or a store.");
         }
-        router.push(path);
-        await speak(`Navigating to ${page}.`);
-        setIsAssistantOpen(false);
         break;
       
       case 'findProduct':
@@ -122,21 +138,23 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
             await speak("Sorry, I can't search for products right now. The database is not connected.");
             break;
         }
-        const { productName, storeName } = command.entities;
+        const { productName, storeName: findStoreName } = command.entities;
         if (!productName) {
             await speak("What product are you looking for?");
             break;
         }
         
         let storeId: string | null = null;
+        let identifiedStoreName = '';
 
-        if (storeName) {
-            const storesSnapshot = await getDocs(collection(firestore, 'stores'));
-            const store = storesSnapshot.docs.find(doc => doc.data().name.toLowerCase() === storeName.toLowerCase());
-            if (store) {
+        if (findStoreName) {
+            const storesSnapshot = await getDocs(query(collection(firestore, 'stores'), where('name', '==', findStoreName)));
+            if (!storesSnapshot.empty) {
+                const store = storesSnapshot.docs[0];
                 storeId = store.id;
+                identifiedStoreName = store.data().name;
             } else {
-                await speak(`Sorry, I could not find a store named ${storeName}.`);
+                await speak(`Sorry, I could not find a store named ${findStoreName}.`);
                 break;
             }
         } else {
@@ -159,7 +177,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
                 setPendingAction({ intent: 'addProductToCart', product: foundProduct });
                 await speak(`I found ${foundProduct.name} for $${foundProduct.price.toFixed(2)}. Should I add it to your cart?`);
             } else {
-                await speak(`I couldn't find ${productName} in this store.`);
+                 await speak(`I couldn't find ${productName} in this store.`);
             }
         }
         break;
@@ -180,7 +198,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         await handleCommand(command);
     } catch(e) {
         console.error("Error interpreting command:", e);
-        speak("Sorry, I had trouble understanding that.");
+        await speak("Sorry, I had trouble understanding that.");
     } finally {
         setIsThinking(false);
     }
@@ -189,13 +207,14 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
 
   const toggleAssistant = useCallback(() => {
     if (isAssistantOpen) {
+      wasManuallyStopped.current = true;
       speechRecognition.current?.stop();
       audio.current?.pause();
       setIsAssistantOpen(false);
-      setIsListening(false);
     } else {
       setConversation([]);
       setIsAssistantOpen(true);
+      wasManuallyStopped.current = false;
       speechRecognition.current?.start();
     }
   }, [isAssistantOpen]);
@@ -206,7 +225,8 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     audio.current = new Audio();
     audio.current.onended = () => {
       setIsSpeaking(false);
-      if (isAssistantOpen) {
+      // Restart listening only if the assistant is supposed to be open
+      if (isAssistantOpen && !wasManuallyStopped.current) {
         speechRecognition.current?.start();
       }
     };
@@ -222,14 +242,24 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     }
 
     const recognition = new SpeechRecognitionAPI();
-    recognition.continuous = true; 
+    recognition.continuous = false; // Process one phrase at a time
     recognition.interimResults = false;
     speechRecognition.current = recognition;
 
-    recognition.onstart = () => setIsListening(true);
-    recognition.onend = () => setIsListening(false);
+    recognition.onstart = () => {
+        setIsListening(true);
+    }
+    
+    recognition.onend = () => {
+        setIsListening(false);
+        // Auto-restart listening if it wasn't manually stopped
+        if (isAssistantOpen && !wasManuallyStopped.current && !isSpeaking) {
+            recognition.start();
+        }
+    };
+
     recognition.onerror = (event) => {
-        if(event.error !== 'no-speech') {
+        if(event.error !== 'no-speech' && event.error !== 'aborted') {
             console.error('Speech recognition error:', event.error);
         }
     };
@@ -240,15 +270,15 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         finalTranscript += event.results[i][0].transcript;
       }
       if (finalTranscript.trim()) {
-        recognition.stop();
         processTranscript(finalTranscript.trim());
       }
     };
 
     return () => {
+        wasManuallyStopped.current = true;
         speechRecognition.current?.stop();
     }
-  }, [processTranscript, toast, isAssistantOpen]);
+  }, [processTranscript, toast, isAssistantOpen, isSpeaking]);
 
 
   const value = {
