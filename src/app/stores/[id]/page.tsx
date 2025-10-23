@@ -4,7 +4,7 @@ import Image from 'next/image';
 import ProductCard from '@/components/product-card';
 import { useFirebase, useCollection, useMemoFirebase, errorEmitter } from '@/firebase';
 import { Store, Product } from '@/lib/types';
-import { useEffect, useState, useTransition, useMemo } from 'react';
+import { useEffect, useState, useTransition, useMemo, useRef } from 'react';
 import { notFound, useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -16,7 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { writeBatch, collection, doc } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { revalidateProductPaths } from '@/app/actions';
-import { PanelLeft } from 'lucide-react';
+import { PanelLeft, Mic, MicOff } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 
 function InventoryManager({ storeId, existingProducts, onProductsAdded }: { storeId: string; existingProducts: Product[], onProductsAdded: () => void }) {
@@ -79,6 +79,7 @@ function InventoryManager({ storeId, existingProducts, onProductsAdded }: { stor
             requestResourceData: { names: productsToAdd },
           });
           errorEmitter.emit('permission-error', permissionError);
+          return Promise.reject(serverError);
        }
     });
   };
@@ -132,6 +133,52 @@ function InventoryManager({ storeId, existingProducts, onProductsAdded }: { stor
 function ProductFilterSidebar({ onFilterChange }: { onFilterChange: (filters: { categories: string[], searchTerm: string }) => void }) {
   const [selectedCategories, setSelectedCategories] = useState<Record<string, boolean>>({});
   const [searchTerm, setSearchTerm] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const speechRecognition = useRef<SpeechRecognition | null>(null);
+
+  useEffect(() => {
+    // Check for browser support
+    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognitionAPI) {
+      console.warn("Speech Recognition API is not supported in this browser.");
+      return;
+    }
+
+    const recognition = new SpeechRecognitionAPI();
+    recognition.continuous = false;
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    speechRecognition.current = recognition;
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setSearchTerm(transcript);
+       const activeCategories = Object.keys(selectedCategories).filter(key => selectedCategories[key]);
+      onFilterChange({ categories: activeCategories, searchTerm: transcript });
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Speech recognition error", event.error);
+      setIsListening(false);
+    };
+
+  }, [onFilterChange, selectedCategories]);
+
+
+  const toggleListening = () => {
+    if (isListening) {
+      speechRecognition.current?.stop();
+    } else {
+      speechRecognition.current?.start();
+    }
+    setIsListening(!isListening);
+  };
+
 
   const handleCategorySelection = (categoryName: string, isChecked: boolean) => {
     const newSelection = { ...selectedCategories, [categoryName]: isChecked };
@@ -154,12 +201,16 @@ function ProductFilterSidebar({ onFilterChange }: { onFilterChange: (filters: { 
         <CardDescription>Filter by category or search.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 flex-1 overflow-y-auto">
-        <div className="px-1">
+        <div className="px-1 flex items-center gap-2">
           <Input 
             placeholder="Search products..."
             value={searchTerm}
             onChange={handleSearchChange}
           />
+          <Button onClick={toggleListening} variant={isListening ? "destructive" : "outline"} size="icon">
+            {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            <span className="sr-only">Toggle Voice Search</span>
+          </Button>
         </div>
         <Accordion type="multiple" className="w-full">
           {groceryData.categories.map((category) => (
