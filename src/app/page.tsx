@@ -2,17 +2,107 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { getStores } from '@/lib/data';
-import { Search } from 'lucide-react';
+import { Search, Mic, MicOff, ShoppingCart } from 'lucide-react';
 import StoreCard from '@/components/store-card';
 import { useFirebase } from '@/firebase';
-import { Store } from '@/lib/types';
-import { useEffect, useState, useMemo } from 'react';
+import { Store, Product } from '@/lib/types';
+import { useEffect, useState, useMemo, useRef } from 'react';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { getDocs, collection } from 'firebase/firestore';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import Link from 'next/link';
+
+interface MatchResult {
+  store: Store;
+  foundItems: Product[];
+  notFoundItems: string[];
+  matchCount: number;
+}
+
+function StoreSuggestionDialog({
+  open,
+  onOpenChange,
+  result,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  result: MatchResult | null;
+}) {
+  if (!result) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            {result.notFoundItems.length === 0
+              ? 'We Found a Perfect Match!'
+              : 'Here is the Best Match We Found'}
+          </DialogTitle>
+          <DialogDescription>
+            Go to <strong>{result.store.name}</strong> to get your items.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <h4 className="font-semibold text-lg">{result.store.name}</h4>
+            <p className="text-sm text-muted-foreground">{result.store.address}</p>
+          </div>
+          <div>
+            <h4 className="font-semibold">Available Items ({result.foundItems.length})</h4>
+            <ul className="list-disc list-inside text-sm text-muted-foreground">
+              {result.foundItems.map(item => (
+                <li key={item.id}>{item.name}</li>
+              ))}
+            </ul>
+          </div>
+          {result.notFoundItems.length > 0 && (
+            <div>
+              <h4 className="font-semibold text-destructive">
+                Unavailable Items ({result.notFoundItems.length})
+              </h4>
+              <ul className="list-disc list-inside text-sm text-destructive/80">
+                {result.notFoundItems.map(item => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+           <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+          <Button asChild>
+            <Link href={`/stores/${result.store.id}`}>Visit Store</Link>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
 export default function Home() {
   const { firestore } = useFirebase();
   const [allStores, setAllStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // State for the new shopping list feature
+  const [shoppingList, setShoppingList] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const speechRecognition = useRef<SpeechRecognition | null>(null);
+  const [isFindingStore, setIsFindingStore] = useState(false);
+  const [matchResult, setMatchResult] = useState<MatchResult | null>(null);
+  const [isSuggestionOpen, setIsSuggestionOpen] = useState(false);
+
 
   useEffect(() => {
     async function fetchStores() {
@@ -29,6 +119,33 @@ export default function Home() {
     }
     fetchStores();
   }, [firestore]);
+  
+  // Setup Speech Recognition
+  useEffect(() => {
+    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognitionAPI) {
+      console.warn("Speech Recognition API is not supported in this browser.");
+      return;
+    }
+
+    const recognition = new SpeechRecognitionAPI();
+    recognition.continuous = false;
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    speechRecognition.current = recognition;
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setShoppingList(prev => prev ? `${prev}\n${transcript}` : transcript);
+    };
+
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = (event) => {
+      console.error("Speech recognition error", event.error);
+      setIsListening(false);
+    };
+  }, []);
 
   const displayedStores = useMemo(() => {
     if (!searchTerm) {
@@ -40,6 +157,73 @@ export default function Home() {
         store.address.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [allStores, searchTerm]);
+
+  const toggleListening = () => {
+    if (isListening) {
+      speechRecognition.current?.stop();
+    } else {
+      speechRecognition.current?.start();
+    }
+    setIsListening(!isListening);
+  };
+
+  const handleFindStore = async () => {
+    if (!firestore || !shoppingList.trim()) return;
+
+    setIsFindingStore(true);
+    setMatchResult(null);
+
+    const desiredItems = shoppingList.trim().toLowerCase().split('\n').map(s => s.trim()).filter(Boolean);
+    if (desiredItems.length === 0) {
+      setIsFindingStore(false);
+      return;
+    }
+
+    const stores = await getStores(firestore);
+    let bestMatch: MatchResult | null = null;
+
+    for (const store of stores) {
+      const productsSnapshot = await getDocs(collection(firestore, 'stores', store.id, 'products'));
+      const storeProducts = productsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Product[];
+      
+      const foundItems: Product[] = [];
+      const notFoundItems: string[] = [];
+      
+      desiredItems.forEach(desiredItem => {
+        const foundProduct = storeProducts.find(p => p.name.toLowerCase() === desiredItem);
+        if (foundProduct) {
+          if (!foundItems.some(item => item.id === foundProduct.id)) {
+            foundItems.push(foundProduct);
+          }
+        }
+      });
+      
+      const matchCount = foundItems.length;
+
+      // Find items from the original list that were not found in this store
+      const foundProductNames = foundItems.map(p => p.name.toLowerCase());
+      desiredItems.forEach(item => {
+        if (!foundProductNames.includes(item)) {
+            notFoundItems.push(item);
+        }
+      });
+
+      if (!bestMatch || matchCount > bestMatch.matchCount) {
+        bestMatch = { store, foundItems, notFoundItems, matchCount };
+      }
+      
+      // If a perfect match is found, stop searching
+      if (matchCount === desiredItems.length) {
+        break;
+      }
+    }
+
+    setMatchResult(bestMatch);
+    setIsFindingStore(false);
+    if(bestMatch) {
+      setIsSuggestionOpen(true);
+    }
+  };
 
 
   return (
@@ -76,15 +260,49 @@ export default function Home() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center justify-center">
-                <img
-                    src="https://picsum.photos/seed/1/600/400"
-                    alt="Hero"
-                    data-ai-hint="grocery basket"
-                    className="mx-auto aspect-video overflow-hidden rounded-xl object-cover sm:w-full lg:order-last lg:aspect-square"
-                />
-            </div>
+             <img
+                src="https://picsum.photos/seed/hero-basket/600/400"
+                alt="Hero"
+                data-ai-hint="grocery basket"
+                className="mx-auto aspect-video overflow-hidden rounded-xl object-cover sm:w-full lg:order-last lg:aspect-square"
+              />
           </div>
+        </div>
+      </section>
+
+      <section className="w-full py-12 md:py-24 lg:py-32 bg-muted/50">
+        <div className="container px-4 md:px-6">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl font-headline">Smart Store Finder</h2>
+            <p className="text-foreground/80 md:text-xl/relaxed mt-2">
+              Create your shopping list, and we'll find the best store that has all your items.
+            </p>
+          </div>
+          <Card className="max-w-2xl mx-auto mt-8">
+            <CardHeader>
+              <CardTitle>Create Your Shopping List</CardTitle>
+              <CardDescription>Type, paste, or speak the items you need. Place each item on a new line.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="relative">
+                <Textarea
+                  placeholder="Apples&#10;Bread&#10;Milk"
+                  className="pr-12"
+                  rows={5}
+                  value={shoppingList}
+                  onChange={(e) => setShoppingList(e.target.value)}
+                />
+                <Button onClick={toggleListening} variant={isListening ? "destructive" : "outline"} size="icon" className="absolute top-3 right-3">
+                  {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                  <span className="sr-only">Toggle Voice Input</span>
+                </Button>
+              </div>
+              <Button onClick={handleFindStore} disabled={isFindingStore || !shoppingList.trim()} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
+                {isFindingStore ? 'Searching Stores...' : 'Find My Store'}
+              </Button>
+            </CardContent>
+          </Card>
+          <StoreSuggestionDialog open={isSuggestionOpen} onOpenChange={setIsSuggestionOpen} result={matchResult} />
         </div>
       </section>
 
@@ -93,7 +311,7 @@ export default function Home() {
           <div className="flex flex-col items-center justify-center space-y-4 text-center">
             <div className="space-y-2">
               <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl font-headline">
-                {searchTerm ? `Results for "${searchTerm}"` : 'Featured Local Stores'}
+                {searchTerm ? `Results for "${searchTerm}"` : 'Or Browse Featured Stores'}
               </h2>
               <p className="max-w-[900px] text-foreground/80 md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
                 Explore top-rated local stores right in your neighborhood.
