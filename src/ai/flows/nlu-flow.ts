@@ -64,6 +64,8 @@ const nluPrompt = ai.definePrompt({
 
     **Examples:**
     - "Find apples in Patel Kirana Store" -> intent: findProduct, entities: { productName: "apples", storeName: "Patel Kirana Store" }
+    - "order apples from shanmuka shop" -> intent: findProduct, entities: { productName: "apples", storeName: "shanmuka shop" }
+    - "get me some bananas at City Fresh Produce" -> intent: findProduct, entities: { productName: "bananas", storeName: "City Fresh Produce" }
     - "show me bananas" -> intent: findProduct, entities: { productName: "bananas" }
     - "Yes, add it" -> intent: confirm, entities: {}
     - "go to my cart" -> intent: navigateTo, entities: { pageName: "cart" }
@@ -102,3 +104,4 @@ const interpretCommandFlow = ai.defineFlow(
     return { ...output, originalText: text };
   }
 );
+
