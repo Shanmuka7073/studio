@@ -2,11 +2,11 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { getStores } from '@/lib/data';
-import { Search, Mic, MicOff, ShoppingCart } from 'lucide-react';
+import { Search, Mic, MicOff } from 'lucide-react';
 import StoreCard from '@/components/store-card';
 import { useFirebase } from '@/firebase';
 import { Store, Product } from '@/lib/types';
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo, useRef, useTransition } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { getDocs, collection } from 'firebase/firestore';
@@ -19,6 +19,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import Link from 'next/link';
+import { translateText } from '@/ai/flows/translate-flow';
 
 interface MatchResult {
   store: Store;
@@ -60,7 +61,7 @@ function StoreSuggestionDialog({
             <h4 className="font-semibold">Available Items ({result.foundItems.length})</h4>
             <ul className="list-disc list-inside text-sm text-muted-foreground">
               {result.foundItems.map(item => (
-                <li key={item.id}>{item.name}</li>
+                <li key={item.id}>{item.name} ({item.localName || item.name})</li>
               ))}
             </ul>
           </div>
@@ -95,14 +96,13 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // State for the new shopping list feature
   const [shoppingList, setShoppingList] = useState('');
   const [isListening, setIsListening] = useState(false);
   const speechRecognition = useRef<SpeechRecognition | null>(null);
   const [isFindingStore, setIsFindingStore] = useState(false);
   const [matchResult, setMatchResult] = useState<MatchResult | null>(null);
   const [isSuggestionOpen, setIsSuggestionOpen] = useState(false);
-
+  const [isTranslating, startTranslation] = useTransition();
 
   useEffect(() => {
     async function fetchStores() {
@@ -120,7 +120,6 @@ export default function Home() {
     fetchStores();
   }, [firestore]);
   
-  // Setup Speech Recognition
   useEffect(() => {
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognitionAPI) {
@@ -129,23 +128,43 @@ export default function Home() {
     }
 
     const recognition = new SpeechRecognitionAPI();
-    recognition.continuous = false;
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
+    recognition.continuous = true; // Keep listening
+    recognition.interimResults = true; // Get results as they are being spoken
+    recognition.lang = 'en-US'; // Set a default, but we'll translate anyway
     speechRecognition.current = recognition;
 
     recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      setShoppingList(prev => prev ? `${prev}\n${transcript}` : transcript);
+      let finalTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+        }
+      }
+
+      if (finalTranscript) {
+          startTranslation(async () => {
+            try {
+                const translatedText = await translateText(finalTranscript);
+                // Append translated text to the shopping list, each item on a new line
+                const items = translatedText.split(/,|\band\b|\s+/).map(s => s.trim()).filter(Boolean);
+                setShoppingList(prev => prev ? `${prev}\n${items.join('\n')}` : items.join('\n'));
+            } catch (error) {
+                console.error("Translation error:", error);
+                // Fallback to original transcript if translation fails
+                const items = finalTranscript.split(/,|\band\b|\s+/).map(s => s.trim()).filter(Boolean);
+                setShoppingList(prev => prev ? `${prev}\n${items.join('\n')}` : items.join('\n'));
+            }
+        });
+      }
     };
 
-    recognition.onend = () => setIsListening(false);
     recognition.onerror = (event) => {
       console.error("Speech recognition error", event.error);
-      setIsListening(false);
+      setIsListening(false); // Stop on error
     };
-  }, []);
+    
+    // We don't use onend to stop listening, only when the user clicks the button
+  }, [startTranslation]);
 
   const displayedStores = useMemo(() => {
     if (!searchTerm) {
@@ -161,10 +180,11 @@ export default function Home() {
   const toggleListening = () => {
     if (isListening) {
       speechRecognition.current?.stop();
+      setIsListening(false);
     } else {
       speechRecognition.current?.start();
+      setIsListening(true);
     }
-    setIsListening(!isListening);
   };
 
   const handleFindStore = async () => {
@@ -190,7 +210,8 @@ export default function Home() {
       const notFoundItems: string[] = [];
       
       desiredItems.forEach(desiredItem => {
-        const foundProduct = storeProducts.find(p => p.name.toLowerCase() === desiredItem);
+        // More lenient matching
+        const foundProduct = storeProducts.find(p => p.name.toLowerCase().includes(desiredItem));
         if (foundProduct) {
           if (!foundItems.some(item => item.id === foundProduct.id)) {
             foundItems.push(foundProduct);
@@ -200,10 +221,9 @@ export default function Home() {
       
       const matchCount = foundItems.length;
 
-      // Find items from the original list that were not found in this store
       const foundProductNames = foundItems.map(p => p.name.toLowerCase());
       desiredItems.forEach(item => {
-        if (!foundProductNames.includes(item)) {
+        if (!foundProductNames.some(pName => pName.includes(item))) {
             notFoundItems.push(item);
         }
       });
@@ -212,7 +232,6 @@ export default function Home() {
         bestMatch = { store, foundItems, notFoundItems, matchCount };
       }
       
-      // If a perfect match is found, stop searching
       if (matchCount === desiredItems.length) {
         break;
       }
@@ -297,8 +316,8 @@ export default function Home() {
                   <span className="sr-only">Toggle Voice Input</span>
                 </Button>
               </div>
-              <Button onClick={handleFindStore} disabled={isFindingStore || !shoppingList.trim()} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-                {isFindingStore ? 'Searching Stores...' : 'Find My Store'}
+              <Button onClick={handleFindStore} disabled={isFindingStore || !shoppingList.trim() || isTranslating} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
+                {isFindingStore ? 'Searching Stores...' : (isTranslating ? 'Processing Voice...' : 'Find My Store')}
               </Button>
             </CardContent>
           </Card>

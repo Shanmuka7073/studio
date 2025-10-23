@@ -3,6 +3,7 @@ import { Timestamp } from "firebase/firestore";
 export type Product = {
   id: string;
   name: string;
+  localName?: string; // Field to support bilingual display
   description: string;
   price: number;
   imageId: string;
@@ -36,7 +37,7 @@ export type OrderItem = {
 }
 
 export type Order = {
-  id: string;
+  id:string;
   userId: string;
   storeId: string;
   customerName: string;
@@ -50,4 +51,3 @@ export type Order = {
   phone: string;
   email: string;
 };
-    
