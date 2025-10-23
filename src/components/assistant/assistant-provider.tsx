@@ -64,11 +64,36 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     setConversation(prev => [...prev, entry]);
   };
 
+  const stopListening = useCallback(() => {
+    if (speechRecognition.current) {
+      try {
+        speechRecognition.current.stop();
+      } catch (e) {
+        console.error("Speech recognition stop error: ", e);
+      } finally {
+        setIsListening(false);
+      }
+    }
+  }, []);
+
+  const startListening = useCallback(() => {
+    if (speechRecognition.current && !isListening && !isSpeaking) {
+      try {
+        speechRecognition.current.start();
+        setIsListening(true);
+      } catch (e) {
+         console.error("Speech recognition start error: ", e);
+         setIsListening(false); 
+      }
+    }
+  }, [isListening, isSpeaking]);
+
+
   const speak = useCallback(async (text: string) => {
     if (!text) return;
-    addToConversation({ speaker: 'bot', text });
     setIsThinking(false);
     setIsSpeaking(true);
+    addToConversation({ speaker: 'bot', text });
     try {
       const audioDataUri = await textToSpeech(text);
       if (audio.current) {
@@ -77,10 +102,13 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       }
     } catch (error) {
       console.error('TTS Error:', error);
-      setIsThinking(false);
       setIsSpeaking(false);
+      // Still start listening even if TTS fails
+      if(isAssistantOpen){
+        startListening();
+      }
     } 
-  }, []);
+  }, [isAssistantOpen, startListening]);
 
   const handleCommand = useCallback(async (command: InterpretedCommand) => {
     setIsThinking(true);
@@ -191,35 +219,9 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     }
   }, [firestore, pathname, router, speak, pendingAction, addItemToCart]);
 
-  const stopListening = useCallback(() => {
-    if (speechRecognition.current) {
-      try {
-        speechRecognition.current.stop();
-      } catch (e) {
-        console.error("Speech recognition stop error: ", e);
-      } finally {
-        setIsListening(false);
-      }
-    }
-  }, []);
-
-  const startListening = useCallback(() => {
-    if (speechRecognition.current && !isListening && !isSpeaking) {
-      try {
-        speechRecognition.current.start();
-        setIsListening(true);
-      } catch (e) {
-         // This can happen if start() is called while it's already starting.
-         console.error("Speech recognition start error: ", e);
-         setIsListening(false); // Reset state
-      }
-    }
-  }, [isListening, isSpeaking]);
-
   const processTranscript = useCallback(async (transcript: string) => {
     if (isThinking || isSpeaking) return;
     stopListening();
-    setIsListening(false);
     setIsThinking(true);
     try {
         const command = await interpretCommand(transcript);
@@ -228,9 +230,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         console.error("Error interpreting command:", e);
         await speak("Sorry, I had trouble understanding that.");
     }
-
-  }, [isThinking, isSpeaking, handleCommand, speak, stopListening]);
-
+  }, [isThinking, isSpeaking, stopListening, handleCommand, speak]);
 
   const toggleAssistant = useCallback(() => {
     setIsAssistantOpen(prev => {
@@ -239,7 +239,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
             startListening();
         } else {
             stopListening();
-            audio.current?.pause();
+            if(audio.current) audio.current.pause();
         }
         return newIsOpen;
     });
@@ -248,6 +248,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
    useEffect(() => {
     if (!isUserLoading && user && !hasWelcomed && !isAssistantOpen) {
       const welcome = async () => {
+        // We still set it open, but the user must click to start the interaction
         setIsAssistantOpen(true);
         setHasWelcomed(true); 
         await speak("Welcome back! How can I help you?");
@@ -267,83 +268,75 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if(typeof window === 'undefined') return;
 
-    audio.current = new Audio();
-    audio.current.onended = () => {
-      setIsSpeaking(false);
-      // Resume listening after speaking if the session is still active
-      if (isAssistantOpen) {
-        startListening();
-      }
-    };
+    if (!audio.current) {
+      audio.current = new Audio();
+      audio.current.onended = () => {
+        setIsSpeaking(false);
+        if (isAssistantOpen) {
+          startListening();
+        }
+      };
+    }
+    
 
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognitionAPI) {
-      toast({
-        variant: 'destructive',
-        title: 'Voice not supported',
-        description: 'Your browser does not support voice recognition.'
-      });
+      if(isAssistantOpen) { // Only toast if user tried to activate it
+        toast({
+            variant: 'destructive',
+            title: 'Voice not supported',
+            description: 'Your browser does not support voice recognition.'
+        });
+      }
       return;
     }
 
-    const recognition = new SpeechRecognitionAPI();
-    recognition.continuous = false; // We manually restart it for better control
-    recognition.interimResults = false;
-    speechRecognition.current = recognition;
+    if (!speechRecognition.current) {
+        const recognition = new SpeechRecognitionAPI();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        speechRecognition.current = recognition;
 
-    recognition.onstart = () => {
-        if (silenceTimer.current) clearTimeout(silenceTimer.current);
-        setIsListening(true);
-    }
-    
-    recognition.onend = () => {
-        setIsListening(false);
-        // Automatically restart listening if the session is supposed to be open
-        // and we aren't currently speaking or thinking.
-        if (isAssistantOpen && !isSpeaking && !isThinking) {
-           startListening(); 
+        recognition.onstart = () => {
+            setIsListening(true);
         }
-    };
-
-    recognition.onerror = (event) => {
-        setIsListening(false); // Always set listening to false on error
-        if(event.error === 'no-speech') {
-            // If the session is open, re-prompt the user.
-            if(isAssistantOpen) {
-                silenceTimer.current = setTimeout(async () => {
-                   await speak("I'm listening. Just tell me what you need.");
-                }, 2000);
+        
+        recognition.onend = () => {
+            setIsListening(false);
+            if (isAssistantOpen && !isSpeaking && !isThinking) {
+               startListening(); 
             }
-        } else if (event.error !== 'aborted') {
-            console.error('Speech recognition error:', event.error);
-        }
-    };
+        };
 
-    recognition.onresult = (event) => {
-      let finalTranscript = '';
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        finalTranscript += event.results[i][0].transcript;
-      }
-      if (finalTranscript.trim()) {
-        processTranscript(finalTranscript.trim());
-      }
-    };
+        recognition.onerror = (event) => {
+            setIsListening(false);
+            if (event.error !== 'no-speech' && event.error !== 'aborted') {
+                console.error('Speech recognition error:', event.error);
+                 toast({ variant: 'destructive', title: 'Voice Error', description: `An error occurred: ${event.error}` });
+            }
+        };
+
+        recognition.onresult = (event) => {
+          let finalTranscript = '';
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            finalTranscript += event.results[i][0].transcript;
+          }
+          if (finalTranscript.trim()) {
+            processTranscript(finalTranscript.trim());
+          }
+        };
+    }
 
     return () => {
         if (speechRecognition.current) {
-          speechRecognition.current.onresult = null;
-          speechRecognition.current.onerror = null;
-          speechRecognition.current.onstart = null;
-          speechRecognition.current.onend = null;
           stopListening();
         }
         if (audio.current) {
-            audio.current.onended = null;
             audio.current.pause();
         }
         if (silenceTimer.current) clearTimeout(silenceTimer.current);
     }
-  }, [processTranscript, isAssistantOpen, isSpeaking, isThinking, startListening, stopListening, speak]);
+  }, [processTranscript, isAssistantOpen, isSpeaking, isThinking, startListening, stopListening, toast]);
 
 
   const value = {
@@ -369,3 +362,5 @@ export function useAssistant() {
   }
   return context;
 }
+
+    
