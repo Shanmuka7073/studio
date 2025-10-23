@@ -1,3 +1,4 @@
+
 'use client';
 import { getStore, getProducts, getStoreImage } from '@/lib/data';
 import Image from 'next/image';
@@ -215,17 +216,16 @@ function ProductFilterSidebar({ onFilterChange }: { onFilterChange: (filters: { 
         <Accordion type="multiple" className="w-full">
           {groceryData.categories.map((category) => (
             <AccordionItem value={category.categoryName} key={category.categoryName}>
-              <AccordionTrigger>
-                <div className="flex items-center gap-2">
-                   <Checkbox
+                <div className="flex items-center gap-2 py-4">
+                    <Checkbox
                         id={`filter-${category.categoryName}`}
                         onCheckedChange={(checked) => handleCategorySelection(category.categoryName, !!checked)}
                         checked={selectedCategories[category.categoryName] || false}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                  {category.categoryName}
+                    />
+                    <AccordionTrigger className="p-0 flex-1">
+                        {category.categoryName}
+                    </AccordionTrigger>
                 </div>
-              </AccordionTrigger>
               <AccordionContent>
                 <div className="grid grid-cols-1 gap-2 p-2">
                    {category.items.map(item => <p key={item} className="text-sm text-muted-foreground ml-4">{item}</p>)}
@@ -360,3 +360,4 @@ export default function StoreDetailPage() {
     </div>
   );
 }
+
