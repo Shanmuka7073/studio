@@ -14,7 +14,7 @@ export default function Home() {
   const { firestore } = useFirebase();
   const [allStores, setAllStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
-  const { toggleAssistant } = useAssistant();
+  const { toggleAssistant, isAssistantOpen } = useAssistant();
 
 
   useEffect(() => {
@@ -48,16 +48,12 @@ export default function Home() {
                 Shop Fresh, Shop Local, Just by Voice
               </h1>
               <p className="max-w-[600px] text-foreground/80 md:text-xl">
-                Press the button and start your shopping list. Navigate, find products, and checkout, all without typing.
+                Your hands-free shopping assistant. Click the mic icon in the header to start a conversation.
               </p>
             </div>
             <div className="w-full max-w-sm space-y-4">
-               <Button onClick={toggleAssistant} size="lg" className="w-full h-16 text-lg bg-accent hover:bg-accent/90 text-accent-foreground">
-                  <Mic className="mr-4 h-8 w-8" />
-                  Tap to Start Shopping
-                </Button>
-                 <p className="text-xs text-foreground/60 text-center">
-                  Try "Find bananas" or "Go to my orders".
+                 <p className="text-sm text-foreground/60 text-center">
+                  Try saying "Find bananas" or "Go to my orders".
                 </p>
             </div>
           </div>

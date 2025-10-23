@@ -48,31 +48,32 @@ const deliveryLinks = [
     { href: '/dashboard/deliveries', label: 'Deliveries', icon: Truck },
 ]
 
-function AssistantStatus() {
-    const { isListening, isThinking, isSpeaking, conversation } = useAssistant();
-    const lastBotMessage = conversation.filter(m => m.speaker === 'bot').pop()?.text;
+function AssistantToggleButton() {
+    const { isListening, isThinking, isSpeaking, isAssistantOpen, toggleAssistant } = useAssistant();
 
-    let statusText = 'Click the mic to start';
-    let icon = <Mic className="h-5 w-5" />;
+    let Icon = Mic;
+    let variant: "outline" | "secondary" | "destructive" = "outline";
+    let title = "Turn on voice assistant";
 
-    if (isListening) {
-        statusText = 'Listening...';
-        icon = <Mic className="h-5 w-5 animate-pulse text-destructive" />;
-    } else if (isThinking) {
-        statusText = 'Thinking...';
-        icon = <Bot className="h-5 w-5 animate-spin" />;
-    } else if (isSpeaking) {
-        statusText = 'Speaking...';
-        icon = <Bot className="h-5 w-5 text-primary" />;
-    } else if(lastBotMessage) {
-        statusText = lastBotMessage;
+    if (isAssistantOpen) {
+        title = "Turn off voice assistant";
+        variant = "secondary";
+        if (isListening) {
+           Icon = Mic;
+           variant = "destructive";
+           title = "Listening... (Click to stop)";
+        } else if (isThinking) {
+            Icon = Bot;
+        } else if (isSpeaking) {
+            Icon = Bot;
+        }
     }
     
     return (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground font-medium">
-            {icon}
-            <span className="truncate max-w-xs">{statusText}</span>
-        </div>
+        <Button onClick={toggleAssistant} variant={variant} size="icon" className="rounded-full" title={title}>
+            <Icon className={cn("h-5 w-5", isListening && "animate-pulse")} />
+            <span className="sr-only">{title}</span>
+        </Button>
     )
 }
 
@@ -136,7 +137,6 @@ function UserMenu() {
 
 export function Header() {
   const pathname = usePathname();
-  const { isAssistantOpen } = useAssistant();
 
   return (
     <header className="sticky top-0 z-50 flex h-16 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:px-6">
@@ -216,13 +216,8 @@ export function Header() {
         </SheetContent>
       </Sheet>
       
-       { isAssistantOpen && (
-          <div className="flex-1 flex items-center justify-center">
-            <AssistantStatus />
-          </div>
-        )}
-
       <div className="flex w-full items-center justify-end gap-4 md:ml-auto md:gap-2 lg:gap-4">
+        <AssistantToggleButton />
         <CartIcon />
         <UserMenu />
       </div>
