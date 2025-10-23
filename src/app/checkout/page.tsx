@@ -20,12 +20,13 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 import { getProductImage } from '@/lib/data';
-import { useTransition, useState, useRef, useEffect } from 'react';
+import { useTransition, useState, useRef } from 'react';
 import { useFirebase, errorEmitter } from '@/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Mic, StopCircle, CheckCircle } from 'lucide-react';
 import { transcribeAndTranslateAudio } from '@/ai/flows/transcribe-translate-flow';
+import Link from 'next/link';
 
 
 const checkoutSchema = z.object({
@@ -103,7 +104,7 @@ export default function CheckoutPage() {
     }
 
     const storeId = cartItems[0]?.product.storeId;
-    if (!storeId && !audioDataUri) {
+    if (cartItems.length === 0 && !audioDataUri) {
         toast({ variant: 'destructive', title: 'Error', description: 'Your cart is empty and no voice memo is recorded. Add items or record a list.' });
         return;
     }
@@ -154,27 +155,29 @@ export default function CheckoutPage() {
             router.push('/order-confirmation');
         }).catch((e) => {
              console.error('Error placing order:', e);
-             errorEmitter.emit('permission-error', new FirestorePermissionError({
+             const permissionError = new FirestorePermissionError({
                 path: ordersCol.path,
                 operation: 'create',
                 requestResourceData: orderData
-            }));
+            });
+            errorEmitter.emit('permission-error', permissionError);
              return Promise.reject(e);
         });
     });
   };
 
   if (cartItems.length === 0 && !audioDataUri) {
-    // Show a slightly different message before checkout is possible.
      return (
-        <div className="container mx-auto py-12 px-4 md:px-6">
-            <div className="grid md:grid-cols-2 gap-12">
+        <div className="container mx-auto py-24 px-4 md:px-6">
+            <div className="grid md:grid-cols-2 gap-12 items-center">
                  <div>
                     <Card>
                         <CardHeader><CardTitle>Add Items to Checkout</CardTitle></CardHeader>
                         <CardContent className="text-center py-12">
-                             <p className="text-muted-foreground mb-8">Your cart is empty. Add items from a store or record a voice memo to proceed.</p>
-                             <Button asChild variant="outline"><a href="/stores">Browse Stores</a></Button>
+                             <p className="text-muted-foreground mb-8">Your cart is empty. Add items from a store to get started.</p>
+                             <Button asChild variant="outline">
+                                <Link href="/stores">Browse Stores</Link>
+                             </Button>
                         </CardContent>
                     </Card>
                 </div>
@@ -182,18 +185,19 @@ export default function CheckoutPage() {
                   <Card>
                     <CardHeader>
                       <CardTitle>Or Record Your Shopping List</CardTitle>
+                      <CardDescription>No need to browse. Just tell us what you need, and a local shopkeeper will handle it.</CardDescription>
                     </CardHeader>
                     <CardContent className="flex flex-col items-center justify-center space-y-4 py-12">
                         <Button
                             onClick={handleToggleRecording}
-                            variant={isRecording ? 'destructive' : 'outline'}
+                            variant={isRecording ? 'destructive' : 'default'}
                             size="lg"
                             className="w-48"
                           >
                             {isRecording ? <StopCircle className="mr-2 h-5 w-5" /> : <Mic className="mr-2 h-5 w-5" />}
                             {isRecording ? 'Stop Recording' : 'Record List'}
                         </Button>
-                        <p className="text-sm text-muted-foreground">Record your full shopping list in any language.</p>
+                        <p className="text-sm text-muted-foreground text-center">Record your full shopping list in any language. We'll translate it for the shopkeeper.</p>
                      </CardContent>
                   </Card>
                  </div>
@@ -304,6 +308,9 @@ export default function CheckoutPage() {
                         </div>
                     )
                 })}
+                 {cartItems.length === 0 && audioDataUri && (
+                    <p className="text-muted-foreground text-sm text-center py-4">Your order will be fulfilled based on your voice memo. The final price will be confirmed by the shopkeeper.</p>
+                )}
             </CardContent>
             <CardFooter className="flex justify-between font-bold text-lg">
                 <span>Total</span>
@@ -312,7 +319,7 @@ export default function CheckoutPage() {
           </Card>
            <Card className="mt-8">
             <CardHeader>
-                <CardTitle>Add Voice Memo</CardTitle>
+                <CardTitle>Voice Memo</CardTitle>
             </CardHeader>
              <CardContent className="flex flex-col items-center justify-center space-y-4">
                 <Button
@@ -322,9 +329,9 @@ export default function CheckoutPage() {
                     className="w-48"
                   >
                     {isRecording ? <StopCircle className="mr-2 h-5 w-5" /> : <Mic className="mr-2 h-5 w-5" />}
-                    {isRecording ? 'Stop Recording' : (audioDataUri ? 'Re-record List' : 'Record List')}
+                    {isRecording ? 'Stop Recording' : (audioDataUri ? 'Re-record' : 'Record List')}
                 </Button>
-                <p className="text-sm text-muted-foreground text-center">Record your shopping list in any language. The shopkeeper will get a translated version.</p>
+                <p className="text-sm text-muted-foreground text-center">You can add special instructions or your full shopping list via voice.</p>
              </CardContent>
            </Card>
         </div>
