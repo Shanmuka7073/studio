@@ -6,7 +6,6 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'genkit';
 
 const commandSchema = z.object({
@@ -44,7 +43,7 @@ const nluPrompt = ai.definePrompt({
   name: 'nluPrompt',
   input: { schema: commandSchema },
   output: { schema: interpretedCommandSchema },
-  model: googleAI.model('gemini-1.5-flash-latest'),
+  model: 'googleai/gemini-1.5-pro-preview-0514',
   prompt: `You are an NLU engine for a grocery shopping app. Your task is to interpret the user's spoken command and extract the intent and relevant entities.
 
     The user is interacting with the app via voice.
