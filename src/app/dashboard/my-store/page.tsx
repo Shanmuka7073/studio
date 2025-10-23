@@ -41,6 +41,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Checkbox } from '@/components/ui/checkbox';
 import groceryData from '@/lib/grocery-data.json';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Share2 } from 'lucide-react';
 
 const storeSchema = z.object({
   name: z.string().min(3, 'Store name must be at least 3 characters'),
@@ -285,6 +286,77 @@ function AddProductForm({ storeId }: { storeId: string }) {
   );
 }
 
+function PromoteStore({ store }: { store: Store }) {
+    const { toast } = useToast();
+
+    const handleShare = async () => {
+        if (!('contacts' in navigator && 'select' in navigator.contacts)) {
+            toast({
+                variant: 'destructive',
+                title: 'API Not Supported',
+                description: 'Your browser does not support the Contact Picker API.',
+            });
+            return;
+        }
+
+        try {
+            const contacts = await navigator.contacts.select(['name', 'email', 'tel'], { multiple: true });
+
+            if (contacts.length === 0) {
+                toast({ title: 'No contacts selected.' });
+                return;
+            }
+
+            const phoneNumbers = contacts.flatMap(c => c.tel || []);
+            const shareText = `Check out my store, ${store.name}, on the LocalBasket app! You can order groceries online and get them delivered right to your door. Visit my storefront here: ${window.location.origin}/stores/${store.id}`;
+            
+            if (phoneNumbers.length > 0) {
+                 const smsLink = `sms:${phoneNumbers.join(',')}?&body=${encodeURIComponent(shareText)}`;
+                 window.open(smsLink, '_blank');
+            } else {
+                 toast({
+                    variant: 'destructive',
+                    title: 'No Phone Numbers Found',
+                    description: 'The selected contacts do not have phone numbers. Email sharing is not yet implemented.',
+                });
+            }
+            
+            toast({
+                title: 'Contacts Selected!',
+                description: `Opening your messaging app to share with ${contacts.length} contacts.`,
+            });
+
+        } catch (ex) {
+            toast({
+                variant: 'destructive',
+                title: 'Could not access contacts',
+                description: 'There was an error trying to access your contacts.',
+            });
+            console.error(ex);
+        }
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Promote Your Store</CardTitle>
+                <CardDescription>
+                    Share your store with your phone contacts to bring in more customers.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Button onClick={handleShare} className="w-full">
+                    <Share2 className="mr-2 h-4 w-4" />
+                    Share with Contacts
+                </Button>
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                    This will open your phone's contact picker. We never see your full contact list.
+                </p>
+            </CardContent>
+        </Card>
+    );
+}
+
 function ManageStoreView({ store }: { store: Store }) {
     const { firestore } = useFirebase();
 
@@ -341,8 +413,9 @@ function ManageStoreView({ store }: { store: Store }) {
                 </CardContent>
             </Card>
         </div>
-        <div>
+         <div className="grid md:grid-cols-2 gap-8">
             <ProductChecklist storeId={store.id} onProductsAdded={() => revalidateProductPaths(store.id)} />
+            <PromoteStore store={store} />
         </div>
       </div>
     )
