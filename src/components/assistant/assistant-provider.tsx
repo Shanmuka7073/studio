@@ -38,7 +38,7 @@ const AssistantContext = createContext<AssistantState | undefined>(undefined);
 export function AssistantProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { firestore, user, isUserLoading } = useFirebase();
+  const { firestore, user } = useFirebase();
   const { addItem: addItemToCart } = useCart();
   const { toast } = useToast();
 
@@ -68,27 +68,6 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       }
     }
   }, []);
-
-  const startListening = useCallback(() => {
-    // This guard is essential to prevent the "already started" error.
-    if (status !== 'idle' || !user) return;
-
-    if (speechRecognition.current) {
-      try {
-        speechRecognition.current.start();
-        setStatus('listening');
-      } catch (e) {
-        // This can happen if the component tries to start recognition
-        // again before the 'onstart' event has fired and updated the status.
-        if (e instanceof DOMException && e.name === 'InvalidStateError') {
-          console.warn('Speech recognition already starting. Ignoring redundant call.');
-        } else {
-          console.error("Speech recognition start error: ", e);
-          setStatus('idle');
-        }
-      }
-    }
-  }, [status, user]);
 
   const speak = useCallback(async (text: string) => {
     if (!text) return;
@@ -225,6 +204,27 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       await speak("Sorry, I had trouble understanding that.");
     }
   }, [status, stopListening, handleCommand, speak]);
+  
+  const startListening = useCallback(() => {
+    // This guard is essential to prevent the "already started" error.
+    if (status !== 'idle' || !user) return;
+
+    if (speechRecognition.current) {
+      try {
+        speechRecognition.current.start();
+        setStatus('listening');
+      } catch (e) {
+        // This can happen if the component tries to start recognition
+        // again before the 'onstart' event has fired and updated the status.
+        if (e instanceof DOMException && e.name === 'InvalidStateError') {
+          console.warn('Speech recognition already starting. Ignoring redundant call.');
+        } else {
+          console.error("Speech recognition start error: ", e);
+          setStatus('idle');
+        }
+      }
+    }
+  }, [status, user]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -288,19 +288,6 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       setStatus('idle');
     }
   }, [status, user, startListening, stopListening]);
-  
-  // Welcome message on login
-  useEffect(() => {
-     if (user && !isUserLoading) {
-        const welcome = async () => {
-             // A brief delay to allow everything to settle
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            speak("Welcome back! How can I help you?");
-        }
-        welcome();
-     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, isUserLoading])
 
 
   const value = {
@@ -324,5 +311,7 @@ export function useAssistant() {
   }
   return context;
 }
+
+    
 
     
