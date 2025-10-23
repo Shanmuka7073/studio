@@ -28,8 +28,10 @@ export function initializeFirebase() {
     
     // Initialize App Check
     if (typeof window !== 'undefined') {
+        // You can get a reCAPTCHA v3 site key from the Google Cloud console.
+        // Make sure to replace the placeholder below.
         initializeAppCheck(firebaseApp, {
-            provider: new ReCaptchaV3Provider('6Ld-pPspAAAAAN3Vqj9c2h6r4tEVpGkE-3J5xX_U'), // Replace with your reCAPTCHA v3 site key
+            provider: new ReCaptchaV3Provider('6Ld-pPspAAAAAN3Vqj9c2h6r4tEVpGkE-3J5xX_U'),
             isTokenAutoRefreshEnabled: true
         });
     }
