@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, {
@@ -27,7 +28,7 @@ type AssistantState = {
   isListening: boolean;
   isThinking: boolean;
   isSpeaking: boolean;
-  isAssistantOpen: boolean;
+  isAssistantOpen: boolean; // Represents if the listening session is active
   conversation: ConversationEntry[];
   toggleAssistant: () => void;
 };
@@ -55,7 +56,6 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
 
   const speechRecognition = useRef<SpeechRecognition | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
-  const wasManuallyStopped = useRef(false);
 
   const addToConversation = (entry: ConversationEntry) => {
     setConversation(prev => [...prev, entry]);
@@ -111,7 +111,6 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
                 path = `/stores/${store.id}`;
                 router.push(path);
                 await speak(`Navigating to ${storeName}.`);
-                setIsAssistantOpen(false);
             } else {
                  await speak(`Sorry, I could not find a store named ${storeName}.`);
             }
@@ -127,7 +126,6 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
             }
             router.push(path);
             await speak(`Navigating to ${page}.`);
-            setIsAssistantOpen(false);
         } else {
              await speak("I'm not sure where you want to go. Please specify a page or a store.");
         }
@@ -206,15 +204,14 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   }, [isThinking, isSpeaking, handleCommand, speak]);
 
   const toggleAssistant = useCallback(() => {
-    if (isAssistantOpen) {
-      wasManuallyStopped.current = true;
+    if (isAssistantOpen) { // If it's currently on, turn it off
       speechRecognition.current?.stop();
       audio.current?.pause();
       setIsAssistantOpen(false);
-    } else {
+      setIsListening(false);
+    } else { // If it's off, turn it on
       setConversation([]);
       setIsAssistantOpen(true);
-      wasManuallyStopped.current = false;
       speechRecognition.current?.start();
     }
   }, [isAssistantOpen]);
@@ -225,8 +222,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     audio.current = new Audio();
     audio.current.onended = () => {
       setIsSpeaking(false);
-      // Restart listening only if the assistant is supposed to be open
-      if (isAssistantOpen && !wasManuallyStopped.current) {
+      if (isAssistantOpen) { // If session is active, resume listening
         speechRecognition.current?.start();
       }
     };
@@ -242,7 +238,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     }
 
     const recognition = new SpeechRecognitionAPI();
-    recognition.continuous = false; // Process one phrase at a time
+    recognition.continuous = false; // We will manually restart it for better control
     recognition.interimResults = false;
     speechRecognition.current = recognition;
 
@@ -252,15 +248,21 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     
     recognition.onend = () => {
         setIsListening(false);
-        // Auto-restart listening if it wasn't manually stopped
-        if (isAssistantOpen && !wasManuallyStopped.current && !isSpeaking) {
+        // Auto-restart listening if the session is still active and we are not speaking
+        if (isAssistantOpen && !isSpeaking) {
             recognition.start();
         }
     };
 
     recognition.onerror = (event) => {
-        if(event.error !== 'no-speech' && event.error !== 'aborted') {
+        if(event.error === 'no-speech' || event.error === 'aborted') {
+            // These are normal, no need to log. 'aborted' happens when we call .stop()
+        } else {
             console.error('Speech recognition error:', event.error);
+        }
+        // Always try to restart if the session is supposed to be open.
+         if (isAssistantOpen && !isSpeaking) {
+            recognition.start();
         }
     };
 
@@ -270,12 +272,12 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         finalTranscript += event.results[i][0].transcript;
       }
       if (finalTranscript.trim()) {
+        recognition.stop(); // Stop listening while we process
         processTranscript(finalTranscript.trim());
       }
     };
 
     return () => {
-        wasManuallyStopped.current = true;
         speechRecognition.current?.stop();
     }
   }, [processTranscript, toast, isAssistantOpen, isSpeaking]);

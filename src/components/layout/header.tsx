@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Package2, Menu, UserCircle, Store, ShoppingBag, Truck } from 'lucide-react';
+import { Package2, Menu, UserCircle, Store, ShoppingBag, Truck, Mic, Bot } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -28,6 +28,7 @@ import {
 import { getAuth, signOut } from 'firebase/auth';
 import { useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAssistant } from '../assistant/assistant-provider';
 
 const navLinks = [
   { href: '/', label: 'Home' },
@@ -46,6 +47,34 @@ const ownerLinks = [
 const deliveryLinks = [
     { href: '/dashboard/deliveries', label: 'Deliveries', icon: Truck },
 ]
+
+function AssistantStatus() {
+    const { isListening, isThinking, isSpeaking, conversation } = useAssistant();
+    const lastBotMessage = conversation.filter(m => m.speaker === 'bot').pop()?.text;
+
+    let statusText = 'Click the mic to start';
+    let icon = <Mic className="h-5 w-5" />;
+
+    if (isListening) {
+        statusText = 'Listening...';
+        icon = <Mic className="h-5 w-5 animate-pulse text-destructive" />;
+    } else if (isThinking) {
+        statusText = 'Thinking...';
+        icon = <Bot className="h-5 w-5 animate-spin" />;
+    } else if (isSpeaking) {
+        statusText = 'Speaking...';
+        icon = <Bot className="h-5 w-5 text-primary" />;
+    } else if(lastBotMessage) {
+        statusText = lastBotMessage;
+    }
+    
+    return (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground font-medium">
+            {icon}
+            <span className="truncate max-w-xs">{statusText}</span>
+        </div>
+    )
+}
 
 function UserMenu() {
   const { user, isUserLoading } = useFirebase();
@@ -107,6 +136,7 @@ function UserMenu() {
 
 export function Header() {
   const pathname = usePathname();
+  const { isAssistantOpen } = useAssistant();
 
   return (
     <header className="sticky top-0 z-50 flex h-16 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:px-6">
@@ -185,6 +215,13 @@ export function Header() {
           </div>
         </SheetContent>
       </Sheet>
+      
+       { isAssistantOpen && (
+          <div className="flex-1 flex items-center justify-center">
+            <AssistantStatus />
+          </div>
+        )}
+
       <div className="flex w-full items-center justify-end gap-4 md:ml-auto md:gap-2 lg:gap-4">
         <CartIcon />
         <UserMenu />

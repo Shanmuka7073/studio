@@ -10,7 +10,6 @@ import { Footer } from '@/components/layout/footer';
 import { CartProvider } from '@/lib/cart';
 import { FirebaseClientProvider } from '@/firebase';
 import { AssistantProvider } from '@/components/assistant/assistant-provider';
-import { AssistantDialog } from '@/components/assistant/assistant-dialog';
 
 
 const ptSans = PT_Sans({
@@ -49,7 +48,6 @@ export default function RootLayout({
                 <main className="flex-1">{children}</main>
                 <Footer />
               </div>
-              <AssistantDialog />
               <Toaster />
             </AssistantProvider>
           </CartProvider>
