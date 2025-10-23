@@ -57,13 +57,11 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
 
   const speechRecognition = useRef<SpeechRecognition | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
-  const silenceTimer = useRef<NodeJS.Timeout | null>(null);
-
 
   const addToConversation = (entry: ConversationEntry) => {
     setConversation(prev => [...prev, entry]);
   };
-
+  
   const stopListening = useCallback(() => {
     if (speechRecognition.current) {
       try {
@@ -77,7 +75,8 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const startListening = useCallback(() => {
-    if (speechRecognition.current && !isListening && !isSpeaking) {
+    if (isListening || isSpeaking) return; // Guard clause
+    if (speechRecognition.current) {
       try {
         speechRecognition.current.start();
         setIsListening(true);
@@ -131,27 +130,16 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     switch (command.intent) {
       case 'navigateTo':
         const page = command.entities.pageName?.toLowerCase();
-        const storeName = command.entities.storeName;
         let path = '/';
 
-        if (storeName && firestore) {
-            const storesSnapshot = await getDocs(query(collection(firestore, 'stores'), where('name', '==', storeName)));
-            if (!storesSnapshot.empty) {
-                const store = storesSnapshot.docs[0];
-                path = `/stores/${store.id}`;
-                router.push(path);
-                await speak(`Navigating to ${storeName}.`);
-            } else {
-                 await speak(`Sorry, I could not find a store named ${storeName}.`);
-            }
-        } else if (page) {
-            if (page?.includes('home')) path = '/';
-            else if (page?.includes('stores')) path = '/stores';
-            else if (page?.includes('cart') || page?.includes('shopping cart')) path = '/cart';
-            else if (page?.includes('my orders')) path = '/dashboard/my-orders';
-            else if (page?.includes('my store')) path = '/dashboard/my-store';
-            else if (page?.includes('store orders')) path = '/dashboard/orders';
-            else if (page?.includes('deliveries')) path = '/dashboard/deliveries';
+        if (page) {
+            if (page.includes('home')) path = '/';
+            else if (page.includes('stores')) path = '/stores';
+            else if (page.includes('cart') || page.includes('shopping cart')) path = '/cart';
+            else if (page.includes('my orders')) path = '/dashboard/my-orders';
+            else if (page.includes('my store')) path = '/dashboard/my-store';
+            else if (page.includes('store orders')) path = '/dashboard/orders';
+            else if (page.includes('deliveries')) path = '/dashboard/deliveries';
             else {
                 await speak(`Sorry, I don't know how to navigate to ${page}.`);
                 break;
@@ -168,26 +156,37 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
             await speak("Sorry, I can't search for products right now. The database is not connected.");
             break;
         }
-        const { productName, storeName: findStoreName } = command.entities;
+        const { productName, storeName } = command.entities;
         if (!productName) {
             await speak("What product are you looking for?");
             break;
         }
         
         let storeId: string | null = null;
-
+        
+        // 1. Check if we are on a store page
         const pathSegments = pathname.split('/').filter(Boolean);
         if (pathSegments[0] === 'stores' && pathSegments.length > 1) {
             storeId = pathSegments[1];
-        } else if (findStoreName) {
-            const storesSnapshot = await getDocs(query(collection(firestore, 'stores'), where('name', '==', findStoreName)));
-            if (!storesSnapshot.empty) {
-                storeId = storesSnapshot.docs[0].id;
-            } else {
-                await speak(`Sorry, I could not find a store named ${findStoreName}.`);
+        } 
+        // 2. Check if a store name was mentioned in the command
+        else if (storeName) {
+             try {
+                const storesSnapshot = await getDocs(query(collection(firestore, 'stores'), where('name', '==', storeName)));
+                if (!storesSnapshot.empty) {
+                    storeId = storesSnapshot.docs[0].id;
+                } else {
+                    await speak(`Sorry, I could not find a store named ${storeName}.`);
+                    break;
+                }
+            } catch (e) {
+                console.error("Error finding store by name:", e);
+                await speak("I had trouble looking up that store.");
                 break;
             }
-        } else {
+        } 
+        // 3. If no store context, ask the user
+        else {
             await speak("Which store are you interested in?");
             break;
         }
@@ -219,6 +218,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     }
   }, [firestore, pathname, router, speak, pendingAction, addItemToCart]);
 
+
   const processTranscript = useCallback(async (transcript: string) => {
     if (isThinking || isSpeaking) return;
     stopListening();
@@ -229,6 +229,8 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     } catch(e) {
         console.error("Error interpreting command:", e);
         await speak("Sorry, I had trouble understanding that.");
+    } finally {
+      setIsThinking(false);
     }
   }, [isThinking, isSpeaking, stopListening, handleCommand, speak]);
 
@@ -246,10 +248,12 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   }, [startListening, stopListening]);
 
    useEffect(() => {
-    if (!isUserLoading && user && !hasWelcomed && !isAssistantOpen) {
+    if (!isUserLoading && user && !hasWelcomed) {
       const welcome = async () => {
-        // We still set it open, but the user must click to start the interaction
-        setIsAssistantOpen(true);
+        // Automatically start the assistant session on login
+        if (!isAssistantOpen) {
+           toggleAssistant();
+        }
         setHasWelcomed(true); 
         await speak("Welcome back! How can I help you?");
       }
@@ -303,6 +307,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         
         recognition.onend = () => {
             setIsListening(false);
+            // Keep the loop going if the session is still active
             if (isAssistantOpen && !isSpeaking && !isThinking) {
                startListening(); 
             }
@@ -334,7 +339,6 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         if (audio.current) {
             audio.current.pause();
         }
-        if (silenceTimer.current) clearTimeout(silenceTimer.current);
     }
   }, [processTranscript, isAssistantOpen, isSpeaking, isThinking, startListening, stopListening, toast]);
 
@@ -362,5 +366,3 @@ export function useAssistant() {
   }
   return context;
 }
-
-    
