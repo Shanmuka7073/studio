@@ -27,6 +27,7 @@ import {
 import { getAuth, signOut } from 'firebase/auth';
 import { useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AssistantDialog } from '../assistant/assistant-dialog';
 
 const navLinks = [
   { href: '/', label: 'Home' },
@@ -166,7 +167,7 @@ export function Header() {
                 ))}
             </nav>
             <div className="border-t pt-4">
-                <p className="px-3 text-sm font-medium text-muted-foreground mb-2">Dashboard</p>
+                <p className="px-3 text-sm font-medium text-muted-foreground mb-2">Pulpito</p>
                 <div className="grid gap-2">
                     {[...customerLinks, ...ownerLinks, ...deliveryLinks].map(({ href, label, icon: Icon }) => (
                     <SheetClose asChild key={href}>
@@ -185,6 +186,7 @@ export function Header() {
         </SheetContent>
       </Sheet>
       <div className="flex w-full items-center justify-end gap-4 md:ml-auto md:gap-2 lg:gap-4">
+        <AssistantDialog />
         <CartIcon />
         <UserMenu />
       </div>

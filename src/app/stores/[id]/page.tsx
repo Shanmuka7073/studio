@@ -4,7 +4,7 @@ import Image from 'next/image';
 import ProductCard from '@/components/product-card';
 import { useFirebase, useCollection, useMemoFirebase, errorEmitter } from '@/firebase';
 import { Store, Product } from '@/lib/types';
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo, useTransition } from 'react';
 import { notFound, useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -16,68 +16,8 @@ import { useToast } from '@/hooks/use-toast';
 import { writeBatch, collection, doc } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { revalidateProductPaths } from '@/app/actions';
-import { PanelLeft, Mic, MicOff, ShoppingCart } from 'lucide-react';
+import { PanelLeft } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import { useCart } from '@/lib/cart';
-
-
-function VoiceResultsDialog({ open, onOpenChange, voiceResults, onAddToCart }: { open: boolean, onOpenChange: (open: boolean) => void, voiceResults: { found: Product[], notFound: string[] }, onAddToCart: (product: Product) => void }) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Voice Shopping List</DialogTitle>
-          <DialogDescription>
-            We found these items from your voice command. Add them to your cart.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          {voiceResults.found.length > 0 && (
-            <div>
-              <h4 className="font-semibold mb-2">Found Items</h4>
-              <ul className="space-y-2">
-                {voiceResults.found.map(product => (
-                  <li key={product.id} className="flex items-center justify-between">
-                    <div>
-                      <p>{product.name}</p>
-                      <p className="text-sm text-primary font-semibold">${product.price.toFixed(2)}</p>
-                    </div>
-                    <Button size="sm" onClick={() => onAddToCart(product)}>
-                      <ShoppingCart className="mr-2 h-4 w-4" /> Add
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {voiceResults.notFound.length > 0 && (
-            <div>
-              <h4 className="font-semibold mb-2">Not Found</h4>
-              <ul className="space-y-1">
-                {voiceResults.notFound.map((item, index) => (
-                  <li key={index} className="text-sm text-muted-foreground">
-                    - {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-        <DialogFooter>
-          <Button onClick={() => onOpenChange(false)}>Close</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
 
 function InventoryManager({ storeId, existingProducts, onProductsAdded }: { storeId: string; existingProducts: Product[], onProductsAdded: () => void }) {
   const { toast } = useToast();
@@ -190,68 +130,9 @@ function InventoryManager({ storeId, existingProducts, onProductsAdded }: { stor
   );
 }
 
-function ProductFilterSidebar({ allProducts, onFilterChange, onVoiceResults }: { allProducts: Product[], onFilterChange: (filters: { categories: string[], searchTerm: string }) => void, onVoiceResults: (results: { found: Product[], notFound: string[] }) => void }) {
+function ProductFilterSidebar({ onFilterChange }: { onFilterChange: (filters: { categories: string[], searchTerm: string }) => void }) {
   const [selectedCategories, setSelectedCategories] = useState<Record<string, boolean>>({});
   const [searchTerm, setSearchTerm] = useState('');
-  const [isListening, setIsListening] = useState(false);
-  const speechRecognition = useRef<SpeechRecognition | null>(null);
-
-  useEffect(() => {
-    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognitionAPI) {
-      console.warn("Speech Recognition API is not supported in this browser.");
-      return;
-    }
-
-    const recognition = new SpeechRecognitionAPI();
-    recognition.continuous = false;
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-    speechRecognition.current = recognition;
-
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      
-      const spokenItems = transcript.split(/,|\s+and\s+|\s+/).map(s => s.trim()).filter(Boolean);
-      const found: Product[] = [];
-      const notFound: string[] = [];
-
-      spokenItems.forEach(itemText => {
-        const foundProduct = allProducts.find(p => p.name.toLowerCase().includes(itemText.toLowerCase()));
-        if(foundProduct) {
-          if (!found.some(p => p.id === foundProduct.id)) {
-            found.push(foundProduct);
-          }
-        } else {
-          notFound.push(itemText);
-        }
-      });
-
-      onVoiceResults({ found, notFound });
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
-    recognition.onerror = (event) => {
-      console.error("Speech recognition error", event.error);
-      setIsListening(false);
-    };
-
-  }, [allProducts, onVoiceResults]);
-
-
-  const toggleListening = () => {
-    if (isListening) {
-      speechRecognition.current?.stop();
-    } else {
-      speechRecognition.current?.start();
-    }
-    setIsListening(!isListening);
-  };
-
 
   const handleCategorySelection = (categoryName: string, isChecked: boolean) => {
     const newSelection = { ...selectedCategories, [categoryName]: isChecked };
@@ -271,19 +152,15 @@ function ProductFilterSidebar({ allProducts, onFilterChange, onVoiceResults }: {
     <div className="h-full flex flex-col">
       <CardHeader>
         <CardTitle>Filter Products</CardTitle>
-        <CardDescription>Filter by category or search. Or use your voice to create a shopping list.</CardDescription>
+        <CardDescription>Filter by category or search for a specific product.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 flex-1 overflow-y-auto">
-        <div className="px-1 flex items-center gap-2">
+        <div className="px-1">
           <Input 
             placeholder="Search products..."
             value={searchTerm}
             onChange={handleSearchChange}
           />
-          <Button onClick={toggleListening} variant={isListening ? "destructive" : "outline"} size="icon">
-            {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-            <span className="sr-only">Toggle Voice Search</span>
-          </Button>
         </div>
         <Accordion type="multiple" className="w-full">
           {groceryData.categories.map((category) => (
@@ -320,9 +197,6 @@ export default function StoreDetailPage() {
   const [store, setStore] = useState<Store | null>(null);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<{ categories: string[], searchTerm: string }>({ categories: [], searchTerm: '' });
-  const [voiceResults, setVoiceResults] = useState<{ found: Product[], notFound: string[] }>({ found: [], notFound: [] });
-  const [isVoiceResultsOpen, setIsVoiceResultsOpen] = useState(false);
-  const { addItem: addToCart } = useCart();
   
   const productsQuery = useMemoFirebase(() => {
     if (!firestore || !id) return null;
@@ -349,16 +223,6 @@ export default function StoreDetailPage() {
   
   const handleFilterChange = (newFilters: { categories: string[], searchTerm: string }) => {
     setFilters(newFilters);
-  };
-
-  const handleVoiceResults = (results: { found: Product[], notFound: string[] }) => {
-    setVoiceResults(results);
-    setIsVoiceResultsOpen(true);
-  };
-  
-  const handleAddToCartFromVoice = (product: Product) => {
-    addToCart(product);
-    // Optional: close dialog or give visual feedback
   };
 
   const filteredProducts = useMemo(() => {
@@ -397,19 +261,13 @@ export default function StoreDetailPage() {
   
   const sidebarContent = isStoreOwner 
     ? <InventoryManager storeId={store.id} existingProducts={products || []} onProductsAdded={() => revalidateProductPaths(store.id)} />
-    : <ProductFilterSidebar allProducts={products || []} onFilterChange={handleFilterChange} onVoiceResults={handleVoiceResults} />;
+    : <ProductFilterSidebar onFilterChange={handleFilterChange} />;
 
   return (
     <div className="flex">
         <div className="hidden lg:block w-96 border-r h-[calc(100vh-4rem)] sticky top-16">
              {sidebarContent}
         </div>
-        <VoiceResultsDialog 
-            open={isVoiceResultsOpen}
-            onOpenChange={setIsVoiceResultsOpen}
-            voiceResults={voiceResults}
-            onAddToCart={handleAddToCartFromVoice}
-        />
         <div className="container mx-auto py-12 px-4 md:px-6 flex-1">
           <div className="flex flex-col md:flex-row gap-8 mb-12">
             <Image
@@ -453,5 +311,3 @@ export default function StoreDetailPage() {
     </div>
   );
 }
-
-    

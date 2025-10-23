@@ -8,6 +8,7 @@ import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
 import { CartProvider } from '@/lib/cart';
 import { FirebaseClientProvider } from '@/firebase';
+import { AssistantProvider } from '@/components/assistant/assistant-provider';
 
 
 const ptSans = PT_Sans({
@@ -40,16 +41,17 @@ export default function RootLayout({
       >
         <FirebaseClientProvider>
           <CartProvider>
-            <div className="relative flex min-h-dvh flex-col bg-background">
-              <Header />
-              <main className="flex-1">{children}</main>
-              <Footer />
-            </div>
-            <Toaster />
+            <AssistantProvider>
+              <div className="relative flex min-h-dvh flex-col bg-background">
+                <Header />
+                <main className="flex-1">{children}</main>
+                <Footer />
+              </div>
+              <Toaster />
+            </AssistantProvider>
           </CartProvider>
         </FirebaseClientProvider>
       </body>
     </html>
   );
 }
-    
