@@ -4,7 +4,7 @@ import { useCart } from '@/lib/cart';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -198,6 +198,7 @@ export default function CheckoutPage() {
                             {isRecording ? 'Stop Recording' : 'Record List'}
                         </Button>
                         <p className="text-sm text-muted-foreground text-center">Record your full shopping list in any language. We'll translate it for the shopkeeper.</p>
+                        <p className="text-xs text-muted-foreground/80 text-center">(Note: This action saves an audio recording to your order.)</p>
                      </CardContent>
                   </Card>
                  </div>
@@ -332,6 +333,7 @@ export default function CheckoutPage() {
                     {isRecording ? 'Stop Recording' : (audioDataUri ? 'Re-record' : 'Record List')}
                 </Button>
                 <p className="text-sm text-muted-foreground text-center">You can add special instructions or your full shopping list via voice.</p>
+                 <p className="text-xs text-muted-foreground/80 text-center">(Note: This action saves an audio recording to your order.)</p>
              </CardContent>
            </Card>
         </div>
