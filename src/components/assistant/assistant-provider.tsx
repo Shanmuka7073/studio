@@ -144,7 +144,11 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         
         let storeId: string | null = null;
 
-        if (findStoreName) {
+        // Check if we are on a store page first
+        const pathSegments = pathname.split('/').filter(Boolean);
+        if (pathSegments[0] === 'stores' && pathSegments[1]) {
+            storeId = pathSegments[1];
+        } else if (findStoreName) {
             const storesSnapshot = await getDocs(query(collection(firestore, 'stores'), where('name', '==', findStoreName)));
             if (!storesSnapshot.empty) {
                 storeId = storesSnapshot.docs[0].id;
@@ -153,14 +157,8 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
                 break;
             }
         } else {
-            // Check if we are on a store page
-            const pathSegments = pathname.split('/').filter(Boolean);
-            if (pathSegments[0] === 'stores' && pathSegments[1]) {
-                storeId = pathSegments[1];
-            } else {
-                await speak("Which store are you interested in?");
-                break;
-            }
+            await speak("Which store are you interested in?");
+            break;
         }
 
         if (storeId) {
@@ -304,5 +302,3 @@ export function useAssistant() {
   }
   return context;
 }
-
-    

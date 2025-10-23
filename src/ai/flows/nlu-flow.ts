@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A Natural Language Understanding (NLU) flow to interpret user commands.
@@ -66,6 +67,7 @@ const nluPrompt = ai.definePrompt({
     - "show me bananas" -> intent: findProduct, entities: { productName: "bananas" }
     - "Yes, add it" -> intent: confirm, entities: {}
     - "go to my cart" -> intent: navigateTo, entities: { pageName: "cart" }
+    - "go to my orders" -> intent: navigateTo, entities: { pageName: "my orders" }
     - "take me home" -> intent: navigateTo, entities: { pageName: "home" }
     - "what's the weather like" -> intent: unknown, entities: {}
 
