@@ -28,7 +28,7 @@ export default function OrderConfirmationPage() {
               <Link href="/stores">Continue Shopping</Link>
             </Button>
             <Button asChild variant="outline">
-              <Link href="/dashboard/my-orders">View Orders</Link>
+              <Link href="/dashboard/customer/my-orders">View Orders</Link>
             </Button>
           </div>
         </CardContent>
