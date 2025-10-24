@@ -13,12 +13,12 @@ import { Label } from '@/components/ui/label';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import {
   initiateEmailSignUp,
   initiateEmailSignIn,
 } from '@/firebase/non-blocking-login';
-import { useAuth } from '@/firebase';
+import { useFirebase, useAuth } from '@/firebase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 
@@ -34,9 +34,20 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const auth = useAuth();
+  const { user, isUserLoading } = useFirebase();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
+
+  const redirectTo = searchParams.get('redirectTo') || '/dashboard';
+
+  useEffect(() => {
+    // If user is already logged in, redirect them away from the login page.
+    if (!isUserLoading && user) {
+      router.push(redirectTo);
+    }
+  }, [user, isUserLoading, router, redirectTo]);
+
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -57,9 +68,8 @@ export default function LoginPage() {
           setIsSignUp(false); // Switch to login view after signup
           form.reset();
         } else {
+          // The sign-in will trigger the useEffect above to redirect on success.
           initiateEmailSignIn(auth, data.email, data.password);
-          const redirectTo = searchParams.get('redirectTo') || '/dashboard';
-          router.push(redirectTo);
         }
       } catch (err: any) {
         setError(err.message);
@@ -77,7 +87,7 @@ export default function LoginPage() {
           <CardDescription>
             {isSignUp
               ? 'Enter your details to get started.'
-              : 'Sign in to access your dashboard.'}
+              : 'Sign in to continue.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -110,7 +120,7 @@ export default function LoginPage() {
               )}
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" className="w-full" disabled={isPending}>
+            <Button type="submit" className="w-full" disabled={isPending || isUserLoading}>
               {isPending
                 ? 'Processing...'
                 : isSignUp

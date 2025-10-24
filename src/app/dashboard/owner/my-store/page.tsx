@@ -666,6 +666,9 @@ export default function MyStorePage() {
   if (isUserLoading || isStoreLoading) {
     return <div className="container mx-auto py-12 px-4 md:px-6">Loading your store...</div>
   }
+
+  // After loading, if user is authenticated but has no store, they can create one.
+  // The query will return empty, and `myStore` will be undefined.
   
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">

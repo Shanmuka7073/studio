@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useRouter } from 'next/navigation';
 
 
 function OrderDetailsDialog({ order, isOpen, onClose }: { order: Order | null; isOpen: boolean; onClose: () => void }) {
@@ -98,8 +99,16 @@ export default function OrdersDashboardPage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
 
-  // 1. Get the current user's store
+  // 1. Redirect if user is not logged in
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.push('/login?redirectTo=/dashboard/owner/orders');
+    }
+  }, [isUserLoading, user, router]);
+
+  // 2. Get the current user's store
   const storeQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(collection(firestore, 'stores'), where('ownerId', '==', user.uid));
@@ -107,7 +116,7 @@ export default function OrdersDashboardPage() {
   const { data: stores, isLoading: isStoreLoading } = useCollection<Store>(storeQuery);
   const myStore = stores?.[0];
 
-  // 2. Fetch all order types when store is available
+  // 3. Fetch all order types when store is available
   useEffect(() => {
     if (!firestore || !myStore) {
         if (!isUserLoading && !isStoreLoading) setIsLoading(false);
