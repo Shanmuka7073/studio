@@ -1,16 +1,19 @@
 
 'use client';
 
-import { Order } from '@/lib/types';
+import { Order, Store } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { MapPin } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
+import { useEffect, useState, useMemo } from 'react';
+import { getStores } from '@/lib/data';
 
 export default function DeliveriesPage() {
   const { firestore } = useFirebase();
+  const [stores, setStores] = useState<Store[]>([]);
 
   // This query now targets orders that are ready for delivery.
   const deliveriesQuery = useMemoFirebase(() => {
@@ -21,12 +24,29 @@ export default function DeliveriesPage() {
     );
   }, [firestore]);
   
-  const { data: deliveries, isLoading } = useCollection<Order>(deliveriesQuery);
+  const { data: deliveries, isLoading: deliveriesLoading } = useCollection<Order>(deliveriesQuery);
 
-  const openInGoogleMaps = (address: string) => {
-    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+  useEffect(() => {
+    if (firestore) {
+      getStores(firestore).then(setStores);
+    }
+  }, [firestore]);
+
+  const deliveriesWithStores = useMemo(() => {
+    if (!deliveries || !stores.length) return [];
+    
+    return deliveries.map(order => {
+      const store = stores.find(s => s.id === order.storeId);
+      return { ...order, store };
+    });
+  }, [deliveries, stores]);
+
+  const openInGoogleMaps = (storeAddress: string, customerAddress: string) => {
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(storeAddress)}&destination=${encodeURIComponent(customerAddress)}`;
     window.open(url, '_blank');
   };
+  
+  const isLoading = deliveriesLoading || stores.length === 0;
 
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
@@ -38,33 +58,40 @@ export default function DeliveriesPage() {
         <CardContent>
           {isLoading ? (
             <p>Loading deliveries...</p>
-          ) : !deliveries || deliveries.length === 0 ? (
+          ) : !deliveriesWithStores || deliveriesWithStores.length === 0 ? (
             <p className="text-muted-foreground">No orders are currently out for delivery.</p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Order ID</TableHead>
+                  <TableHead>Store Pickup</TableHead>
                   <TableHead>Customer</TableHead>
-                  <TableHead>Address</TableHead>
-                  <TableHead>Location</TableHead>
+                  <TableHead>Customer Phone</TableHead>
+                  <TableHead>Delivery Address</TableHead>
+                  <TableHead>Route</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {deliveries.map((order) => (
+                {deliveriesWithStores.map((order) => (
                   <TableRow key={order.id}>
-                    <TableCell className="font-medium truncate max-w-[100px]">{order.id}</TableCell>
+                    <TableCell>
+                      <div className="font-medium">{order.store?.name}</div>
+                      <div className="text-sm text-muted-foreground">{order.store?.address}</div>
+                    </TableCell>
                     <TableCell>{order.customerName}</TableCell>
+                    <TableCell>{order.phone}</TableCell>
                     <TableCell>{order.deliveryAddress}</TableCell>
                     <TableCell>
-                       <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openInGoogleMaps(order.deliveryAddress)}
-                        >
-                          <MapPin className="mr-2 h-4 w-4" />
-                          View on Map
-                        </Button>
+                       {order.store && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openInGoogleMaps(order.store!.address, order.deliveryAddress)}
+                          >
+                            <MapPin className="mr-2 h-4 w-4" />
+                            View Route
+                          </Button>
+                       )}
                     </TableCell>
                   </TableRow>
                 ))}

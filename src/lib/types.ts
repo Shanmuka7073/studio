@@ -52,4 +52,5 @@ export type Order = {
   email: string;
   voiceMemoUrl?: string; // URL to the recorded voice memo
   translatedList?: string; // Bilingual translated list
+  store?: Store; // Optional: Denormalized or joined store data
 };
