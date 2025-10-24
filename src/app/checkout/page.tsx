@@ -32,7 +32,6 @@ import Link from 'next/link';
 
 const checkoutSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
-  address: z.string().min(10, 'Please enter a valid address'),
   phone: z.string().min(10, 'Please enter a valid phone number'),
 });
 
@@ -128,7 +127,6 @@ export default function CheckoutPage() {
     resolver: zodResolver(checkoutSchema),
     defaultValues: {
       name: '',
-      address: '',
       phone: '',
     },
   });
@@ -178,7 +176,7 @@ export default function CheckoutPage() {
         const orderPayload = {
             userId: user.uid,
             customerName: data.name,
-            deliveryAddress: data.address,
+            deliveryAddress: 'Delivery via captured GPS coordinates',
             deliveryLat: deliveryCoords.lat,
             deliveryLng: deliveryCoords.lng,
             phone: data.phone,
@@ -235,13 +233,13 @@ export default function CheckoutPage() {
 
   if (cartItems.length === 0 && !audioDataUri) {
      return (
-        <div className="container mx-auto py-24 px-4 md:px-6">
-            <div className="grid md:grid-cols-2 gap-12 items-center">
+        <div class="container mx-auto py-24 px-4 md:px-6">
+            <div class="grid md:grid-cols-2 gap-12 items-center">
                  <div>
                     <Card>
                         <CardHeader><CardTitle>Add Items to Checkout</CardTitle></CardHeader>
-                        <CardContent className="text-center py-12">
-                             <p className="text-muted-foreground mb-8">Your cart is empty. Add items from a store to get started.</p>
+                        <CardContent class="text-center py-12">
+                             <p class="text-muted-foreground mb-8">Your cart is empty. Add items from a store to get started.</p>
                              <Button asChild variant="outline">
                                 <Link href="/stores">Browse Stores</Link>
                              </Button>
@@ -254,18 +252,18 @@ export default function CheckoutPage() {
                       <CardTitle>Or Record Your Shopping List</CardTitle>
                       <UiCardDescription>No need to browse. Just tell us what you need, and a local shopkeeper will handle it.</UiCardDescription>
                     </CardHeader>
-                    <CardContent className="flex flex-col items-center justify-center space-y-4 py-12">
+                    <CardContent class="flex flex-col items-center justify-center space-y-4 py-12">
                         <Button
                             onClick={handleToggleRecording}
                             variant={isRecording ? 'destructive' : 'default'}
                             size="lg"
-                            className="w-48"
+                            class="w-48"
                           >
-                            {isRecording ? <StopCircle className="mr-2 h-5 w-5" /> : <Mic className="mr-2 h-5 w-5" />}
+                            {isRecording ? <StopCircle class="mr-2 h-5 w-5" /> : <Mic class="mr-2 h-5 w-5" />}
                             {isRecording ? 'Stop Recording' : 'Record List'}
                         </Button>
-                        <p className="text-sm text-muted-foreground text-center">Record your full shopping list. We'll convert it to text for the shopkeeper.</p>
-                        <p className="text-xs text-muted-foreground/80 text-center">(Note: This action saves an audio recording to your order.)</p>
+                        <p class="text-sm text-muted-foreground text-center">Record your full shopping list. We'll convert it to text for the shopkeeper.</p>
+                        <p class="text-xs text-muted-foreground/80 text-center">(Note: This action saves an audio recording to your order.)</p>
                      </CardContent>
                   </Card>
                  </div>
@@ -275,9 +273,9 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div className="container mx-auto py-12 px-4 md:px-6">
-      <h1 className="text-4xl font-bold mb-8 font-headline">Checkout</h1>
-      <div className="grid md:grid-cols-2 gap-12">
+    <div class="container mx-auto py-12 px-4 md:px-6">
+      <h1 class="text-4xl font-bold mb-8 font-headline">Checkout</h1>
+      <div class="grid md:grid-cols-2 gap-12">
         <div>
           <Card>
             <CardHeader>
@@ -285,7 +283,7 @@ export default function CheckoutPage() {
             </CardHeader>
             <CardContent>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <form onSubmit={form.handleSubmit(onSubmit)} class="space-y-6">
                   <FormField
                     control={form.control}
                     name="name"
@@ -299,31 +297,18 @@ export default function CheckoutPage() {
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="address"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Shipping Address</FormLabel>
-                        <FormControl>
-                          <Input placeholder="123 Green St, Springfield" {...field} />
-                        </FormControl>
-                         <FormDescription>
-                            This is for reference. Delivery will be based on your captured GPS location.
-                         </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                   <div className="space-y-2">
+                   <div class="space-y-2">
                         <FormLabel>Delivery Location</FormLabel>
-                        <div className="flex items-center gap-4">
-                            <Button type="button" variant="outline" onClick={handleGetLocation} className="flex-1">
-                                <MapPin className="mr-2 h-4 w-4" /> Get Current Location
+                         <FormDescription>
+                            Your precise delivery location will be based on your captured GPS coordinates.
+                         </FormDescription>
+                        <div class="flex items-center gap-4 pt-2">
+                            <Button type="button" variant="outline" onClick={handleGetLocation} class="flex-1">
+                                <MapPin class="mr-2 h-4 w-4" /> Get Current Location
                             </Button>
                             {deliveryCoords && (
-                                <div className="flex items-center text-green-600">
-                                    <CheckCircle className="mr-2 h-5 w-5" />
+                                <div class="flex items-center text-green-600">
+                                    <CheckCircle class="mr-2 h-5 w-5" />
                                     <span>Location captured!</span>
                                 </div>
                             )}
@@ -342,7 +327,7 @@ export default function CheckoutPage() {
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" disabled={isPlacingOrder} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
+                  <Button type="submit" disabled={isPlacingOrder} class="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
                     {isPlacingOrder ? 'Placing Order...' : 'Place Order'}
                   </Button>
                 </form>
@@ -355,29 +340,29 @@ export default function CheckoutPage() {
             <CardHeader>
               <CardTitle>Order Summary</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent class="space-y-4">
                 {audioDataUri && (
-                    <div className="rounded-md border p-4 space-y-2">
-                        <div className="flex items-center gap-2 font-medium">
-                            <CheckCircle className="h-5 w-5 text-green-500" />
+                    <div class="rounded-md border p-4 space-y-2">
+                        <div class="flex items-center gap-2 font-medium">
+                            <CheckCircle class="h-5 w-5 text-green-500" />
                             <p>Voice Memo Recorded</p>
                         </div>
-                        <audio src={audioDataUri} controls className="w-full" />
+                        <audio src={audioDataUri} controls class="w-full" />
                     </div>
                 )}
                  {isTranslating && (
-                    <div className="flex items-center justify-center text-muted-foreground p-4">
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <div class="flex items-center justify-center text-muted-foreground p-4">
+                        <Loader2 class="mr-2 h-4 w-4 animate-spin" />
                         <p>Processing your list...</p>
                     </div>
                  )}
                 {translatedList && (
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-lg">Your Transcribed Shopping List</CardTitle>
+                            <CardTitle class="text-lg">Your Transcribed Shopping List</CardTitle>
                         </CardHeader>
                         <CardContent>
-                             <pre className="text-sm whitespace-pre-wrap font-sans bg-muted/50 p-4 rounded-md">
+                             <pre class="text-sm whitespace-pre-wrap font-sans bg-muted/50 p-4 rounded-md">
                                 {translatedList}
                             </pre>
                         </CardContent>
@@ -386,12 +371,12 @@ export default function CheckoutPage() {
                 {cartItems.map(({product, quantity}) => {
                     const image = getProductImage(product.imageId);
                     return (
-                        <div key={product.id} className="flex justify-between items-center">
-                            <div className="flex items-center gap-4">
-                                <Image src={image.imageUrl} alt={product.name} data-ai-hint={image.imageHint} width={48} height={48} className="rounded-md" />
+                        <div key={product.id} class="flex justify-between items-center">
+                            <div class="flex items-center gap-4">
+                                <Image src={image.imageUrl} alt={product.name} data-ai-hint={image.imageHint} width={48} height={48} class="rounded-md" />
                                 <div>
-                                    <p className="font-medium">{product.name}</p>
-                                    <p className="text-sm text-muted-foreground">Qty: {quantity}</p>
+                                    <p class="font-medium">{product.name}</p>
+                                    <p class="text-sm text-muted-foreground">Qty: {quantity}</p>
                                 </div>
                             </div>
                             <p>${(product.price * quantity).toFixed(2)}</p>
@@ -399,30 +384,30 @@ export default function CheckoutPage() {
                     )
                 })}
                  {cartItems.length === 0 && audioDataUri && (
-                    <p className="text-muted-foreground text-sm text-center py-4">Your order will be fulfilled based on your voice memo. The final price will be confirmed by the shopkeeper.</p>
+                    <p class="text-muted-foreground text-sm text-center py-4">Your order will be fulfilled based on your voice memo. The final price will be confirmed by the shopkeeper.</p>
                 )}
             </CardContent>
-            <CardFooter className="flex justify-between font-bold text-lg">
+            <CardFooter class="flex justify-between font-bold text-lg">
                 <span>Total</span>
                 <span>${cartTotal.toFixed(2)}</span>
             </CardFooter>
           </Card>
-           <Card className="mt-8">
+           <Card class="mt-8">
             <CardHeader>
                 <CardTitle>Voice Memo</CardTitle>
             </CardHeader>
-             <CardContent className="flex flex-col items-center justify-center space-y-4">
+             <CardContent class="flex flex-col items-center justify-center space-y-4">
                 <Button
                     onClick={handleToggleRecording}
                     variant={isRecording ? 'destructive' : 'outline'}
                     size="lg"
-                    className="w-48"
+                    class="w-48"
                   >
-                    {isRecording ? <StopCircle className="mr-2 h-5 w-5" /> : <Mic className="mr-2 h-5 w-5" />}
+                    {isRecording ? <StopCircle class="mr-2 h-5 w-5" /> : <Mic class="mr-2 h-5 w-5" />}
                     {isRecording ? 'Stop Recording' : (audioDataUri ? 'Re-record' : 'Record List')}
                 </Button>
-                <p className="text-sm text-muted-foreground text-center">You can add special instructions or your full shopping list via voice.</p>
-                 <p className="text-xs text-muted-foreground/80 text-center">(Note: This action saves an audio recording to your order.)</p>
+                <p class="text-sm text-muted-foreground text-center">You can add special instructions or your full shopping list via voice.</p>
+                 <p class="text-xs text-muted-foreground/80 text-center">(Note: This action saves an audio recording to your order.)</p>
              </CardContent>
            </Card>
         </div>
