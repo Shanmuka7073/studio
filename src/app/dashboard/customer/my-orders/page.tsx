@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirebase, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { Order } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +10,7 @@ import { format, parseISO } from 'date-fns';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, FirestoreError } from 'firebase/firestore';
 import { useState, useEffect } from 'react';
 
 
@@ -29,18 +29,19 @@ export default function MyOrdersPage() {
 
     const fetchOrders = async () => {
       setIsLoading(true);
-      try {
-        const regularOrdersQuery = query(
-          collection(firestore, 'orders'),
-          where('userId', '==', user.uid),
-          orderBy('orderDate', 'desc')
-        );
-        const voiceOrdersQuery = query(
-          collection(firestore, 'voice-orders'),
-          where('userId', '==', user.uid),
-          orderBy('orderDate', 'desc')
-        );
 
+      const regularOrdersQuery = query(
+        collection(firestore, 'orders'),
+        where('userId', '==', user.uid),
+        orderBy('orderDate', 'desc')
+      );
+      const voiceOrdersQuery = query(
+        collection(firestore, 'voice-orders'),
+        where('userId', '==', user.uid),
+        orderBy('orderDate', 'desc')
+      );
+      
+      try {
         const [regularOrdersSnapshot, voiceOrdersSnapshot] = await Promise.all([
             getDocs(regularOrdersQuery),
             getDocs(voiceOrdersQuery)
@@ -60,7 +61,16 @@ export default function MyOrdersPage() {
         
         setAllOrders(combinedOrders);
       } catch (error) {
-        console.error("Error fetching orders:", error);
+        if (error instanceof FirestoreError && error.code === 'permission-denied') {
+            // Determine which query failed, or assume the first one for simplicity
+            const permissionError = new FirestorePermissionError({
+                path: 'orders or voice-orders', // It's hard to know which one failed without separate try/catch
+                operation: 'list',
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        } else {
+            console.error("An unexpected error occurred while fetching orders:", error);
+        }
       } finally {
         setIsLoading(false);
       }
