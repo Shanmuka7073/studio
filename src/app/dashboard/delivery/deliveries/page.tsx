@@ -5,7 +5,7 @@ import { Order, Store } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MapPin } from 'lucide-react';
+import { MapPin, Check } from 'lucide-react';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
 import { useEffect, useState, useMemo } from 'react';
@@ -14,8 +14,8 @@ import { getStores } from '@/lib/data';
 export default function DeliveriesPage() {
   const { firestore } = useFirebase();
   const [stores, setStores] = useState<Store[]>([]);
+  const [pickedUpOrders, setPickedUpOrders] = useState<Record<string, boolean>>({});
 
-  // This query now targets orders that are ready for delivery.
   const deliveriesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(
@@ -41,8 +41,12 @@ export default function DeliveriesPage() {
     });
   }, [deliveries, stores]);
 
-  const openInGoogleMaps = (storeAddress: string, customerAddress: string) => {
-    const url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(storeAddress)}&destination=${encodeURIComponent(customerAddress)}`;
+  const handleConfirmPickup = (orderId: string) => {
+    setPickedUpOrders(prev => ({ ...prev, [orderId]: true }));
+  };
+
+  const openInGoogleMaps = (origin: string, destination: string) => {
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}`;
     window.open(url, '_blank');
   };
   
@@ -67,12 +71,14 @@ export default function DeliveriesPage() {
                   <TableHead>Store Pickup</TableHead>
                   <TableHead>Customer</TableHead>
                   <TableHead>Customer Phone</TableHead>
-                  <TableHead>Delivery Address</TableHead>
+                  <TableHead>Action</TableHead>
                   <TableHead>Route</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {deliveriesWithStores.map((order) => (
+                {deliveriesWithStores.map((order) => {
+                  const isPickedUp = pickedUpOrders[order.id];
+                  return (
                   <TableRow key={order.id}>
                     <TableCell>
                       <div className="font-medium">{order.store?.name}</div>
@@ -80,21 +86,37 @@ export default function DeliveriesPage() {
                     </TableCell>
                     <TableCell>{order.customerName}</TableCell>
                     <TableCell>{order.phone}</TableCell>
-                    <TableCell>{order.deliveryAddress}</TableCell>
+                     <TableCell>
+                      <Button
+                        variant={isPickedUp ? "secondary" : "default"}
+                        size="sm"
+                        onClick={() => handleConfirmPickup(order.id)}
+                        disabled={isPickedUp}
+                      >
+                        {isPickedUp && <Check className="mr-2 h-4 w-4" />}
+                        {isPickedUp ? 'Picked Up' : 'Confirm Pickup'}
+                      </Button>
+                    </TableCell>
                     <TableCell>
                        {order.store && (
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => openInGoogleMaps(order.store!.address, order.deliveryAddress)}
+                            onClick={() => openInGoogleMaps(
+                                order.store!.address, 
+                                isPickedUp ? order.deliveryAddress : order.store!.address
+                            )}
                           >
                             <MapPin className="mr-2 h-4 w-4" />
-                            View Route
+                            {isPickedUp ? 'View Route to Customer' : 'View Route to Store'}
                           </Button>
+                       )}
+                       {isPickedUp && (
+                            <div className="text-sm text-muted-foreground mt-1">{order.deliveryAddress}</div>
                        )}
                     </TableCell>
                   </TableRow>
-                ))}
+                )})}
               </TableBody>
             </Table>
           )}
