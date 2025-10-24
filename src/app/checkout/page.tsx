@@ -20,12 +20,11 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 import { getProductImage } from '@/lib/data';
-import { useTransition, useState, useRef } from 'react';
+import { useTransition, useState, useRef, useCallback } from 'react';
 import { useFirebase, errorEmitter } from '@/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Mic, StopCircle, CheckCircle, Loader2 } from 'lucide-react';
-import { transcribeAndTranslateAudio } from '@/ai/flows/transcribe-translate-flow';
 import Link from 'next/link';
 
 
@@ -49,58 +48,74 @@ export default function CheckoutPage() {
   const [audioDataUri, setAudioDataUri] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const speechRecognitionRef = useRef<SpeechRecognition | null>(null);
 
   const [isTranslating, startTranslationTransition] = useTransition();
   const [translatedList, setTranslatedList] = useState<string | null>(null);
 
-
-  const handleProcessRecording = async (audioUri: string) => {
-    startTranslationTransition(async () => {
-      try {
-        const list = await transcribeAndTranslateAudio(audioUri);
-        setTranslatedList(list);
-      } catch (e) {
-        console.error(e);
-        toast({ variant: 'destructive', title: "AI Translation Error", description: "Failed to process your voice memo." });
-      }
+  const processTranscript = useCallback((transcript: string) => {
+    startTranslationTransition(() => {
+        setTranslatedList(transcript);
+        toast({ title: "Voice memo transcribed!", description: "Your shopping list has been converted to text." });
     });
-  }
+  }, [toast]);
+
 
   const handleToggleRecording = () => {
     if (isRecording) {
       mediaRecorderRef.current?.stop();
+      speechRecognitionRef.current?.stop();
+      setIsRecording(false);
     } else {
       setAudioDataUri(null);
       setTranslatedList(null);
       navigator.mediaDevices.getUserMedia({ audio: true })
         .then(stream => {
+          
+          // Audio recording part
           const recorder = new MediaRecorder(stream);
           mediaRecorderRef.current = recorder;
           audioChunksRef.current = [];
-
-          recorder.ondataavailable = (event) => {
-            audioChunksRef.current.push(event.data);
-          };
-
+          recorder.ondataavailable = (event) => audioChunksRef.current.push(event.data);
           recorder.onstop = () => {
             const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
             const reader = new FileReader();
             reader.readAsDataURL(audioBlob);
-            reader.onloadend = () => {
-              const audioUri = reader.result as string;
-              setAudioDataUri(audioUri);
-              toast({ title: "Recording complete!", description: "Now processing your voice memo..." });
-              handleProcessRecording(audioUri);
-            };
-            setIsRecording(false);
-             stream.getTracks().forEach(track => track.stop()); // Stop microphone
+            reader.onloadend = () => setAudioDataUri(reader.result as string);
+            stream.getTracks().forEach(track => track.stop()); // Stop microphone
           };
+
+          // Speech recognition part
+          const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+          if (SpeechRecognition) {
+            const recognition = new SpeechRecognition();
+            speechRecognitionRef.current = recognition;
+            recognition.continuous = true;
+            recognition.interimResults = false;
+            
+            let fullTranscript = '';
+            recognition.onresult = (event) => {
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    fullTranscript += event.results[i][0].transcript + ' ';
+                }
+            };
+
+            recognition.onend = () => {
+                if (fullTranscript.trim()) {
+                    processTranscript(fullTranscript.trim());
+                }
+            };
+            
+            recognition.start();
+          } else {
+             toast({ variant: 'destructive', title: 'Not Supported', description: 'Voice transcription is not supported by your browser.' });
+          }
 
           recorder.start();
           setIsRecording(true);
         })
         .catch(err => {
-          toast({ variant: 'destructive', title: 'Microphone Error', description: 'Could not access the microphone.' });
+          toast({ variant: 'destructive', title: 'Microphone Error', description: 'Could not access the microphone. Please grant permission.' });
           console.error("Mic error:", err);
         });
     }
@@ -206,7 +221,7 @@ export default function CheckoutPage() {
                             {isRecording ? <StopCircle className="mr-2 h-5 w-5" /> : <Mic className="mr-2 h-5 w-5" />}
                             {isRecording ? 'Stop Recording' : 'Record List'}
                         </Button>
-                        <p className="text-sm text-muted-foreground text-center">Record your full shopping list in any language. We'll translate it for the shopkeeper.</p>
+                        <p className="text-sm text-muted-foreground text-center">Record your full shopping list. We'll convert it to text for the shopkeeper.</p>
                         <p className="text-xs text-muted-foreground/80 text-center">(Note: This action saves an audio recording to your order.)</p>
                      </CardContent>
                   </Card>
@@ -312,7 +327,7 @@ export default function CheckoutPage() {
                 {translatedList && (
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-lg">Your Translated Shopping List</CardTitle>
+                            <CardTitle className="text-lg">Your Transcribed Shopping List</CardTitle>
                         </CardHeader>
                         <CardContent>
                              <pre className="text-sm whitespace-pre-wrap font-sans bg-muted/50 p-4 rounded-md">
@@ -368,3 +383,5 @@ export default function CheckoutPage() {
     </div>
   );
 }
+
+    
