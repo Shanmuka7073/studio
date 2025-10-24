@@ -184,6 +184,51 @@
         "deliveryAddress"
       ]
     },
+    "VoiceOrder": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "VoiceOrder",
+      "type": "object",
+      "description": "Represents a voice-only order placed by a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the VoiceOrder entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N VoiceOrder)"
+        },
+        "orderDate": {
+          "type": "string",
+          "description": "The date and time the order was placed.",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the order (e.g., pending, processing, delivered)."
+        },
+        "deliveryAddress": {
+          "type": "string",
+          "description": "Delivery address for the order."
+        },
+        "voiceMemoUrl": {
+          "type": "string",
+          "description": "URL to the recorded voice memo audio file."
+        },
+        "translatedList": {
+          "type": "string",
+          "description": "The text transcription of the voice memo."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "orderDate",
+        "status",
+        "deliveryAddress",
+        "voiceMemoUrl"
+      ]
+    },
     "OrderItem": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "OrderItem",
@@ -332,6 +377,22 @@
             {
               "name": "orderId",
               "description": "The unique identifier of the order."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/voice-orders/{voiceOrderId}",
+        "definition": {
+          "entityName": "VoiceOrder",
+          "schema": {
+            "$ref": "#/backend/entities/VoiceOrder"
+          },
+          "description": "Stores voice-only orders. Accessible by delivery partners for fulfillment.",
+          "params": [
+            {
+              "name": "voiceOrderId",
+              "description": "The unique identifier of the voice order."
             }
           ]
         }

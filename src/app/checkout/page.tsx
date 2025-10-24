@@ -138,20 +138,21 @@ export default function CheckoutPage() {
         return;
     }
 
+    const isVoiceOrder = cartItems.length === 0 && !!audioDataUri;
     const storeId = cartItems[0]?.product.storeId;
+    
     if (cartItems.length === 0 && !audioDataUri) {
         toast({ variant: 'destructive', title: 'Error', description: 'Your cart is empty and no voice memo is recorded. Add items or record a list.' });
         return;
     }
-     if (!storeId && cartItems.length > 0) {
+     if (!storeId && !isVoiceOrder) {
         toast({ variant: 'destructive', title: 'Error', description: 'Could not determine the store for this order.' });
         return;
     }
 
     startPlaceOrderTransition(async () => {
-        const orderData = {
+        const orderPayload = {
             userId: user.uid,
-            storeId: storeId || 'VOICE_ORDER', // Use a placeholder if it's a voice-only order
             customerName: data.name,
             deliveryAddress: data.address,
             phone: data.phone,
@@ -159,18 +160,33 @@ export default function CheckoutPage() {
             orderDate: serverTimestamp(),
             totalAmount: cartTotal,
             status: 'Pending' as 'Pending',
+        };
+
+        let collectionName = 'orders';
+        let orderData: any = {
+            ...orderPayload,
+            storeId: storeId,
             items: cartItems.map(item => ({
                 productId: item.product.id,
                 name: item.product.name,
                 quantity: item.quantity,
                 price: item.product.price,
             })),
-            voiceMemoUrl: audioDataUri, // Can be large, consider storage if this becomes an issue
-            translatedList: translatedList,
         };
 
-        const ordersCol = collection(firestore, 'orders');
-        addDoc(ordersCol, orderData).then(() => {
+        if (isVoiceOrder) {
+            collectionName = 'voice-orders';
+            orderData = {
+                ...orderPayload,
+                totalAmount: 0, // Price to be confirmed by shopkeeper
+                voiceMemoUrl: audioDataUri,
+                translatedList: translatedList,
+            };
+        }
+
+
+        const colRef = collection(firestore, collectionName);
+        addDoc(colRef, orderData).then(() => {
             clearCart();
             toast({
                 title: "Order Placed!",
@@ -180,7 +196,7 @@ export default function CheckoutPage() {
         }).catch((e) => {
              console.error('Error placing order:', e);
              const permissionError = new FirestorePermissionError({
-                path: ordersCol.path,
+                path: colRef.path,
                 operation: 'create',
                 requestResourceData: orderData
             });
@@ -383,5 +399,3 @@ export default function CheckoutPage() {
     </div>
   );
 }
-
-    
