@@ -7,9 +7,9 @@ import Link from 'next/link';
 
 const roleCards = [
     {
-        title: 'Customer',
-        description: 'View your order history and track your purchases.',
-        href: '/dashboard/customer/my-orders',
+        title: 'Start Shopping',
+        description: 'Browse local stores and find fresh groceries near you.',
+        href: '/stores',
         icon: ShoppingCart,
     },
     {
@@ -44,7 +44,7 @@ export default function DashboardPage() {
                             <CardContent className="flex-1 flex flex-col justify-between">
                                 <CardDescription>{card.description}</CardDescription>
                                 <div className="flex items-center text-primary font-semibold mt-4">
-                                    <span>Go to {card.title} Dashboard</span>
+                                    <span>Go to {card.title}</span>
                                     <ArrowRight className="ml-2 h-4 w-4" />
                                 </div>
                             </CardContent>

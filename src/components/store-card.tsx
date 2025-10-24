@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import type { Store } from '@/lib/types';
 import { getStoreImage } from '@/lib/data';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, MapPin } from 'lucide-react';
 
 interface StoreCardProps {
   store: Store;
@@ -34,6 +34,12 @@ export default function StoreCard({ store }: StoreCardProps) {
         <CardTitle className="text-xl font-headline">{store.name}</CardTitle>
         <CardDescription className="flex-1">{store.description}</CardDescription>
         <p className="text-sm text-muted-foreground">{store.address}</p>
+        {store.distance && (
+          <div className="flex items-center text-sm text-muted-foreground font-medium">
+            <MapPin className="mr-2 h-4 w-4 text-primary" />
+            <span>{store.distance.toFixed(2)} km away</span>
+          </div>
+        )}
         <Button asChild variant="outline" className="w-full mt-auto">
           <Link href={`/stores/${store.id}`}>
             Visit Store <ArrowRight className="ml-2 h-4 w-4" />
