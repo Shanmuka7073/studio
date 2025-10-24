@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useFirebase, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { useFirebase, errorEmitter } from '@/firebase';
 import { Order } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,8 +10,9 @@ import { format, parseISO } from 'date-fns';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { collection, query, where, orderBy, getDocs, FirestoreError } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { useState, useEffect } from 'react';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 
 export default function MyOrdersPage() {
