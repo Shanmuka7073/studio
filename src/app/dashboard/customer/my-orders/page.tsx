@@ -36,6 +36,7 @@ export default function MyOrdersPage() {
         where('userId', '==', user.uid),
         orderBy('orderDate', 'desc')
       );
+      
       const voiceOrdersQuery = query(
         collection(firestore, 'voice-orders'),
         where('userId', '==', user.uid),
@@ -48,7 +49,6 @@ export default function MyOrdersPage() {
             operation: 'list',
           });
           errorEmitter.emit('permission-error', permissionError);
-          // Return an empty array to allow Promise.all to resolve
           return { docs: [] };
       });
 
@@ -58,7 +58,6 @@ export default function MyOrdersPage() {
             operation: 'list',
           });
           errorEmitter.emit('permission-error', permissionError);
-           // Return an empty array to allow Promise.all to resolve
           return { docs: [] };
       });
       
@@ -82,7 +81,6 @@ export default function MyOrdersPage() {
         
         setAllOrders(combinedOrders);
       } catch (error) {
-         // This will catch other errors, but permission errors are handled above
          console.error("An unexpected error occurred while fetching orders:", error);
       } finally {
         setIsLoading(false);
@@ -107,11 +105,9 @@ export default function MyOrdersPage() {
 
   const formatDate = (date: any) => {
     if (!date) return 'N/A';
-    // Firebase Timestamps may be objects with seconds/nanoseconds
     if (date.seconds) {
       return format(new Date(date.seconds * 1000), 'PPP');
     }
-    // Or they may be ISO strings from older data
     if (typeof date === 'string') {
         try {
             return format(parseISO(date), 'PPP');
