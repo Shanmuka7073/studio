@@ -199,7 +199,6 @@ export default function CheckoutPage() {
                 requestResourceData: orderData
             });
             errorEmitter.emit('permission-error', permissionError);
-             return Promise.reject(e);
         });
     });
   };
@@ -384,5 +383,3 @@ export default function CheckoutPage() {
     </div>
   );
 }
-
-    
