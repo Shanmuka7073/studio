@@ -1,3 +1,4 @@
+
 'use client';
 import { getStore, getStoreImage } from '@/lib/data';
 import Image from 'next/image';
@@ -10,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from '@/components/ui/sheet';
 import groceryData from '@/lib/grocery-data.json';
 import { useToast } from '@/hooks/use-toast';
 import { writeBatch, collection, doc } from 'firebase/firestore';
@@ -288,8 +289,17 @@ export default function StoreDetailPage() {
                             {isStoreOwner ? 'Manage Inventory' : 'Filter Products'}
                         </Button>
                     </SheetTrigger>
-                    <SheetContent side="left" className="p-0 w-full max-w-md">
-                        {sidebarContent}
+                    <SheetContent side="left" className="p-0 w-full max-w-md flex flex-col">
+                       <SheetHeader className="p-6 pb-0">
+                          <SheetTitle>{isStoreOwner ? 'Manage Inventory' : 'Filter Products'}</SheetTitle>
+                          <SheetDescription>
+                            {isStoreOwner ? 'Add or remove products from your store.' : 'Find exactly what you\'re looking for.'}
+                          </SheetDescription>
+                        </SheetHeader>
+                        {/* The content itself has its own padding and scrolling */}
+                        <div className="flex-1 overflow-y-auto">
+                            {sidebarContent}
+                        </div>
                     </SheetContent>
                 </Sheet>
               </div>
