@@ -1,10 +1,11 @@
+
 'use client';
 
 import { useCart } from '@/lib/cart';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription as UiCardDescription } from '@/components/ui/card';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -15,6 +16,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from '@/components/ui/form';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
@@ -250,7 +252,7 @@ export default function CheckoutPage() {
                   <Card>
                     <CardHeader>
                       <CardTitle>Or Record Your Shopping List</CardTitle>
-                      <CardDescription>No need to browse. Just tell us what you need, and a local shopkeeper will handle it.</CardDescription>
+                      <UiCardDescription>No need to browse. Just tell us what you need, and a local shopkeeper will handle it.</UiCardDescription>
                     </CardHeader>
                     <CardContent className="flex flex-col items-center justify-center space-y-4 py-12">
                         <Button
@@ -428,3 +430,5 @@ export default function CheckoutPage() {
     </div>
   );
 }
+
+    
