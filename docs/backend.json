@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "Store": {
@@ -127,6 +128,14 @@
         "phoneNumber": {
           "type": "string",
           "description": "The phone number of the user."
+        },
+        "latitude": {
+            "type": "number",
+            "description": "The latitude of the user's location."
+        },
+        "longitude": {
+            "type": "number",
+            "description": "The longitude of the user's location."
         }
       },
       "required": [
