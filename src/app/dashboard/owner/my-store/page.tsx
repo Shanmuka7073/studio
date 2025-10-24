@@ -91,7 +91,7 @@ function ProductChecklist({ storeId, onProductsAdded }: { storeId: string; onPro
        const batch = writeBatch(firestore);
         productNames.forEach(name => {
           const newProductRef = doc(collection(firestore, 'stores', storeId, 'products'));
-          const category = groceryData.categories.find(c => c.items.includes(name))?.categoryName || 'Miscellaneous';
+          const category = groceryData.categories.find(c => c.items && Array.isArray(c.items) && c.items.includes(name))?.categoryName || 'Miscellaneous';
           batch.set(newProductRef, {
             name,
             price: 0.99, // Default price
@@ -132,30 +132,35 @@ function ProductChecklist({ storeId, onProductsAdded }: { storeId: string; onPro
       </CardHeader>
       <CardContent className="space-y-4">
         <Accordion type="multiple" className="w-full">
-          {groceryData.categories.map((category) => (
-            <AccordionItem value={category.categoryName} key={category.categoryName}>
-              <AccordionTrigger>{category.categoryName} ({category.items.filter(item => selectedProducts[item]).length}/{category.items.length})</AccordionTrigger>
-              <AccordionContent>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4">
-                  {category.items.map((item) => (
-                    <div key={item} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`${category.categoryName}-${item}`}
-                        onCheckedChange={(checked) => handleProductSelection(item, !!checked)}
-                        checked={selectedProducts[item] || false}
-                      />
-                      <label
-                        htmlFor={`${category.categoryName}-${item}`}
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        {item}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          ))}
+          {groceryData.categories.map((category) => {
+            const categoryItems = category.items && Array.isArray(category.items) ? category.items : [];
+            const selectedInCategory = categoryItems.filter(item => selectedProducts[item]).length;
+
+            return (
+              <AccordionItem value={category.categoryName} key={category.categoryName}>
+                <AccordionTrigger>{category.categoryName} ({selectedInCategory}/{categoryItems.length})</AccordionTrigger>
+                <AccordionContent>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4">
+                    {categoryItems.map((item) => (
+                      <div key={item} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`${category.categoryName}-${item}`}
+                          onCheckedChange={(checked) => handleProductSelection(item, !!checked)}
+                          checked={selectedProducts[item] || false}
+                        />
+                        <label
+                          htmlFor={`${category.categoryName}-${item}`}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          {item}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            )
+          })}
         </Accordion>
         <Button onClick={handleAddSelectedProducts} disabled={isAdding || selectedCount === 0} className="w-full">
             {isAdding ? 'Adding...' : `Add ${selectedCount} Selected Products`}
@@ -372,7 +377,7 @@ function ManageStoreView({ store }: { store: Store }) {
         <div className="grid md:grid-cols-2 gap-8">
             <Card>
                 <CardHeader>
-                    <CardTitle>Manage {store.name}</CardTitle>
+                    <CardTitle>Manage ${store.name}</CardTitle>
                     <CardDescription>
                         View your existing inventory below and add new products.
                     </CardDescription>
@@ -400,9 +405,9 @@ function ManageStoreView({ store }: { store: Store }) {
                         <TableBody>
                             {products.map(product => (
                                 <TableRow key={product.id}>
-                                    <TableCell>{product.name}</TableCell>
+                                    <TableCell>${product.name}</TableCell>
                                     <TableCell>${product.price.toFixed(2)}</TableCell>
-                                    <TableCell>{product.category}</TableCell>
+                                    <TableCell>${product.category}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
@@ -470,7 +475,7 @@ function CreateStoreForm({ user }) {
                 const batch = writeBatch(firestore);
                 productNames.forEach(name => {
                     const newProductRef = doc(collection(firestore, 'stores', storeRef.id, 'products'));
-                    const category = groceryData.categories.find(c => c.items.includes(name))?.categoryName || 'Miscellaneous';
+                    const category = groceryData.categories.find(c => c.items && Array.isArray(c.items) && c.items.includes(name))?.categoryName || 'Miscellaneous';
                     batch.set(newProductRef, {
                     name,
                     price: 0.99,
@@ -601,30 +606,35 @@ function CreateStoreForm({ user }) {
               <div className="space-y-4">
                   <h3 className="text-lg font-medium">Select Your Initial Inventory</h3>
                   <Accordion type="multiple" className="w-full">
-                    {groceryData.categories.map((category) => (
-                      <AccordionItem value={category.categoryName} key={category.categoryName}>
-                        <AccordionTrigger>{category.categoryName} ({category.items.filter(item => selectedProducts[item]).length}/{category.items.length})</AccordionTrigger>
-                        <AccordionContent>
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4">
-                            {category.items.map((item) => (
-                              <div key={item} className="flex items-center space-x-2">
-                                <Checkbox
-                                  id={`${category.categoryName}-${item}`}
-                                  onCheckedChange={(checked) => handleProductSelection(item, !!checked)}
-                                  checked={selectedProducts[item] || false}
-                                />
-                                <label
-                                  htmlFor={`${category.categoryName}-${item}`}
-                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                                >
-                                  {item}
-                                </label>
-                              </div>
-                            ))}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    ))}
+                    {groceryData.categories.map((category) => {
+                       const categoryItems = category.items && Array.isArray(category.items) ? category.items : [];
+                       const selectedInCategory = categoryItems.filter(item => selectedProducts[item]).length;
+
+                      return (
+                        <AccordionItem value={category.categoryName} key={category.categoryName}>
+                          <AccordionTrigger>{category.categoryName} ({selectedInCategory}/{categoryItems.length})</AccordionTrigger>
+                          <AccordionContent>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4">
+                              {categoryItems.map((item) => (
+                                <div key={item} className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id={`create-${category.categoryName}-${item}`}
+                                    onCheckedChange={(checked) => handleProductSelection(item, !!checked)}
+                                    checked={selectedProducts[item] || false}
+                                  />
+                                  <label
+                                    htmlFor={`create-${category.categoryName}-${item}`}
+                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                  >
+                                    {item}
+                                  </label>
+                                </div>
+                              ))}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      )
+                    })}
                   </Accordion>
               </div>
 
@@ -684,3 +694,5 @@ export default function MyStorePage() {
     </div>
   );
 }
+
+    
