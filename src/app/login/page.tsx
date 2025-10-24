@@ -59,7 +59,9 @@ export default function LoginPage() {
     startTransition(() => {
       try {
         if (isSignUp) {
-          initiateEmailSignUp(auth, data.email, data.password);
+          initiateEmailSignUp(auth, data.email, data.password).catch(err => {
+              setError(err.message);
+          });
           toast({
             title: 'Account Created!',
             description:
@@ -69,7 +71,9 @@ export default function LoginPage() {
           form.reset();
         } else {
           // The sign-in will trigger the useEffect above to redirect on success.
-          initiateEmailSignIn(auth, data.email, data.password);
+          initiateEmailSignIn(auth, data.email, data.password).catch(err => {
+              setError(err.message);
+          });
         }
       } catch (err: any) {
         setError(err.message);
