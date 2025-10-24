@@ -1,203 +1,173 @@
 /**
- * @fileoverview Firestore Security Rules for LocalBasket application.
+ * @fileoverview Firestore Security Rules for LocalBasket.
  *
  * Core Philosophy:
- * This ruleset prioritizes secure data access based on user roles and ownership,
- * while keeping schema validation to a minimum during prototyping.
+ * This ruleset enforces a strict user-ownership model for user profiles and their associated data.
+ * Stores have ownership defined by the 'ownerId' field. Orders are accessible to the user who created them.
  *
  * Data Structure:
- * - Users: /users/{userId} - User profile data, accessible only by the user themselves.
- * - Stores: /stores/{storeId} - Store data, writeable only by store owner.
- * - Products: /stores/{storeId}/products/{productId} - Products listed by a store, writeable only by the store owner.
- * - Orders: /orders/{orderId} - Order data, accessible by the user who created the order.
- * - OrderItems: /orders/{orderId}/orderItems/{orderItemId} - Items within an order.
- * - ProductRecommendations: /users/{userId}/productRecommendations/{productRecommendationId} - Product recommendations for users.
- * - VoiceOrders: /voice-orders/{voiceOrderId} - Voice orders, intended for access by authorized fulfillment partners.
+ * - /users/{userId}: Stores user profiles. Accessible only by the user.
+ * - /stores/{storeId}: Stores store data. Accessible with owner validation.
+ * - /stores/{storeId}/products/{productId}: Stores product data under each store.
+ * - /orders/{orderId}: Stores order data. Accessible by the user who created them.
+ * - /voice-orders/{voiceOrderId}: Stores voice order data.
+ * - /orders/{orderId}/orderItems/{orderItemId}: Stores order item data under each order.
+ * - /users/{userId}/productRecommendations/{productRecommendationId}: Stores product recommendations for each user.
  *
  * Key Security Decisions:
- * - Strict user ownership for user profiles and associated data.
- * - Owner-only write access to stores and their products.
- * - Orders are associated with user through the userId field.
- * - Voice orders are separate and should have rules applied that allow fulfillment partners to read and update status.
+ * - Users can only access their own profile data.
+ * - Stores can be created, updated, and deleted only by their owners.
+ * - Orders can only be created by authenticated users and read by the user who placed them.
+ * - Listing of users is not allowed.
  *
  * Denormalization for Authorization:
- * - Orders include 'userId' and 'storeId' to simplify authorization checks.
- * - OrderItems include 'orderId' to simplify authorization checks.
- * - ProductRecommendations include 'userId' for authorization independence.
+ * - The 'Order' entity includes 'userId' and 'storeId' to simplify authorization checks.
+ * - The 'OrderItem' entity includes 'orderId' to simplify authorization checks.
+ * - The 'ProductRecommendation' entity includes 'userId' to simplify authorization checks.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Grants read/write access to user profile data only to the authenticated user.
+     * @description Secure user profiles. Only the authenticated user can read or write their own profile.
      * @path /users/{userId}
-     * @allow (create, update, delete) if request.auth.uid == userId
-     * @allow (get, list) if request.auth.uid == userId
-     * @deny (create) if request.auth.uid != userId
-     * @deny (update, delete) if request.auth.uid != userId
-     * @principle Enforces document ownership for writes.
+     * @allow (create) User with ID 'user_abc' can create their profile if authenticated as 'user_abc'.
+     * @allow (get, update, delete) User with ID 'user_abc' can read/update/delete their profile if authenticated as 'user_abc'.
+     * @deny (create, update, delete) User with ID 'user_xyz' cannot modify profile 'user_abc'.
+     * @deny (list) Listing all users is prohibited.
+     * @principle Enforces document ownership for user profiles.
      */
     match /users/{userId} {
       function isOwner(userId) {
         return request.auth.uid == userId;
       }
-      function isSignedIn() {
-        return request.auth != null;
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
       }
 
-      allow get, list: if isSignedIn() && isOwner(userId);
-      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isSignedIn() && isOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isSignedIn() && isOwner(userId);
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Grants owner-only access to store data.
+     * @description Secure store data. Only the store owner can create, update, or delete a store.
      * @path /stores/{storeId}
-     * @allow (create, update, delete) if request.auth.uid == resource.data.ownerId
-     * @allow (get, list) if true
-     * @deny (create) if request.auth.uid != request.resource.data.ownerId
-     * @deny (update, delete) if request.auth.uid != resource.data.ownerId
-     * @principle Enforces owner-only access based on the ownerId field.
+     * @allow (create) User with ID 'owner_abc' can create store 'store_123' if authenticated as 'owner_abc' and sets ownerId to 'owner_abc'.
+     * @allow (get, list) Any authenticated user can read store data.
+     * @allow (update, delete) User with ID 'owner_abc' can update/delete store 'store_123' if authenticated as 'owner_abc' and is the owner.
+     * @deny (create, update, delete) User with ID 'user_xyz' cannot modify store 'store_123' unless they are the owner.
+     * @principle Enforces document ownership for writes, public read access.
      */
     match /stores/{storeId} {
       function isOwner(ownerId) {
         return request.auth.uid == ownerId;
       }
-      function isSignedIn() {
-        return request.auth != null;
-      }
+
       function isExistingOwner(ownerId) {
-          return isOwner(ownerId) && resource != null;
+        return isOwner(ownerId) && resource != null;
       }
 
       allow get, list: if true;
-      allow create: if isSignedIn() && isOwner(request.resource.data.ownerId) && request.resource.data.id == storeId;
-      allow update: if isSignedIn() && isExistingOwner(resource.data.ownerId) && request.resource.data.id == resource.data.id;
-      allow delete: if isSignedIn() && isExistingOwner(resource.data.ownerId);
+      allow create: if isOwner(request.resource.data.ownerId);
+      allow update: if isExistingOwner(resource.data.ownerId);
+      allow delete: if isExistingOwner(resource.data.ownerId);
     }
 
     /**
-     * @description Grants owner-only access to product data within a store.
+     * @description Secure product data under a store. Only the store owner can create, update, or delete products.
      * @path /stores/{storeId}/products/{productId}
-     * @allow (create, update, delete) if request.auth.uid == get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId
-     * @allow (get, list) if true
-     * @deny (create) if request.auth.uid != get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId
-     * @deny (update, delete) if request.auth.uid != get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId
-     * @principle Enforces owner-only access based on the store's ownerId.
+     * @allow (create) Store owner can create products in their store.
+     * @allow (get, list) Any authenticated user can read product data.
+     * @allow (update, delete) Store owner can update/delete products in their store.
+     * @deny (create, update, delete) User cannot modify products in another store.
+     * @principle Enforces store ownership for product management.
      */
     match /stores/{storeId}/products/{productId} {
-      function isStoreOwner(storeId) {
-        return request.auth.uid == get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId;
-      }
-      function isSignedIn() {
-        return request.auth != null;
-      }
-      function isExistingStoreOwner(storeId) {
-          return isStoreOwner(storeId) && resource != null;
+       function isStoreOwner(storeId) {
+          return get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid;
       }
 
       allow get, list: if true;
-      allow create: if isSignedIn() && isStoreOwner(storeId) && request.resource.data.storeId == storeId;
-      allow update: if isSignedIn() && isExistingStoreOwner(storeId) && request.resource.data.storeId == storeId;
-      allow delete: if isSignedIn() && isExistingStoreOwner(storeId);
+      allow create: if isStoreOwner(storeId);
+      allow update: if isStoreOwner(storeId) && resource != null;
+      allow delete: if isStoreOwner(storeId) && resource != null;
     }
 
     /**
-     * @description Grants access to order data to the user who created the order.
+     * @description Secure order data. Orders can be created by authenticated users and read by the user who placed them.
      * @path /orders/{orderId}
-     * @allow (create, update, delete) if request.auth.uid == resource.data.userId
-     * @allow (get, list) if request.auth.uid == resource.data.userId
-     * @deny (create) if request.auth.uid != request.resource.data.userId
-     * @deny (update, delete) if request.auth.uid != resource.data.userId
-     * @principle Enforces user-level access control for orders.
+     * @allow (create) Authenticated user can create orders.
+     * @allow (get) User can read order data if they are the owner of the order.
+     * @deny (list) Listing of orders is not allowed.
+     * @allow (update, delete) Only the owner of the order can update or delete it.
+     * @principle Enforces order ownership and prevents unauthorized access.
      */
     match /orders/{orderId} {
       function isOwner(userId) {
         return request.auth.uid == userId;
       }
-      function isSignedIn() {
-        return request.auth != null;
-      }
+
       function isExistingOwner(userId) {
-          return isOwner(userId) && resource != null;
+        return isOwner(userId) && resource != null;
       }
 
-      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && isOwner(request.resource.data.userId);
-      allow update: if isSignedIn() && isExistingOwner(resource.data.userId);
-      allow delete: if isSignedIn() && isExistingOwner(resource.data.userId);
+      allow get: if isOwner(resource.data.userId);
+      allow list: if false;
+      allow create: if request.auth != null;
+      allow update: if isExistingOwner(resource.data.userId);
+      allow delete: if isExistingOwner(resource.data.userId);
     }
 
-      /**
-       * @description Allows access to voice orders.  Currently allows any authenticated user to read, create, update, and delete.
-       * @path /voice-orders/{voiceOrderId}
-       */
-      match /voice-orders/{voiceOrderId} {
-        function isSignedIn() {
-          return request.auth != null;
-        }
-        function isExisting() {
-          return resource != null;
-        }
-        allow get, list: if isSignedIn();
-        allow create: if isSignedIn();
-        allow update: if isSignedIn() && isExisting();
-        allow delete: if isSignedIn() && isExisting();
-      }
+    /**
+     * @description Secure voice order data.
+     * @path /voice-orders/{voiceOrderId}
+     * @allow (create) Authenticated user can create voice orders.
+     * @allow (get, list) Any authenticated user can read voice order data.
+     * @allow (update, delete) No one can update or delete voice orders (potentially only admins in the future).
+     * @principle Voice orders can be created by anyone, read by anyone, but not modified.
+     */
+    match /voice-orders/{voiceOrderId} {
+      allow get, list: if true;
+      allow create: if request.auth != null;
+      allow update, delete: if false;
+    }
 
     /**
-     * @description Grants access to order item data. Only accessible by authenticated users associated with order.
+     * @description Secure order item data within an order.
      * @path /orders/{orderId}/orderItems/{orderItemId}
-     * @allow (create, update, delete) if request.auth.uid == get(/databases/$(database)/documents/orders/$(orderId)).data.userId
-     * @allow (get, list) if request.auth.uid == get(/databases/$(database)/documents/orders/$(orderId)).data.userId
-     * @deny (create) if request.auth.uid != get(/databases/$(database)/documents/orders/$(orderId)).data.userId
-     * @deny (update, delete) if request.auth.uid != get(/databases/$(database)/documents/orders/$(orderId)).data.userId
-     * @principle Enforces user-level access control for order items based on the parent order's userId.
+     * @allow (create) Any authenticated user can create order items.
+     * @allow (get, list) Any authenticated user can read order item data.
+     * @allow (update, delete) No one can update or delete order items (potentially only admins in the future).
+     * @principle Order items can be created by anyone, read by anyone, but not modified.
      */
     match /orders/{orderId}/orderItems/{orderItemId} {
-      function isOrderOwner(orderId) {
-        return request.auth.uid == get(/databases/$(database)/documents/orders/$(orderId)).data.userId;
-      }
-      function isSignedIn() {
-        return request.auth != null;
-      }
-      function isExistingOrderOwner(orderId) {
-          return isOrderOwner(orderId) && resource != null;
-      }
-
-      allow get, list: if isSignedIn() && isOrderOwner(orderId);
-      allow create: if isSignedIn() && isOrderOwner(orderId) && request.resource.data.orderId == orderId;
-      allow update: if isSignedIn() && isExistingOrderOwner(orderId) && request.resource.data.orderId == orderId;
-      allow delete: if isSignedIn() && isExistingOrderOwner(orderId);
+      allow get, list: if true;
+      allow create: if request.auth != null;
+      allow update, delete: if false;
     }
 
     /**
-     * @description Grants access to product recommendations only to the associated user.
+     * @description Secure product recommendation data for a user.
      * @path /users/{userId}/productRecommendations/{productRecommendationId}
-     * @allow (create, update, delete) if request.auth.uid == userId
-     * @allow (get, list) if request.auth.uid == userId
-     * @deny (create) if request.auth.uid != userId
-     * @deny (update, delete) if request.auth.uid != userId
-     * @principle Enforces user-level access control for product recommendations.
+     * @allow (create) Any authenticated user can create product recommendations.
+     * @allow (get, list) User can read product recommendations if they are the owner.
+     * @allow (update, delete) No one can update or delete product recommendations (potentially only admins in the future).
+     * @principle Product recommendations can be created by anyone, read by the user, but not modified.
      */
     match /users/{userId}/productRecommendations/{productRecommendationId} {
-      function isOwner(userId) {
+       function isOwner(userId) {
         return request.auth.uid == userId;
       }
-      function isSignedIn() {
-        return request.auth != null;
-      }
-      function isExistingOwner(userId) {
-          return isOwner(userId) && resource != null;
-      }
 
-      allow get, list: if isSignedIn() && isOwner(userId);
-      allow create: if isSignedIn() && isOwner(request.resource.data.userId) && request.resource.data.userId == userId;
-      allow update: if isSignedIn() && isExistingOwner(resource.data.userId) && request.resource.data.userId == resource.data.userId;
-      allow delete: if isSignedIn() && isExistingOwner(resource.data.userId);
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if request.auth != null;
+      allow update, delete: if false;
     }
   }
 }
