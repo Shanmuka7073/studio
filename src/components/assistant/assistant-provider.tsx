@@ -51,9 +51,8 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   const speechRecognition = useRef<SpeechRecognition | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
   
-  // Moved statusRef to the top level of the component
   const statusRef = useRef(status);
-  statusRef.current = status; // Keep it updated on every render
+  statusRef.current = status; 
 
   const addToConversation = (entry: ConversationEntry) => {
     setConversation(prev => [...prev, entry]);
@@ -239,66 +238,67 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
 
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    try {
+        if (typeof window === 'undefined') return;
 
-    if (!audio.current) {
-      audio.current = new Audio();
-      audio.current.onended = () => {
-        setStatus('idle');
-      };
-    }
-
-    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognitionAPI) {
-      console.warn("Voice recognition not supported by this browser.");
-      return;
-    }
-
-    if (!speechRecognition.current) {
-      const recognition = new SpeechRecognitionAPI();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      speechRecognition.current = recognition;
-
-      recognition.onstart = () => {
-        // Check ref to ensure we should be changing state.
-        if (statusRef.current === 'idle') {
-          setStatus('listening');
-        }
-      };
-      
-      recognition.onend = () => {
-        // Use the ref to check the status at the moment of 'onend'
-        if (statusRef.current === 'listening') {
-          setStatus('idle');
-        }
-      };
-
-      recognition.onerror = (event) => {
-        if (event.error !== 'no-speech' && event.error !== 'aborted') {
-          console.error('Speech recognition error:', event.error);
-          if (event.error === 'not-allowed') {
-            toast({ variant: 'destructive', title: 'Microphone permission denied', description: "Please enable microphone access in your browser settings." });
-          } else {
-            toast({ variant: 'destructive', title: 'Voice Error', description: `An error occurred: ${event.error}` });
-          }
-        }
-         if (statusRef.current !== 'idle') {
+        if (!audio.current) {
+        audio.current = new Audio();
+        audio.current.onended = () => {
             setStatus('idle');
+        };
         }
-      };
 
-      recognition.onresult = (event) => {
-        let finalTranscript = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          finalTranscript += event.results[i][0].transcript;
+        const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognitionAPI) {
+        console.warn("Voice recognition not supported by this browser.");
+        return;
         }
-        if (finalTranscript.trim()) {
-          processTranscript(finalTranscript.trim());
+
+        if (!speechRecognition.current) {
+        const recognition = new SpeechRecognitionAPI();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        speechRecognition.current = recognition;
+
+        recognition.onstart = () => {
+            if (statusRef.current === 'idle') {
+            setStatus('listening');
+            }
+        };
+        
+        recognition.onend = () => {
+            if (statusRef.current === 'listening') {
+            setStatus('idle');
+            }
+        };
+
+        recognition.onerror = (event) => {
+            if (event.error !== 'no-speech' && event.error !== 'aborted') {
+            console.error('Speech recognition error:', event.error);
+            if (event.error === 'not-allowed') {
+                toast({ variant: 'destructive', title: 'Microphone permission denied', description: "Please enable microphone access in your browser settings." });
+            } else {
+                toast({ variant: 'destructive', title: 'Voice Error', description: `An error occurred: ${event.error}` });
+            }
+            }
+            if (statusRef.current !== 'idle') {
+                setStatus('idle');
+            }
+        };
+
+        recognition.onresult = (event) => {
+            let finalTranscript = '';
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+            finalTranscript += event.results[i][0].transcript;
+            }
+            if (finalTranscript.trim()) {
+            processTranscript(finalTranscript.trim());
+            }
+        };
         }
-      };
+    } catch (e) {
+        console.error("Error initializing speech recognition:", e);
     }
-
   }, [processTranscript, toast]);
 
 
@@ -324,5 +324,4 @@ export function useAssistant() {
   }
   return context;
 }
-
     
