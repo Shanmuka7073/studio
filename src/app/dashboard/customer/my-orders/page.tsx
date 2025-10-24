@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useFirebase, errorEmitter } from '@/firebase';
+import { useFirebase, errorEmitter, useCollection, useMemoFirebase } from '@/firebase';
 import { Order } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,85 +11,49 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { FirestorePermissionError } from '@/firebase/errors';
 
 
 export default function MyOrdersPage() {
   const { user, isUserLoading, firestore } = useFirebase();
-  const [allOrders, setAllOrders] = useState<Order[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    if (!firestore || !user) {
-      if (!isUserLoading) {
-        setIsLoading(false);
-      }
-      return;
-    }
-
-    const fetchOrders = async () => {
-      setIsLoading(true);
-
-      const regularOrdersQuery = query(
+  
+  const regularOrdersQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return query(
         collection(firestore, 'orders'),
         where('userId', '==', user.uid),
         orderBy('orderDate', 'desc')
-      );
-      
-      const voiceOrdersQuery = query(
+    );
+  }, [firestore, user]);
+
+  const voiceOrdersQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return query(
         collection(firestore, 'voice-orders'),
         where('userId', '==', user.uid),
         orderBy('orderDate', 'desc')
-      );
-      
-      const regularOrdersPromise = getDocs(regularOrdersQuery).catch(serverError => {
-          const permissionError = new FirestorePermissionError({
-            path: collection(firestore, 'orders').path,
-            operation: 'list',
-          });
-          errorEmitter.emit('permission-error', permissionError);
-          throw permissionError;
-      });
+    );
+  }, [firestore, user]);
 
-      const voiceOrdersPromise = getDocs(voiceOrdersQuery).catch(serverError => {
-          const permissionError = new FirestorePermissionError({
-            path: collection(firestore, 'voice-orders').path,
-            operation: 'list',
-          });
-          errorEmitter.emit('permission-error', permissionError);
-          throw permissionError;
-      });
-      
-      try {
-        const [regularOrdersSnapshot, voiceOrdersSnapshot] = await Promise.all([
-            regularOrdersPromise,
-            voiceOrdersPromise
-        ]);
+  const { data: regularOrders, isLoading: regularOrdersLoading } = useCollection<Order>(regularOrdersQuery);
+  const { data: voiceOrders, isLoading: voiceOrdersLoading } = useCollection<Order>(voiceOrdersQuery);
 
-        const regularOrders = regularOrdersSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Order[];
-        const voiceOrders = voiceOrdersSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Order[];
+  const allOrders = useMemo(() => {
+    if (!regularOrders && !voiceOrders) return [];
+    
+    const combined = [...(regularOrders || []), ...(voiceOrders || [])];
+    
+    return combined.sort((a, b) => {
+        const dateA = a.orderDate as any;
+        const dateB = b.orderDate as any;
+        if (!dateA || !dateB) return 0;
+        const secondsA = dateA.seconds || (dateA.getTime ? dateA.getTime() / 1000 : 0);
+        const secondsB = dateB.seconds || (dateB.getTime ? dateB.getTime() / 1000 : 0);
+        return secondsB - secondsA;
+    });
 
-        const combinedOrders = [...regularOrders, ...voiceOrders].sort((a, b) => {
-            const dateA = a.orderDate as any;
-            const dateB = b.orderDate as any;
-            if (!dateA || !dateB) return 0;
-            const secondsA = dateA.seconds || new Date(dateA).getTime() / 1000;
-            const secondsB = dateB.seconds || new Date(dateB).getTime() / 1000;
-            return secondsB - secondsA;
-        });
-        
-        setAllOrders(combinedOrders);
-      } catch (error) {
-         // Errors are now thrown and will be caught by Next.js error boundary
-         console.error("An unexpected error occurred while fetching orders:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchOrders();
-  }, [firestore, user, isUserLoading]);
+  }, [regularOrders, voiceOrders]);
 
 
   const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
@@ -102,7 +66,7 @@ export default function MyOrdersPage() {
     }
   }
 
-  const effectiveLoading = isLoading || isUserLoading;
+  const effectiveLoading = isUserLoading || (user && (regularOrdersLoading || voiceOrdersLoading));
 
   const formatDate = (date: any) => {
     if (!date) return 'N/A';
@@ -113,7 +77,11 @@ export default function MyOrdersPage() {
         try {
             return format(parseISO(date), 'PPP');
         } catch (e) {
-            return 'Invalid Date';
+             try {
+                return format(new Date(date), 'PPP');
+             } catch(e2) {
+                return 'Invalid Date';
+             }
         }
     }
     if (date instanceof Date) {
