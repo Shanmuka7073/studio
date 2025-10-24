@@ -47,7 +47,7 @@ const transcribeAndTranslateFlow = ai.defineFlow(
     // Step 2: Translate and format the text
     const translationResponse = await ai.generate({
       model: googleAI.model('gemini-1.5-flash-latest'),
-      prompt: `Translate the following shopping list into a clean, bilingual format with English on the left and Hindi on the right (e.g., "Onion - प्याज"). Ensure each item is on a new line.
+      prompt: `Translate the following shopping list into a clean, bilingual format with English on the left and Telugu on the right (e.g., "Onion - ఉల్లిపాయ"). Ensure each item is on a new line.
 
         Shopping List:
         "${transcribedText}"

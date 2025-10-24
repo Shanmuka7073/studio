@@ -24,7 +24,7 @@ import { useTransition, useState, useRef } from 'react';
 import { useFirebase, errorEmitter } from '@/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { Mic, StopCircle, CheckCircle } from 'lucide-react';
+import { Mic, StopCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { transcribeAndTranslateAudio } from '@/ai/flows/transcribe-translate-flow';
 import Link from 'next/link';
 
@@ -42,7 +42,7 @@ export default function CheckoutPage() {
   const { cartItems, cartTotal, clearCart } = useCart();
   const router = useRouter();
   const { toast } = useToast();
-  const [isPlacingOrder, startTransition] = useTransition();
+  const [isPlacingOrder, startPlaceOrderTransition] = useTransition();
   const { firestore, user } = useFirebase();
 
   const [isRecording, setIsRecording] = useState(false);
@@ -50,10 +50,28 @@ export default function CheckoutPage() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
+  const [isTranslating, startTranslationTransition] = useTransition();
+  const [translatedList, setTranslatedList] = useState<string | null>(null);
+
+
+  const handleProcessRecording = async (audioUri: string) => {
+    startTranslationTransition(async () => {
+      try {
+        const list = await transcribeAndTranslateAudio(audioUri);
+        setTranslatedList(list);
+      } catch (e) {
+        console.error(e);
+        toast({ variant: 'destructive', title: "AI Translation Error", description: "Failed to process your voice memo." });
+      }
+    });
+  }
+
   const handleToggleRecording = () => {
     if (isRecording) {
       mediaRecorderRef.current?.stop();
     } else {
+      setAudioDataUri(null);
+      setTranslatedList(null);
       navigator.mediaDevices.getUserMedia({ audio: true })
         .then(stream => {
           const recorder = new MediaRecorder(stream);
@@ -69,8 +87,10 @@ export default function CheckoutPage() {
             const reader = new FileReader();
             reader.readAsDataURL(audioBlob);
             reader.onloadend = () => {
-              setAudioDataUri(reader.result as string);
-              toast({ title: "Recording complete!", description: "Your voice memo has been saved." });
+              const audioUri = reader.result as string;
+              setAudioDataUri(audioUri);
+              toast({ title: "Recording complete!", description: "Now processing your voice memo..." });
+              handleProcessRecording(audioUri);
             };
             setIsRecording(false);
              stream.getTracks().forEach(track => track.stop()); // Stop microphone
@@ -113,18 +133,7 @@ export default function CheckoutPage() {
         return;
     }
 
-    startTransition(async () => {
-        let translatedList;
-        if (audioDataUri) {
-          try {
-            translatedList = await transcribeAndTranslateAudio(audioDataUri);
-          } catch(e) {
-            console.error(e);
-            toast({variant: 'destructive', title: "AI Error", description: "Failed to process voice memo."})
-            return;
-          }
-        }
-    
+    startPlaceOrderTransition(async () => {
         const orderData = {
             userId: user.uid,
             storeId: storeId || 'VOICE_ORDER', // Use a placeholder if it's a voice-only order
@@ -293,6 +302,24 @@ export default function CheckoutPage() {
                         </div>
                         <audio src={audioDataUri} controls className="w-full" />
                     </div>
+                )}
+                 {isTranslating && (
+                    <div className="flex items-center justify-center text-muted-foreground p-4">
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <p>Processing your list...</p>
+                    </div>
+                 )}
+                {translatedList && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-lg">Your Translated Shopping List</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                             <pre className="text-sm whitespace-pre-wrap font-sans bg-muted/50 p-4 rounded-md">
+                                {translatedList}
+                            </pre>
+                        </CardContent>
+                    </Card>
                 )}
                 {cartItems.map(({product, quantity}) => {
                     const image = getProductImage(product.imageId);
