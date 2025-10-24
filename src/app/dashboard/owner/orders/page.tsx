@@ -1,17 +1,16 @@
 
 'use client';
 
-import { useFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { useFirebase, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase } from '@/firebase';
 import { Order, Store } from '@/lib/types';
 import { collection, query, where, orderBy, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { format, parseISO } from 'date-fns';
-import { useCollection, useMemoFirebase } from '@/firebase';
+import { format } from 'date-fns';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { useState, useEffect, useTransition } from 'react';
+import { useState, useEffect, useTransition, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useRouter } from 'next/navigation';
@@ -22,12 +21,32 @@ import { useToast } from '@/hooks/use-toast';
 function OrderDetailsDialog({ order, isOpen, onClose }: { order: Order | null; isOpen: boolean; onClose: () => void }) {
     if (!order) return null;
 
+    const formatDateSafe = (date: any) => {
+        if (!date) return 'N/A';
+        if (date.seconds) {
+          return format(new Date(date.seconds * 1000), 'PPP p');
+        }
+        if (typeof date === 'string') {
+           try {
+             return format(new Date(date), 'PPP p');
+           } catch {
+             return 'Invalid Date';
+           }
+        }
+        if (date instanceof Date) {
+            return format(date, 'PPP p');
+        }
+        return 'N/A';
+    }
+
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent className="max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Order Details</DialogTitle>
-                    <DialogDescription>Order ID: {order.id.substring(0, 7)}</DialogDescription>
+                    <DialogDescription>
+                        ID: {order.id} | Placed on: {formatDateSafe(order.orderDate)}
+                    </DialogDescription>
                 </DialogHeader>
                 <ScrollArea className="max-h-[60vh]">
                 <div className="grid gap-4 py-4 pr-6">
@@ -124,90 +143,74 @@ function StatusManager({ order, onStatusChange }: { order: Order; onStatusChange
 export default function OrdersDashboardPage() {
   const { firestore, user, isUserLoading } = useFirebase();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [allOrders, setAllOrders] = useState<Order[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const { toast } = useToast();
 
-  // 1. Redirect if user is not logged in
   useEffect(() => {
     if (!isUserLoading && !user) {
       router.push('/login?redirectTo=/dashboard/owner/orders');
     }
   }, [isUserLoading, user, router]);
 
-  // 2. Get the current user's store
   const storeQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(collection(firestore, 'stores'), where('ownerId', '==', user.uid));
   }, [firestore, user]);
+  
   const { data: stores, isLoading: isStoreLoading } = useCollection<Store>(storeQuery);
-  const myStore = stores?.[0];
+  const myStore = useMemo(() => stores?.[0], [stores]);
 
-  useEffect(() => {
-    const fetchOrders = async () => {
-        if (!firestore || !user) return;
-        
-        setIsLoading(true);
-        try {
-            let regularOrders: Order[] = [];
-            if (myStore) {
-                const regularOrdersQuery = query(
-                    collection(firestore, 'orders'), 
-                    where('storeId', '==', myStore.id),
-                    orderBy('orderDate', 'desc')
-                );
-                
-                const regularOrdersPromise = getDocs(regularOrdersQuery).catch(serverError => {
-                  const permissionError = new FirestorePermissionError({
-                    path: `orders where storeId == ${myStore.id}`,
-                    operation: 'list',
-                  });
-                  errorEmitter.emit('permission-error', permissionError);
-                  throw permissionError;
-                });
-                const regularOrdersSnapshot = await regularOrdersPromise;
-                regularOrders = regularOrdersSnapshot.docs.map(doc => ({...doc.data(), id: doc.id})) as Order[];
-            }
+  const regularOrdersQuery = useMemoFirebase(() => {
+      if (!firestore || !myStore) return null;
+      return query(
+          collection(firestore, 'orders'),
+          where('storeId', '==', myStore.id),
+          orderBy('orderDate', 'desc')
+      );
+  }, [firestore, myStore]);
 
-            // Fetch all pending voice orders, as they are not assigned to a store yet.
-            const voiceOrdersQuery = query(
-                collection(firestore, 'voice-orders'),
-                where('status', '==', 'Pending') 
-            );
-            const voiceOrdersPromise = getDocs(voiceOrdersQuery).catch(serverError => {
-              const permissionError = new FirestorePermissionError({
-                path: 'voice-orders',
-                operation: 'list',
-              });
-              errorEmitter.emit('permission-error', permissionError);
-              throw permissionError;
-            });
+  const voiceOrdersQuery = useMemoFirebase(() => {
+      if (!firestore) return null;
+      // Fetch all pending voice orders, as they are unassigned.
+      // Also fetch any voice orders that have been assigned to this store.
+      // This requires a composite index, which should be configured.
+      return query(
+          collection(firestore, 'voice-orders'),
+          where('status', '==', 'Pending')
+      );
+  }, [firestore]);
 
-            const voiceOrdersSnapshot = await voiceOrdersPromise;
-            const voiceOrders = voiceOrdersSnapshot.docs.map(doc => ({...doc.data(), id: doc.id})) as Order[];
-            
-            const combinedOrders = [...regularOrders, ...voiceOrders].sort((a, b) => {
-                const dateA = a.orderDate as any;
-                const dateB = b.orderDate as any;
-                if (!dateA || !dateB) return 0;
-                const secondsA = dateA.seconds || new Date(dateA).getTime() / 1000;
-                const secondsB = dateB.seconds || new Date(dateB).getTime() / 1000;
-                return secondsB - secondsA;
-            });
-            
-            setAllOrders(combinedOrders);
-        } catch (error) {
-            console.error("Failed to fetch orders:", error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-    
-    if (!isUserLoading && !isStoreLoading) {
-        fetchOrders();
-    }
-  }, [firestore, user, myStore, isUserLoading, isStoreLoading]);
+  const assignedVoiceOrdersQuery = useMemoFirebase(() => {
+      if (!firestore || !myStore) return null;
+      return query(
+          collection(firestore, 'voice-orders'),
+          where('storeId', '==', myStore.id)
+      )
+  }, [firestore, myStore]);
+  
+  const { data: regularOrders, isLoading: regularOrdersLoading } = useCollection<Order>(regularOrdersQuery);
+  const { data: pendingVoiceOrders, isLoading: voiceOrdersLoading } = useCollection<Order>(voiceOrdersQuery);
+  const { data: assignedVoiceOrders, isLoading: assignedVoiceOrdersLoading } = useCollection<Order>(assignedVoiceOrdersQuery);
+
+  const allOrders = useMemo(() => {
+      const combined = [
+          ...(regularOrders || []),
+          ...(pendingVoiceOrders || []),
+          ...(assignedVoiceOrders || [])
+      ];
+      
+      const uniqueOrders = Array.from(new Map(combined.map(order => [order.id, order])).values());
+
+      return uniqueOrders.sort((a, b) => {
+        const dateA = a.orderDate as any;
+        const dateB = b.orderDate as any;
+        if (!dateA || !dateB) return 0;
+        const secondsA = dateA.seconds || new Date(dateA).getTime() / 1000;
+        const secondsB = dateB.seconds || new Date(dateB).getTime() / 1000;
+        return secondsB - secondsA;
+      });
+  }, [regularOrders, pendingVoiceOrders, assignedVoiceOrders]);
+
 
   const handleStatusChange = async (orderId: string, collectionName: 'orders' | 'voice-orders', newStatus: Order['status']) => {
     if (!firestore) return;
@@ -215,9 +218,8 @@ export default function OrdersDashboardPage() {
     const orderDocRef = doc(firestore, collectionName, orderId);
     
     try {
-        // When a store owner processes a voice order, assign their store ID to it.
         const updatePayload: { status: Order['status'], storeId?: string } = { status: newStatus };
-        if (collectionName === 'voice-orders' && myStore) {
+        if (collectionName === 'voice-orders' && newStatus !== 'Pending' && myStore) {
             updatePayload.storeId = myStore.id;
         }
 
@@ -227,53 +229,21 @@ export default function OrdersDashboardPage() {
             title: "Status Updated",
             description: `Order ${orderId.substring(0,7)} marked as ${newStatus}.`,
         });
-        // Refetch orders to update the list
-        // A simple refetch is okay for this prototype
-        if (!isUserLoading && !isStoreLoading) {
-            const fetchOrders = async () => {
-                if (!firestore || !user) return;
-                setIsLoading(true);
-                try {
-                    let regularOrders: Order[] = [];
-                    if (myStore) {
-                        const regularOrdersQuery = query(collection(firestore, 'orders'), where('storeId', '==', myStore.id), orderBy('orderDate', 'desc'));
-                        const regularOrdersSnapshot = await getDocs(regularOrdersQuery);
-                        regularOrders = regularOrdersSnapshot.docs.map(doc => ({...doc.data(), id: doc.id})) as Order[];
-                    }
-                    const voiceOrdersQuery = query(collection(firestore, 'voice-orders'), where('status', '==', 'Pending'));
-                    const voiceOrdersSnapshot = await getDocs(voiceOrdersQuery);
-                    const voiceOrders = voiceOrdersSnapshot.docs.map(doc => ({...doc.data(), id: doc.id})) as Order[];
-                    const combinedOrders = [...regularOrders, ...voiceOrders].sort((a, b) => {
-                        const dateA = a.orderDate as any; const dateB = b.orderDate as any;
-                        if (!dateA || !dateB) return 0;
-                        const secondsA = dateA.seconds || new Date(dateA).getTime() / 1000;
-                        const secondsB = dateB.seconds || new Date(dateB).getTime() / 1000;
-                        return secondsB - secondsA;
-                    });
-                    setAllOrders(combinedOrders);
-                } catch (error) { console.error("Failed to fetch orders:", error); } finally { setIsLoading(false); }
-            };
-            fetchOrders();
-        }
-    } catch (error) {
+    } catch (error: any) {
         console.error("Failed to update status:", error);
+         const permissionError = new FirestorePermissionError({
+            path: orderDocRef.path,
+            operation: 'update',
+            requestResourceData: { status: newStatus },
+        });
+        errorEmitter.emit('permission-error', permissionError);
         toast({
             variant: "destructive",
             title: "Update Failed",
-            description: "Could not update the order status.",
+            description: "Could not update the order status. Check permissions.",
         });
     }
   };
-
-
-  const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
-    switch (status) {
-        case 'Delivered': return 'default';
-        case 'Processing': return 'secondary';
-        case 'Out for Delivery': return 'outline';
-        default: return 'secondary';
-    }
-  }
 
   const formatDate = (date: any) => {
     if (!date) return 'N/A';
@@ -281,13 +251,14 @@ export default function OrdersDashboardPage() {
       return format(new Date(date.seconds * 1000), 'PPP');
     }
     try {
-        return format(parseISO(date as string), 'PPP');
+        return format(new Date(date as string), 'PPP');
     } catch {
-        return format(date, 'PPP');
+        // Fallback for different date string formats if needed
+        return 'Invalid Date';
     }
   }
 
-  const finalLoading = isLoading || isUserLoading || isStoreLoading;
+  const finalLoading = isUserLoading || isStoreLoading || regularOrdersLoading || voiceOrdersLoading || assignedVoiceOrdersLoading;
 
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
@@ -306,6 +277,13 @@ export default function OrdersDashboardPage() {
               <p className="text-muted-foreground mb-4">Please log in to manage orders.</p>
               <Button asChild>
                 <Link href="/login?redirectTo=/dashboard/owner/orders">Login</Link>
+              </Button>
+            </div>
+          ) : !myStore ? (
+             <div className="text-center py-12">
+              <p className="text-muted-foreground mb-4">You have not created a store yet. Please create one to see orders.</p>
+              <Button asChild>
+                <Link href="/dashboard/owner/my-store">Create Store</Link>
               </Button>
             </div>
           ) : allOrders.length === 0 ? (
@@ -355,5 +333,3 @@ export default function OrdersDashboardPage() {
     </div>
   );
 }
-
-    
