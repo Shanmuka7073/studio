@@ -50,6 +50,10 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   
   const speechRecognition = useRef<SpeechRecognition | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
+  
+  // Moved statusRef to the top level of the component
+  const statusRef = useRef(status);
+  statusRef.current = status; // Keep it updated on every render
 
   const addToConversation = (entry: ConversationEntry) => {
     setConversation(prev => [...prev, entry]);
@@ -65,7 +69,9 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       } catch (e) {
         console.error("Speech recognition stop error: ", e);
       } finally {
-        setStatus('idle');
+        if (statusRef.current === 'listening') {
+            setStatus('idle');
+        }
       }
     }
   }, []);
@@ -193,7 +199,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   }, [firestore, pathname, router, speak, pendingAction, addItemToCart]);
 
   const processTranscript = useCallback(async (transcript: string) => {
-    if (status === 'thinking' || status === 'speaking') return;
+    if (statusRef.current === 'thinking' || statusRef.current === 'speaking') return;
     stopListening();
     setStatus('thinking');
     try {
@@ -203,19 +209,16 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       console.error("Error interpreting command:", e);
       await speak("Sorry, I had trouble understanding that.");
     }
-  }, [status, stopListening, handleCommand, speak]);
+  }, [stopListening, handleCommand, speak]);
   
   const startListening = useCallback(() => {
-    // Add a guard to prevent starting if not idle.
-    if (status !== 'idle' || !user) return;
+    if (statusRef.current !== 'idle' || !user) return;
   
     if (speechRecognition.current) {
       try {
         speechRecognition.current.start();
         setStatus('listening');
       } catch (e) {
-        // This can happen if start() is called while it's already starting.
-        // It's safe to ignore in this context.
         if (e instanceof DOMException && e.name === 'InvalidStateError') {
            console.warn('Speech recognition already starting. Ignoring redundant call.');
         } else {
@@ -224,15 +227,15 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         }
       }
     }
-  }, [status, user]);
+  }, [user]);
 
   const toggleListening = useCallback(() => {
-    if (status === 'listening') {
+    if (statusRef.current === 'listening') {
       stopListening();
     } else {
       startListening();
     }
-  }, [status, startListening, stopListening]);
+  }, [startListening, stopListening]);
 
 
   useEffect(() => {
@@ -258,12 +261,14 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       speechRecognition.current = recognition;
 
       recognition.onstart = () => {
-        setStatus('listening');
+        // Check ref to ensure we should be changing state.
+        if (statusRef.current === 'idle') {
+          setStatus('listening');
+        }
       };
       
       recognition.onend = () => {
-        // Check if the status is still 'listening' before setting to 'idle'
-        // This avoids race conditions if the status was changed by another process
+        // Use the ref to check the status at the moment of 'onend'
         if (statusRef.current === 'listening') {
           setStatus('idle');
         }
@@ -278,7 +283,9 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
             toast({ variant: 'destructive', title: 'Voice Error', description: `An error occurred: ${event.error}` });
           }
         }
-        setStatus('idle');
+         if (statusRef.current !== 'idle') {
+            setStatus('idle');
+        }
       };
 
       recognition.onresult = (event) => {
@@ -291,12 +298,8 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         }
       };
     }
-    
-    // Create a ref to hold the current status to check in onend handler
-    const statusRef = React.useRef(status);
-    statusRef.current = status;
 
-  }, [processTranscript, toast, status]);
+  }, [processTranscript, toast]);
 
 
   const value = {
@@ -321,3 +324,5 @@ export function useAssistant() {
   }
   return context;
 }
+
+    
