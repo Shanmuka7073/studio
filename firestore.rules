@@ -12,13 +12,13 @@
  * - Orders: /orders/{orderId} - Order data, accessible by the user who created the order.
  * - OrderItems: /orders/{orderId}/orderItems/{orderItemId} - Items within an order.
  * - ProductRecommendations: /users/{userId}/productRecommendations/{productRecommendationId} - Product recommendations for users.
- * - Site Configuration: /config/site - Global site configuration settings. Publicly readable.
+ * - VoiceOrders: /voice-orders/{voiceOrderId} - Voice orders, intended for access by authorized fulfillment partners.
  *
  * Key Security Decisions:
  * - Strict user ownership for user profiles and associated data.
  * - Owner-only write access to stores and their products.
- * - Public read access to site configuration.
  * - Orders are associated with user through the userId field.
+ * - Voice orders are separate and should have rules applied that allow fulfillment partners to read and update status.
  *
  * Denormalization for Authorization:
  * - Orders include 'userId' and 'storeId' to simplify authorization checks.
@@ -47,8 +47,8 @@ service cloud.firestore {
       }
 
       allow get, list: if isSignedIn() && isOwner(userId);
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isSignedIn() && isOwner(userId) && request.resource.data.id == resource.data.id;
       allow delete: if isSignedIn() && isOwner(userId);
     }
 
@@ -68,11 +68,14 @@ service cloud.firestore {
       function isSignedIn() {
         return request.auth != null;
       }
+      function isExistingOwner(ownerId) {
+          return isOwner(ownerId) && resource != null;
+      }
 
       allow get, list: if true;
-      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow update: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow delete: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() && isOwner(request.resource.data.ownerId) && request.resource.data.id == storeId;
+      allow update: if isSignedIn() && isExistingOwner(resource.data.ownerId) && request.resource.data.id == resource.data.id;
+      allow delete: if isSignedIn() && isExistingOwner(resource.data.ownerId);
     }
 
     /**
@@ -86,16 +89,19 @@ service cloud.firestore {
      */
     match /stores/{storeId}/products/{productId} {
       function isStoreOwner(storeId) {
-          return request.auth.uid == get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId;
+        return request.auth.uid == get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId;
       }
       function isSignedIn() {
         return request.auth != null;
       }
+      function isExistingStoreOwner(storeId) {
+          return isStoreOwner(storeId) && resource != null;
+      }
 
       allow get, list: if true;
-      allow create: if isSignedIn() && isStoreOwner(storeId);
-      allow update: if isSignedIn() && isStoreOwner(storeId);
-      allow delete: if isSignedIn() && isStoreOwner(storeId);
+      allow create: if isSignedIn() && isStoreOwner(storeId) && request.resource.data.storeId == storeId;
+      allow update: if isSignedIn() && isExistingStoreOwner(storeId) && request.resource.data.storeId == storeId;
+      allow delete: if isSignedIn() && isExistingStoreOwner(storeId);
     }
 
     /**
@@ -114,13 +120,33 @@ service cloud.firestore {
       function isSignedIn() {
         return request.auth != null;
       }
+      function isExistingOwner(userId) {
+          return isOwner(userId) && resource != null;
+      }
 
       allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isOwner(request.resource.data.userId);
+      allow update: if isSignedIn() && isExistingOwner(resource.data.userId);
+      allow delete: if isSignedIn() && isExistingOwner(resource.data.userId);
     }
+
+      /**
+       * @description Allows access to voice orders.  Currently allows any authenticated user to read, create, update, and delete.
+       * @path /voice-orders/{voiceOrderId}
+       */
+      match /voice-orders/{voiceOrderId} {
+        function isSignedIn() {
+          return request.auth != null;
+        }
+        function isExisting() {
+          return resource != null;
+        }
+        allow get, list: if isSignedIn();
+        allow create: if isSignedIn();
+        allow update: if isSignedIn() && isExisting();
+        allow delete: if isSignedIn() && isExisting();
+      }
 
     /**
      * @description Grants access to order item data. Only accessible by authenticated users associated with order.
@@ -138,11 +164,14 @@ service cloud.firestore {
       function isSignedIn() {
         return request.auth != null;
       }
+      function isExistingOrderOwner(orderId) {
+          return isOrderOwner(orderId) && resource != null;
+      }
 
       allow get, list: if isSignedIn() && isOrderOwner(orderId);
-      allow create: if isSignedIn() && isOrderOwner(orderId);
-      allow update: if isSignedIn() && isOrderOwner(orderId);
-      allow delete: if isSignedIn() && isOrderOwner(orderId);
+      allow create: if isSignedIn() && isOrderOwner(orderId) && request.resource.data.orderId == orderId;
+      allow update: if isSignedIn() && isExistingOrderOwner(orderId) && request.resource.data.orderId == orderId;
+      allow delete: if isSignedIn() && isExistingOrderOwner(orderId);
     }
 
     /**
@@ -161,23 +190,14 @@ service cloud.firestore {
       function isSignedIn() {
         return request.auth != null;
       }
+      function isExistingOwner(userId) {
+          return isOwner(userId) && resource != null;
+      }
 
       allow get, list: if isSignedIn() && isOwner(userId);
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId);
-      allow delete: if isSignedIn() && isOwner(userId);
-    }
-
-    /**
-     * @description Grants public read access to site configuration.
-     * @path /config/site
-     * @allow (get, list) if true
-     * @deny (create, update, delete) if true
-     * @principle Allows public access to site configuration, read-only.
-     */
-    match /config/site {
-      allow get, list: if true;
-      allow create, update, delete: if false;
+      allow create: if isSignedIn() && isOwner(request.resource.data.userId) && request.resource.data.userId == userId;
+      allow update: if isSignedIn() && isExistingOwner(resource.data.userId) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isSignedIn() && isExistingOwner(resource.data.userId);
     }
   }
 }
