@@ -41,10 +41,30 @@ export default function MyOrdersPage() {
         orderBy('orderDate', 'desc')
       );
       
+      const regularOrdersPromise = getDocs(regularOrdersQuery).catch(serverError => {
+          const permissionError = new FirestorePermissionError({
+            path: 'orders',
+            operation: 'list',
+          });
+          errorEmitter.emit('permission-error', permissionError);
+          // Return an empty array to allow Promise.all to resolve
+          return { docs: [] };
+      });
+
+      const voiceOrdersPromise = getDocs(voiceOrdersQuery).catch(serverError => {
+          const permissionError = new FirestorePermissionError({
+            path: 'voice-orders',
+            operation: 'list',
+          });
+          errorEmitter.emit('permission-error', permissionError);
+           // Return an empty array to allow Promise.all to resolve
+          return { docs: [] };
+      });
+      
       try {
         const [regularOrdersSnapshot, voiceOrdersSnapshot] = await Promise.all([
-            getDocs(regularOrdersQuery),
-            getDocs(voiceOrdersQuery)
+            regularOrdersPromise,
+            voiceOrdersPromise
         ]);
 
         const regularOrders = regularOrdersSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Order[];
@@ -61,16 +81,8 @@ export default function MyOrdersPage() {
         
         setAllOrders(combinedOrders);
       } catch (error) {
-        if (error instanceof FirestoreError && error.code === 'permission-denied') {
-            // Determine which query failed, or assume the first one for simplicity
-            const permissionError = new FirestorePermissionError({
-                path: 'orders or voice-orders', // It's hard to know which one failed without separate try/catch
-                operation: 'list',
-            });
-            errorEmitter.emit('permission-error', permissionError);
-        } else {
-            console.error("An unexpected error occurred while fetching orders:", error);
-        }
+         // This will catch other errors, but permission errors are handled above
+         console.error("An unexpected error occurred while fetching orders:", error);
       } finally {
         setIsLoading(false);
       }
@@ -99,7 +111,17 @@ export default function MyOrdersPage() {
       return format(new Date(date.seconds * 1000), 'PPP');
     }
     // Or they may be ISO strings from older data
-    return format(parseISO(date as string), 'PPP');
+    if (typeof date === 'string') {
+        try {
+            return format(parseISO(date), 'PPP');
+        } catch (e) {
+            return 'Invalid Date';
+        }
+    }
+    if (date instanceof Date) {
+        return format(date, 'PPP');
+    }
+    return 'N/A';
   }
 
   return (
