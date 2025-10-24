@@ -31,6 +31,7 @@ type AssistantState = {
   status: AssistantStatus;
   conversation: ConversationEntry[];
   lastBotResponse: string;
+  toggleListening: () => void;
 };
 
 const AssistantContext = createContext<AssistantState | undefined>(undefined);
@@ -175,7 +176,6 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         break;
 
       case 'addProductToCart':
-        // This intent is now handled via pendingAction confirmation
         await speak("Sorry, I need to find a product first before adding it to the cart.");
         break;
 
@@ -206,18 +206,18 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   }, [status, stopListening, handleCommand, speak]);
   
   const startListening = useCallback(() => {
-    // This guard is essential to prevent the "already started" error.
+    // Add a guard to prevent starting if not idle.
     if (status !== 'idle' || !user) return;
-
+  
     if (speechRecognition.current) {
       try {
         speechRecognition.current.start();
         setStatus('listening');
       } catch (e) {
-        // This can happen if the component tries to start recognition
-        // again before the 'onstart' event has fired and updated the status.
+        // This can happen if start() is called while it's already starting.
+        // It's safe to ignore in this context.
         if (e instanceof DOMException && e.name === 'InvalidStateError') {
-          console.warn('Speech recognition already starting. Ignoring redundant call.');
+           console.warn('Speech recognition already starting. Ignoring redundant call.');
         } else {
           console.error("Speech recognition start error: ", e);
           setStatus('idle');
@@ -225,6 +225,15 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       }
     }
   }, [status, user]);
+
+  const toggleListening = useCallback(() => {
+    if (status === 'listening') {
+      stopListening();
+    } else {
+      startListening();
+    }
+  }, [status, startListening, stopListening]);
+
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -253,13 +262,21 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       };
       
       recognition.onend = () => {
-        setStatus('idle');
+        // Check if the status is still 'listening' before setting to 'idle'
+        // This avoids race conditions if the status was changed by another process
+        if (statusRef.current === 'listening') {
+          setStatus('idle');
+        }
       };
 
       recognition.onerror = (event) => {
         if (event.error !== 'no-speech' && event.error !== 'aborted') {
           console.error('Speech recognition error:', event.error);
-          toast({ variant: 'destructive', title: 'Voice Error', description: `An error occurred: ${event.error}` });
+          if (event.error === 'not-allowed') {
+            toast({ variant: 'destructive', title: 'Microphone permission denied', description: "Please enable microphone access in your browser settings." });
+          } else {
+            toast({ variant: 'destructive', title: 'Voice Error', description: `An error occurred: ${event.error}` });
+          }
         }
         setStatus('idle');
       };
@@ -274,32 +291,25 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         }
       };
     }
-  }, [processTranscript, toast]);
+    
+    // Create a ref to hold the current status to check in onend handler
+    const statusRef = React.useRef(status);
+    statusRef.current = status;
 
-  // The main listening loop
-  useEffect(() => {
-    if (user && status === 'idle') {
-      const timer = setTimeout(() => {
-        startListening();
-      }, 500); // A brief pause before listening again
-      return () => clearTimeout(timer);
-    } else if (!user) {
-      stopListening();
-      setStatus('idle');
-    }
-  }, [status, user, startListening, stopListening]);
+  }, [processTranscript, toast, status]);
 
 
   const value = {
     status,
     conversation,
     lastBotResponse,
+    toggleListening,
   };
 
   return (
     <AssistantContext.Provider value={value}>
       {children}
-      {user && <AssistantStatusBar status={status} lastBotResponse={lastBotResponse} />}
+      {user && status !== 'idle' && <AssistantStatusBar status={status} lastBotResponse={lastBotResponse} />}
     </AssistantContext.Provider>
   );
 }
@@ -311,7 +321,3 @@ export function useAssistant() {
   }
   return context;
 }
-
-    
-
-    

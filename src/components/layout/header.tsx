@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Package2, Menu, UserCircle, Store, ShoppingBag, Truck } from 'lucide-react';
+import { Package2, Menu, UserCircle, Store, ShoppingBag, Truck, Mic } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -15,7 +15,7 @@ import {
 import { CartIcon } from '@/components/cart/cart-icon';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useAssistant } from '@/firebase';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,6 +46,23 @@ const ownerLinks = [
 const deliveryLinks = [
     { href: '/dashboard/deliveries', label: 'Deliveries', icon: Truck },
 ]
+
+function AssistantToggle() {
+    const { status, toggleListening } = useAssistant();
+    const isListening = status === 'listening';
+
+    return (
+        <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={toggleListening}
+            className={cn(isListening && "bg-destructive text-destructive-foreground hover:bg-destructive/90")}
+        >
+          <Mic className="h-5 w-5" />
+          <span className="sr-only">Toggle Voice Assistant</span>
+        </Button>
+    )
+}
 
 function UserMenu() {
   const { user, isUserLoading } = useFirebase();
@@ -107,6 +124,7 @@ function UserMenu() {
 
 export function Header() {
   const pathname = usePathname();
+  const { user } = useFirebase();
 
   return (
     <header className="sticky top-0 z-50 flex h-16 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:px-6">
@@ -187,6 +205,7 @@ export function Header() {
       </Sheet>
       
       <div className="flex w-full items-center justify-end gap-4 md:ml-auto md:gap-2 lg:gap-4">
+        {user && <AssistantToggle />}
         <CartIcon />
         <UserMenu />
       </div>
