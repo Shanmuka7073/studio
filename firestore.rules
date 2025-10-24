@@ -8,18 +8,19 @@
  *
  * Data Structure:
  * - /users/{userId}: User profiles, accessible only by the user.
- * - /stores/{storeId}: Store information.
- * - /stores/{storeId}/products/{productId}: Products listed by a store.
- * - /orders/{orderId}: Order information, with denormalized storeId and userId for efficient querying and security.
- * - /voice-orders/{voiceOrderId}: Voice-only orders.
- * - /orders/{orderId}/orderItems/{orderItemId}: Items within an order.
- * - /users/{userId}/productRecommendations/{productRecommendationId}: Product recommendations for a user.
+ * - /stores/{storeId}: Store information, accessible by anyone, but only the owner can modify.
+ * - /stores/{storeId}/products/{productId}: Products listed by a store, publicly readable, but only the store owner can modify.
+ * - /orders/{orderId}: Order information, publicly readable, but only the store owner can modify.
+ * - /voice-orders/{voiceOrderId}: Voice-only orders, publicly readable, no modification allowed.
+ * - /orders/{orderId}/orderItems/{orderItemId}: Items within an order, publicly readable, no modification allowed.
+ * - /users/{userId}/productRecommendations/{productRecommendationId}: Product recommendations for a user, only accessible and modifiable by the user.
  *
  * Key Security Decisions:
  * - Users can only access their own profile data.
  * - Stores have full control over their products.
- * - Orders can be read by the store that owns them (using the denormalized storeId)
+ * - Orders can be read by anyone but only stores can manage their own orders based on the denormalized storeId.
  * - Listing of users is disallowed for privacy.
+ * - Voice orders and OrderItems are read-only.
  * - Data validation is relaxed in this prototype for rapid iteration.
  *
  * Denormalization for Authorization:
@@ -29,6 +30,7 @@
  *
  * Structural Segregation:
  * - Private user data is stored under /users/{userId} to ensure it's only accessible by the user.
+ * - Public data like products are available to anyone.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -65,8 +67,8 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isOwner(userId);
       allow list: if false; // Listing users is not allowed.
-      allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.id == request.auth.uid;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
       allow delete: if isExistingOwner(userId);
     }
 
@@ -82,7 +84,7 @@ service cloud.firestore {
      */
     match /stores/{storeId} {
       allow get, list: if true;
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
       allow update: if isSignedIn() && resource.data.ownerId == request.auth.uid;
       allow delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
     }
@@ -99,7 +101,7 @@ service cloud.firestore {
      */
     match /stores/{storeId}/products/{productId} {
       allow get, list: if true;
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() && get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid;
       allow update: if isSignedIn() && get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid;
       allow delete: if isSignedIn() && get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid;
     }
@@ -116,8 +118,8 @@ service cloud.firestore {
      */
     match /orders/{orderId} {
       allow get: if true;
-      allow list: if get(/databases/$(database)/documents/stores/$(request.query.storeId)).data.ownerId == request.auth.uid;
-      allow create: if isSignedIn();
+      allow list: if isSignedIn() && get(/databases/$(database)/documents/stores/$(resource.data.storeId)).data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() && get(/databases/$(database)/documents/stores/$(request.resource.data.storeId)).data.ownerId == request.auth.uid;
       allow update: if isSignedIn() && get(/databases/$(database)/documents/stores/$(resource.data.storeId)).data.ownerId == request.auth.uid;
       allow delete: if isSignedIn() && get(/databases/$(database)/documents/stores/$(resource.data.storeId)).data.ownerId == request.auth.uid;
     }
@@ -158,8 +160,8 @@ service cloud.firestore {
     match /users/{userId}/productRecommendations/{productRecommendationId} {
       allow get: if isOwner(userId);
       allow list: if isOwner(userId);
-      allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.userId == request.auth.uid;
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
       allow delete: if isExistingOwner(userId);
     }
   }
