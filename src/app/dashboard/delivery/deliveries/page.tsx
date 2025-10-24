@@ -45,8 +45,8 @@ export default function DeliveriesPage() {
     setPickedUpOrders(prev => ({ ...prev, [orderId]: true }));
   };
 
-  const openInGoogleMaps = (origin: string, destination: string) => {
-    const url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}`;
+  const openInGoogleMaps = (originLat: number, originLng: number, destLat: number, destLng: number) => {
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${originLat},${originLng}&destination=${destLat},${destLng}`;
     window.open(url, '_blank');
   };
   
@@ -103,8 +103,10 @@ export default function DeliveriesPage() {
                             variant="outline"
                             size="sm"
                             onClick={() => openInGoogleMaps(
-                                order.store!.address, 
-                                isPickedUp ? order.deliveryAddress : order.store!.address
+                                order.store!.latitude, 
+                                order.store!.longitude,
+                                isPickedUp ? order.deliveryLat : order.store!.latitude, 
+                                isPickedUp ? order.deliveryLng : order.store!.longitude,
                             )}
                           >
                             <MapPin className="mr-2 h-4 w-4" />

@@ -42,8 +42,8 @@ export type Order = {
   storeId: string;
   customerName: string;
   deliveryAddress: string;
-  deliveryLat?: number;
-  deliveryLng?: number;
+  deliveryLat: number;
+  deliveryLng: number;
   items: OrderItem[];
   totalAmount: number;
   status: 'Pending' | 'Processing' | 'Out for Delivery' | 'Delivered';

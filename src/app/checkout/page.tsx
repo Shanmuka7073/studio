@@ -24,7 +24,7 @@ import { useTransition, useState, useRef, useCallback } from 'react';
 import { useFirebase, errorEmitter } from '@/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { Mic, StopCircle, CheckCircle, Loader2 } from 'lucide-react';
+import { Mic, StopCircle, CheckCircle, Loader2, MapPin } from 'lucide-react';
 import Link from 'next/link';
 
 
@@ -51,6 +51,7 @@ export default function CheckoutPage() {
 
   const [isTranslating, startTranslationTransition] = useTransition();
   const [translatedList, setTranslatedList] = useState<string | null>(null);
+  const [deliveryCoords, setDeliveryCoords] = useState<{lat: number, lng: number} | null>(null);
 
   const processTranscript = useCallback((transcript: string) => {
     startTranslationTransition(() => {
@@ -130,9 +131,32 @@ export default function CheckoutPage() {
     },
   });
 
+   const handleGetLocation = () => {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    setDeliveryCoords({
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    });
+                    toast({ title: "Location Fetched!", description: "Your current location has been captured for delivery." });
+                },
+                () => {
+                    toast({ variant: 'destructive', title: "Location Error", description: "Could not retrieve your location. Please enter your address manually and ensure permissions are enabled." });
+                }
+            );
+        } else {
+            toast({ variant: 'destructive', title: "Not Supported", description: "Geolocation is not supported by your browser." });
+        }
+    };
+
   const onSubmit = (data: CheckoutFormValues) => {
     if (!firestore || !user) {
         toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to place an order.' });
+        return;
+    }
+    if (!deliveryCoords) {
+        toast({ variant: 'destructive', title: 'Location Required', description: 'Please capture your current location for delivery.' });
         return;
     }
 
@@ -153,6 +177,8 @@ export default function CheckoutPage() {
             userId: user.uid,
             customerName: data.name,
             deliveryAddress: data.address,
+            deliveryLat: deliveryCoords.lat,
+            deliveryLng: deliveryCoords.lng,
             phone: data.phone,
             email: user.email,
             orderDate: serverTimestamp(),
@@ -180,6 +206,8 @@ export default function CheckoutPage() {
                 voiceMemoUrl: audioDataUri,
                 translatedList: translatedList,
             };
+            delete orderData.items;
+            delete orderData.storeId;
         }
 
 
@@ -278,10 +306,27 @@ export default function CheckoutPage() {
                         <FormControl>
                           <Input placeholder="123 Green St, Springfield" {...field} />
                         </FormControl>
+                         <FormDescription>
+                            This is for reference. Delivery will be based on your captured GPS location.
+                         </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+                   <div className="space-y-2">
+                        <FormLabel>Delivery Location</FormLabel>
+                        <div className="flex items-center gap-4">
+                            <Button type="button" variant="outline" onClick={handleGetLocation} className="flex-1">
+                                <MapPin className="mr-2 h-4 w-4" /> Get Current Location
+                            </Button>
+                            {deliveryCoords && (
+                                <div className="flex items-center text-green-600">
+                                    <CheckCircle className="mr-2 h-5 w-5" />
+                                    <span>Location captured!</span>
+                                </div>
+                            )}
+                        </div>
+                   </div>
                    <FormField
                     control={form.control}
                     name="phone"

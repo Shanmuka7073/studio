@@ -181,6 +181,14 @@
         "deliveryAddress": {
           "type": "string",
           "description": "Delivery address for the order."
+        },
+        "deliveryLat": {
+            "type": "number",
+            "description": "The latitude of the delivery location."
+        },
+        "deliveryLng": {
+            "type": "number",
+            "description": "The longitude of the delivery location."
         }
       },
       "required": [
