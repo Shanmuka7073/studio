@@ -10,23 +10,65 @@ import { format, parseISO } from 'date-fns';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { useState, useEffect } from 'react';
 
 
 export default function MyOrdersPage() {
   const { user, isUserLoading, firestore } = useFirebase();
+  const [allOrders, setAllOrders] = useState<Order[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const ordersQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(
-        collection(firestore, 'orders'), 
-        where('userId', '==', user.uid),
-        orderBy('orderDate', 'desc')
-    );
-  }, [firestore, user]);
+  useEffect(() => {
+    if (!firestore || !user) {
+      if (!isUserLoading) {
+        setIsLoading(false);
+      }
+      return;
+    }
 
-  const { data: orders, isLoading: areOrdersLoading } = useCollection<Order>(ordersQuery);
- 
+    const fetchOrders = async () => {
+      setIsLoading(true);
+      try {
+        const regularOrdersQuery = query(
+          collection(firestore, 'orders'),
+          where('userId', '==', user.uid),
+          orderBy('orderDate', 'desc')
+        );
+        const voiceOrdersQuery = query(
+          collection(firestore, 'voice-orders'),
+          where('userId', '==', user.uid),
+          orderBy('orderDate', 'desc')
+        );
+
+        const [regularOrdersSnapshot, voiceOrdersSnapshot] = await Promise.all([
+            getDocs(regularOrdersQuery),
+            getDocs(voiceOrdersQuery)
+        ]);
+
+        const regularOrders = regularOrdersSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Order[];
+        const voiceOrders = voiceOrdersSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Order[];
+
+        const combinedOrders = [...regularOrders, ...voiceOrders].sort((a, b) => {
+            const dateA = a.orderDate as any;
+            const dateB = b.orderDate as any;
+            if (!dateA || !dateB) return 0;
+            const secondsA = dateA.seconds || new Date(dateA).getTime() / 1000;
+            const secondsB = dateB.seconds || new Date(dateB).getTime() / 1000;
+            return secondsB - secondsA;
+        });
+        
+        setAllOrders(combinedOrders);
+      } catch (error) {
+        console.error("Error fetching orders:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchOrders();
+  }, [firestore, user, isUserLoading]);
+
 
   const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
     switch (status) {
@@ -38,8 +80,7 @@ export default function MyOrdersPage() {
     }
   }
 
-  // The page is loading if the user state is loading OR if we are fetching orders.
-  const effectiveLoading = areOrdersLoading || isUserLoading;
+  const effectiveLoading = isLoading || isUserLoading;
 
   const formatDate = (date: any) => {
     if (!date) return 'N/A';
@@ -68,7 +109,7 @@ export default function MyOrdersPage() {
                     <Link href="/login">Login</Link>
                 </Button>
             </div>
-          ) : orders && orders.length === 0 ? (
+          ) : allOrders && allOrders.length === 0 ? (
             <div className="text-center py-12">
                 <p className="text-muted-foreground mb-4">You haven't placed any orders yet.</p>
                 <Button asChild>
@@ -77,43 +118,60 @@ export default function MyOrdersPage() {
             </div>
           ) : (
             <Accordion type="single" collapsible className="w-full">
-              {orders && orders.map((order) => (
+              {allOrders && allOrders.map((order) => (
                 <AccordionItem value={order.id} key={order.id}>
                   <AccordionTrigger>
                     <div className="flex justify-between w-full pr-4">
                         <div className="flex-1 text-left">
-                            <p className="font-medium">Order #{order.id.substring(0, 7)}</p>
+                            <p className="font-medium">Order #{order.id.substring(0, 7)}...</p>
                             <p className="text-sm text-muted-foreground">{formatDate(order.orderDate)}</p>
                         </div>
                         <div className="flex-1 text-center">
                             <Badge variant={getStatusVariant(order.status)}>{order.status}</Badge>
                         </div>
                         <div className="flex-1 text-right">
-                            <p className="font-medium">${order.totalAmount.toFixed(2)}</p>
+                             <p className="font-medium">${order.totalAmount.toFixed(2)}</p>
                         </div>
                     </div>
                   </AccordionTrigger>
                   <AccordionContent>
                     <div className="p-4 bg-muted/50 rounded-md">
-                        <h4 className="font-semibold mb-2">Order Items</h4>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Product</TableHead>
-                                    <TableHead>Quantity</TableHead>
-                                    <TableHead className="text-right">Price</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {order.items.map((item, index) => (
-                                    <TableRow key={index}>
-                                        <TableCell>{item.name}</TableCell>
-                                        <TableCell>{item.quantity}</TableCell>
-                                        <TableCell className="text-right">${item.price.toFixed(2)}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                        {order.items && order.items.length > 0 ? (
+                            <>
+                                <h4 className="font-semibold mb-2">Order Items</h4>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Product</TableHead>
+                                            <TableHead>Quantity</TableHead>
+                                            <TableHead className="text-right">Price</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {order.items.map((item, index) => (
+                                            <TableRow key={index}>
+                                                <TableCell>{item.name}</TableCell>
+                                                <TableCell>{item.quantity}</TableCell>
+                                                <TableCell className="text-right">${item.price.toFixed(2)}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </>
+                        ) : order.voiceMemoUrl ? (
+                             <div className="space-y-4">
+                                <h4 className="font-semibold">Voice Order</h4>
+                                <audio src={order.voiceMemoUrl} controls className="w-full" />
+                                {order.translatedList && (
+                                    <div>
+                                        <h5 className="font-semibold text-sm">Transcribed List:</h5>
+                                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{order.translatedList}</p>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <p>This order has no items listed.</p>
+                        )}
                         <div className="mt-4">
                             <h4 className="font-semibold">Delivery Address</h4>
                             <p className="text-sm text-muted-foreground">{order.deliveryAddress}</p>
