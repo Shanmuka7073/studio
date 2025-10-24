@@ -45,20 +45,20 @@ export default function MyOrdersPage() {
       
       const regularOrdersPromise = getDocs(regularOrdersQuery).catch(serverError => {
           const permissionError = new FirestorePermissionError({
-            path: 'orders',
+            path: collection(firestore, 'orders').path,
             operation: 'list',
           });
           errorEmitter.emit('permission-error', permissionError);
-          return { docs: [] };
+          throw permissionError;
       });
 
       const voiceOrdersPromise = getDocs(voiceOrdersQuery).catch(serverError => {
           const permissionError = new FirestorePermissionError({
-            path: 'voice-orders',
+            path: collection(firestore, 'voice-orders').path,
             operation: 'list',
           });
           errorEmitter.emit('permission-error', permissionError);
-          return { docs: [] };
+          throw permissionError;
       });
       
       try {
@@ -81,6 +81,7 @@ export default function MyOrdersPage() {
         
         setAllOrders(combinedOrders);
       } catch (error) {
+         // Errors are now thrown and will be caught by Next.js error boundary
          console.error("An unexpected error occurred while fetching orders:", error);
       } finally {
         setIsLoading(false);
