@@ -27,7 +27,7 @@ import { useToast } from '@/hooks/use-toast';
 import { revalidateStorePaths, revalidateProductPaths } from '@/app/actions';
 import type { Store, Product } from '@/lib/types';
 import { useFirebase, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, query, where, addDoc, writeBatch, doc } from 'firebase/firestore';
+import { collection, query, where, addDoc, writeBatch, doc, updateDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import {
   Table,
@@ -41,7 +41,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Checkbox } from '@/components/ui/checkbox';
 import groceryData from '@/lib/grocery-data.json';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Share2 } from 'lucide-react';
+import { Share2, MapPin } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const storeSchema = z.object({
   name: z.string().min(3, 'Store name must be at least 3 characters'),
@@ -49,8 +50,13 @@ const storeSchema = z.object({
     .string()
     .min(10, 'Description must be at least 10 characters'),
   address: z.string().min(10, 'Please enter a valid address'),
-  latitude: z.coerce.number().min(-90).max(90),
-  longitude: z.coerce.number().min(-180).max(180),
+  latitude: z.coerce.number().min(-90, "Invalid latitude").max(90, "Invalid latitude"),
+  longitude: z.coerce.number().min(-180, "Invalid longitude").max(180, "Invalid longitude"),
+});
+
+const locationSchema = z.object({
+    latitude: z.coerce.number().min(-90).max(90),
+    longitude: z.coerce.number().min(-180).max(180),
 });
 
 const productSchema = z.object({
@@ -62,6 +68,7 @@ const productSchema = z.object({
 
 type StoreFormValues = z.infer<typeof storeSchema>;
 type ProductFormValues = z.infer<typeof productSchema>;
+type LocationFormValues = z.infer<typeof locationSchema>;
 
 function ProductChecklist({ storeId, onProductsAdded }: { storeId: string; onProductsAdded: () => void }) {
   const { toast } = useToast();
@@ -91,7 +98,7 @@ function ProductChecklist({ storeId, onProductsAdded }: { storeId: string; onPro
        const batch = writeBatch(firestore);
         productNames.forEach(name => {
           const newProductRef = doc(collection(firestore, 'stores', storeId, 'products'));
-          const category = groceryData.categories.find(c => c.items && Array.isArray(c.items) && c.items.includes(name))?.categoryName || 'Miscellaneous';
+          const category = groceryData.categories.find(c => Array.isArray(c.items) && c.items.includes(name))?.categoryName || 'Miscellaneous';
           batch.set(newProductRef, {
             name,
             price: 0.99, // Default price
@@ -133,7 +140,7 @@ function ProductChecklist({ storeId, onProductsAdded }: { storeId: string; onPro
       <CardContent className="space-y-4">
         <Accordion type="multiple" className="w-full">
           {groceryData.categories.map((category) => {
-            const categoryItems = category.items && Array.isArray(category.items) ? category.items : [];
+             const categoryItems = category.items && Array.isArray(category.items) ? category.items : [];
             const selectedInCategory = categoryItems.filter(item => selectedProducts[item]).length;
 
             return (
@@ -362,6 +369,94 @@ function PromoteStore({ store }: { store: Store }) {
     );
 }
 
+function UpdateLocationForm({ store, onUpdate }: { store: Store, onUpdate: () => void }) {
+    const { firestore } = useFirebase();
+    const [isPending, startTransition] = useTransition();
+    const { toast } = useToast();
+
+    const form = useForm<LocationFormValues>({
+        resolver: zodResolver(locationSchema),
+        defaultValues: {
+            latitude: store.latitude || 0,
+            longitude: store.longitude || 0,
+        },
+    });
+
+    const handleGetLocation = () => {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    form.setValue('latitude', position.coords.latitude);
+                    form.setValue('longitude', position.coords.longitude);
+                    toast({ title: "Location Fetched!", description: "Your current location has been filled in." });
+                },
+                () => {
+                    toast({ variant: 'destructive', title: "Location Error", description: "Could not retrieve your location. Please enter it manually." });
+                }
+            );
+        } else {
+            toast({ variant: 'destructive', title: "Not Supported", description: "Geolocation is not supported by your browser." });
+        }
+    };
+    
+    const onSubmit = (data: LocationFormValues) => {
+        if (!firestore) return;
+        startTransition(async () => {
+            const storeRef = doc(firestore, 'stores', store.id);
+            try {
+                await updateDoc(storeRef, data);
+                toast({ title: "Store Location Updated!", description: "Your store's location has been saved." });
+                onUpdate();
+            } catch (error) {
+                const permissionError = new FirestorePermissionError({
+                    path: storeRef.path,
+                    operation: 'update',
+                    requestResourceData: data,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            }
+        });
+    };
+
+    return (
+        <Alert variant="destructive">
+            <AlertTitle>Action Required: Update Your Store's Location</AlertTitle>
+            <AlertDescription>
+                Your store is missing GPS coordinates. This is required for customers to find you and for delivery services to work. Please update it below.
+            </AlertDescription>
+            <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
+                    <div className="flex items-end gap-4">
+                        <div className="grid grid-cols-2 gap-4 flex-1">
+                            <FormField control={form.control} name="latitude" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Latitude</FormLabel>
+                                    <FormControl><Input type="number" {...field} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                            <FormField control={form.control} name="longitude" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Longitude</FormLabel>
+                                    <FormControl><Input type="number" {...field} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                        </div>
+                         <Button type="button" variant="outline" onClick={handleGetLocation}>
+                            <MapPin className="mr-2 h-4 w-4" /> Get Current Location
+                        </Button>
+                    </div>
+                     <Button type="submit" disabled={isPending}>
+                        {isPending ? "Saving..." : "Save Location"}
+                    </Button>
+                </form>
+            </Form>
+        </Alert>
+    );
+}
+
+
 function ManageStoreView({ store }: { store: Store }) {
     const { firestore } = useFirebase();
 
@@ -371,13 +466,16 @@ function ManageStoreView({ store }: { store: Store }) {
     }, [firestore, store.id]);
 
     const { data: products, isLoading } = useCollection<Product>(productsQuery);
+    
+    const needsLocationUpdate = !store.latitude || !store.longitude;
 
     return (
       <div className="space-y-8">
+        {needsLocationUpdate && <UpdateLocationForm store={store} onUpdate={revalidateStorePaths} />}
         <div className="grid md:grid-cols-2 gap-8">
             <Card>
                 <CardHeader>
-                    <CardTitle>Manage ${store.name}</CardTitle>
+                    <CardTitle>Manage {store.name}</CardTitle>
                     <CardDescription>
                         View your existing inventory below and add new products.
                     </CardDescription>
@@ -405,9 +503,9 @@ function ManageStoreView({ store }: { store: Store }) {
                         <TableBody>
                             {products.map(product => (
                                 <TableRow key={product.id}>
-                                    <TableCell>${product.name}</TableCell>
+                                    <TableCell>{product.name}</TableCell>
                                     <TableCell>${product.price.toFixed(2)}</TableCell>
-                                    <TableCell>${product.category}</TableCell>
+                                    <TableCell>{product.category}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
@@ -447,12 +545,38 @@ function CreateStoreForm({ user }) {
     setSelectedProducts(prev => ({...prev, [productName]: isChecked}));
   }
 
+  const handleGetLocation = () => {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                form.setValue('latitude', position.coords.latitude);
+                form.setValue('longitude', position.coords.longitude);
+                toast({ title: "Location Fetched!", description: "Your current location has been filled in." });
+            },
+            () => {
+                 toast({ variant: 'destructive', title: "Location Error", description: "Could not retrieve your location. Please enable permissions and try again." });
+            }
+        );
+    } else {
+        toast({ variant: 'destructive', title: "Not Supported", description: "Geolocation is not supported by your browser." });
+    }
+  };
+
+
   const onSubmit = (data: StoreFormValues) => {
     if (!user || !firestore) {
         toast({
             variant: 'destructive',
             title: 'Authentication Error',
             description: 'You must be logged in to create a store.',
+        });
+        return;
+    }
+     if (data.latitude === 0 || data.longitude === 0) {
+        toast({
+            variant: 'destructive',
+            title: 'Location Required',
+            description: 'Please provide your store\'s location using the GPS button or by entering it manually.',
         });
         return;
     }
@@ -475,7 +599,7 @@ function CreateStoreForm({ user }) {
                 const batch = writeBatch(firestore);
                 productNames.forEach(name => {
                     const newProductRef = doc(collection(firestore, 'stores', storeRef.id, 'products'));
-                    const category = groceryData.categories.find(c => c.items && Array.isArray(c.items) && c.items.includes(name))?.categoryName || 'Miscellaneous';
+                    const category = groceryData.categories.find(c => Array.isArray(c.items) && c.items.includes(name))?.categoryName || 'Miscellaneous';
                     batch.set(newProductRef, {
                     name,
                     price: 0.99,
@@ -496,9 +620,9 @@ function CreateStoreForm({ user }) {
         } catch (serverError) {
             console.error("Failed to create store or products:", serverError);
             const permissionError = new FirestorePermissionError({
-                path: 'stores or subcollections',
+                path: 'stores',
                 operation: 'create',
-                requestResourceData: data,
+                requestResourceData: storeData,
             });
             errorEmitter.emit('permission-error', permissionError);
         }
@@ -566,41 +690,29 @@ function CreateStoreForm({ user }) {
                   </FormItem>
                 )}
               />
-               <div className="grid grid-cols-2 gap-4">
-                 <FormField
-                    control={form.control}
-                    name="latitude"
-                    render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Latitude</FormLabel>
-                        <FormControl>
-                        <Input
-                            type="number"
-                            placeholder="e.g., 19.0760"
-                            {...field}
-                        />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="longitude"
-                    render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Longitude</FormLabel>
-                        <FormControl>
-                        <Input
-                            type="number"
-                            placeholder="e.g., 72.8777"
-                            {...field}
-                        />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                    )}
-                />
+               <div className="space-y-2">
+                    <FormLabel>Store Location (GPS)</FormLabel>
+                    <div className="flex items-end gap-4">
+                        <div className="grid grid-cols-2 gap-4 flex-1">
+                            <FormField control={form.control} name="latitude" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="text-xs text-muted-foreground">Latitude</FormLabel>
+                                    <FormControl><Input type="number" placeholder="e.g., 19.0760" {...field} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                            <FormField control={form.control} name="longitude" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="text-xs text-muted-foreground">Longitude</FormLabel>
+                                    <FormControl><Input type="number" placeholder="e.g., 72.8777" {...field} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                        </div>
+                        <Button type="button" variant="outline" onClick={handleGetLocation}>
+                            <MapPin className="mr-2 h-4 w-4" /> Get Current Location
+                        </Button>
+                    </div>
                </div>
 
               <div className="space-y-4">
@@ -676,9 +788,6 @@ export default function MyStorePage() {
   if (isUserLoading || isStoreLoading) {
     return <div className="container mx-auto py-12 px-4 md:px-6">Loading your store...</div>
   }
-
-  // After loading, if user is authenticated but has no store, they can create one.
-  // The query will return empty, and `myStore` will be undefined.
   
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
@@ -694,5 +803,3 @@ export default function MyStorePage() {
     </div>
   );
 }
-
-    
