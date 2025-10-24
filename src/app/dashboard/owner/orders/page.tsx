@@ -118,8 +118,12 @@ export default function OrdersDashboardPage() {
 
   // 3. Fetch all order types when store is available
   useEffect(() => {
+    // Only proceed if we have a firestore instance and the user's store is loaded and exists.
     if (!firestore || !myStore) {
-        if (!isUserLoading && !isStoreLoading) setIsLoading(false);
+        // If we're done loading and there's no store, stop loading and show the appropriate UI.
+        if (!isUserLoading && !isStoreLoading) {
+            setIsLoading(false);
+        }
         return;
     };
 
@@ -147,7 +151,10 @@ export default function OrdersDashboardPage() {
             const combinedOrders = [...regularOrders, ...voiceOrders].sort((a, b) => {
                 const dateA = a.orderDate as any;
                 const dateB = b.orderDate as any;
-                return (dateB.seconds || dateB) - (dateA.seconds || dateA);
+                if (!dateA || !dateB) return 0;
+                const secondsA = dateA.seconds || new Date(dateA).getTime() / 1000;
+                const secondsB = dateB.seconds || new Date(dateB).getTime() / 1000;
+                return secondsB - secondsA;
             });
             
             setAllOrders(combinedOrders);
@@ -178,7 +185,12 @@ export default function OrdersDashboardPage() {
     if (date.seconds) {
       return format(new Date(date.seconds * 1000), 'PPP');
     }
-    return format(parseISO(date as string), 'PPP');
+    // Attempt to parse if it's a string, otherwise it might be a Date object already
+    try {
+        return format(parseISO(date as string), 'PPP');
+    } catch {
+        return format(date, 'PPP');
+    }
   }
 
   const finalLoading = isLoading || isUserLoading || isStoreLoading;
