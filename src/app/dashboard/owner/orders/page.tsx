@@ -145,18 +145,22 @@ export default function OrdersDashboardPage() {
   const myStore = stores?.[0];
 
   const fetchOrders = async () => {
-    if (!firestore || !myStore) return;
+    if (!firestore) return;
     
     setIsLoading(true);
     try {
-        const regularOrdersQuery = query(
-            collection(firestore, 'orders'), 
-            where('storeId', '==', myStore.id),
-            orderBy('orderDate', 'desc')
-        );
-        const regularOrdersSnapshot = await getDocs(regularOrdersQuery);
-        const regularOrders = regularOrdersSnapshot.docs.map(doc => ({...doc.data(), id: doc.id})) as Order[];
+        let regularOrders: Order[] = [];
+        if (myStore) {
+            const regularOrdersQuery = query(
+                collection(firestore, 'orders'), 
+                where('storeId', '==', myStore.id),
+                orderBy('orderDate', 'desc')
+            );
+            const regularOrdersSnapshot = await getDocs(regularOrdersQuery);
+            regularOrders = regularOrdersSnapshot.docs.map(doc => ({...doc.data(), id: doc.id})) as Order[];
+        }
 
+        // Fetch all pending voice orders, as they are not assigned to a store yet.
         const voiceOrdersQuery = query(
             collection(firestore, 'voice-orders'),
             where('status', '==', 'Pending') 
@@ -193,7 +197,14 @@ export default function OrdersDashboardPage() {
     const orderDocRef = doc(firestore, collectionName, orderId);
     
     try {
-        await updateDoc(orderDocRef, { status: newStatus });
+        // When a store owner processes a voice order, assign their store ID to it.
+        const updatePayload: { status: Order['status'], storeId?: string } = { status: newStatus };
+        if (collectionName === 'voice-orders' && myStore) {
+            updatePayload.storeId = myStore.id;
+        }
+
+        await updateDoc(orderDocRef, updatePayload);
+
         toast({
             title: "Status Updated",
             description: `Order ${orderId.substring(0,7)} marked as ${newStatus}.`,
@@ -246,11 +257,11 @@ export default function OrdersDashboardPage() {
         <CardContent>
           {finalLoading ? (
             <p>Loading orders...</p>
-          ) : !myStore ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground mb-4">You need to create a store to see your orders.</p>
+          ) : !user ? (
+             <div className="text-center py-12">
+              <p className="text-muted-foreground mb-4">Please log in to manage orders.</p>
               <Button asChild>
-                <Link href="/dashboard/owner/my-store">Create Store</Link>
+                <Link href="/login?redirectTo=/dashboard/owner/orders">Login</Link>
               </Button>
             </div>
           ) : allOrders.length === 0 ? (
