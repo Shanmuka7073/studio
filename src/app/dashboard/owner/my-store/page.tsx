@@ -649,7 +649,7 @@ export default function MyStorePage() {
 
   useEffect(() => {
     if (!isUserLoading && !user) {
-      router.push('/login?redirectTo=/dashboard/my-store');
+      router.push('/login?redirectTo=/dashboard/owner/my-store');
     }
   }, [isUserLoading, user, router]);
 

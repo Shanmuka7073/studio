@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Package2, Menu, UserCircle, Store, ShoppingBag, Truck, Mic } from 'lucide-react';
+import { Package2, Menu, UserCircle, Store, ShoppingBag, Truck, Mic, LayoutDashboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -23,10 +23,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu';
 import { getAuth, signOut } from 'firebase/auth';
-import { useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const navLinks = [
@@ -34,17 +32,11 @@ const navLinks = [
   { href: '/stores', label: 'Stores' },
 ];
 
-const customerLinks = [
-    { href: '/dashboard/my-orders', label: 'My Orders', icon: ShoppingBag},
-]
-
-const ownerLinks = [
-    { href: '/dashboard/my-store', label: 'My Store', icon: Store },
-    { href: '/dashboard/orders', label: 'Store Orders', icon: ShoppingBag },
-]
-
-const deliveryLinks = [
-    { href: '/dashboard/deliveries', label: 'Deliveries', icon: Truck },
+const dashboardLinks = [
+    { href: '/dashboard/customer/my-orders', label: 'My Orders', icon: ShoppingBag},
+    { href: '/dashboard/owner/my-store', label: 'My Store', icon: Store },
+    { href: '/dashboard/owner/orders', label: 'Store Orders', icon: ShoppingBag },
+    { href: '/dashboard/delivery/deliveries', label: 'Deliveries', icon: Truck },
 ]
 
 function AssistantToggle() {
@@ -66,7 +58,6 @@ function AssistantToggle() {
 
 function UserMenu() {
   const { user, isUserLoading } = useFirebase();
-  const [isOwnerView, setIsOwnerView] = useState(false);
 
   const handleLogout = async () => {
     const auth = getAuth();
@@ -85,8 +76,6 @@ function UserMenu() {
     );
   }
 
-  const visibleDashboardLinks = isOwnerView ? [...ownerLinks, ...deliveryLinks] : customerLinks;
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -99,15 +88,15 @@ function UserMenu() {
         <DropdownMenuLabel>My Account</DropdownMenuLabel>
         <DropdownMenuItem disabled>{user.email}</DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuCheckboxItem
-            checked={isOwnerView}
-            onCheckedChange={setIsOwnerView}
-        >
-            Store Owner/Partner View
-        </DropdownMenuCheckboxItem>
+        <Link href="/dashboard" passHref>
+          <DropdownMenuItem>
+              <LayoutDashboard className="mr-2 h-4 w-4" />
+              <span>Dashboard</span>
+          </DropdownMenuItem>
+        </Link>
         <DropdownMenuSeparator />
-        <DropdownMenuLabel>Dashboard</DropdownMenuLabel>
-        {visibleDashboardLinks.map(({ href, label, icon: Icon }) => (
+        <DropdownMenuLabel>Roles</DropdownMenuLabel>
+        {dashboardLinks.map(({ href, label, icon: Icon }) => (
              <Link key={href} href={href} passHref>
                 <DropdownMenuItem>
                     <Icon className="mr-2 h-4 w-4" />
@@ -185,9 +174,9 @@ export function Header() {
                 ))}
             </nav>
             <div className="border-t pt-4">
-                <p className="px-3 text-sm font-medium text-muted-foreground mb-2">Pulpito</p>
+                <p className="px-3 text-sm font-medium text-muted-foreground mb-2">Dashboard</p>
                 <div className="grid gap-2">
-                    {[...customerLinks, ...ownerLinks, ...deliveryLinks].map(({ href, label, icon: Icon }) => (
+                    {dashboardLinks.map(({ href, label, icon: Icon }) => (
                     <SheetClose asChild key={href}>
                         <Link
                             href={href}

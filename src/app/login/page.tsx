@@ -1,3 +1,4 @@
+
 'use client';
 import {
   Card,
@@ -57,7 +58,7 @@ export default function LoginPage() {
           form.reset();
         } else {
           initiateEmailSignIn(auth, data.email, data.password);
-          const redirectTo = searchParams.get('redirectTo') || '/';
+          const redirectTo = searchParams.get('redirectTo') || '/dashboard';
           router.push(redirectTo);
         }
       } catch (err: any) {
@@ -76,7 +77,7 @@ export default function LoginPage() {
           <CardDescription>
             {isSignUp
               ? 'Enter your details to get started.'
-              : 'Sign in to manage your store.'}
+              : 'Sign in to access your dashboard.'}
           </CardDescription>
         </CardHeader>
         <CardContent>

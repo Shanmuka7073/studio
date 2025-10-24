@@ -117,10 +117,10 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
           if (page.includes('home')) path = '/';
           else if (page.includes('stores')) path = '/stores';
           else if (page.includes('cart') || page.includes('shopping cart')) path = '/cart';
-          else if (page.includes('my orders')) path = '/dashboard/my-orders';
-          else if (page.includes('my store')) path = '/dashboard/my-store';
-          else if (page.includes('store orders')) path = '/dashboard/orders';
-          else if (page.includes('deliveries')) path = '/dashboard/deliveries';
+          else if (page.includes('my orders')) path = '/dashboard/customer/my-orders';
+          else if (page.includes('my store')) path = '/dashboard/owner/my-store';
+          else if (page.includes('store orders')) path = '/dashboard/owner/orders';
+          else if (page.includes('deliveries')) path = '/dashboard/delivery/deliveries';
           else {
             await speak(`Sorry, I don't know how to navigate to ${page}.`);
             break;
@@ -324,4 +324,3 @@ export function useAssistant() {
   }
   return context;
 }
-    

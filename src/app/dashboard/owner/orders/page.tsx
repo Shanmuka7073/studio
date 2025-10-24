@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useFirebase } from '@/firebase';
@@ -150,7 +151,7 @@ export default function OrdersDashboardPage() {
             <div className="text-center py-12">
               <p className="text-muted-foreground mb-4">You need to create a store to see your orders.</p>
               <Button asChild>
-                <Link href="/dashboard/my-store">Create Store</Link>
+                <Link href="/dashboard/owner/my-store">Create Store</Link>
               </Button>
             </div>
           ) : orders && orders.length === 0 ? (
