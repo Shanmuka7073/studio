@@ -3,7 +3,7 @@
 
 import { useFirebase } from '@/firebase';
 import { Order, Store } from '@/lib/types';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +11,7 @@ import { format, parseISO } from 'date-fns';
 import { useCollection, useMemoFirebase } from '@/firebase';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -96,6 +96,8 @@ function OrderDetailsDialog({ order, isOpen, onClose }: { order: Order | null; i
 export default function OrdersDashboardPage() {
   const { firestore, user, isUserLoading } = useFirebase();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [allOrders, setAllOrders] = useState<Order[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // 1. Get the current user's store
   const storeQuery = useMemoFirebase(() => {
@@ -105,16 +107,52 @@ export default function OrdersDashboardPage() {
   const { data: stores, isLoading: isStoreLoading } = useCollection<Store>(storeQuery);
   const myStore = stores?.[0];
 
-  // 2. Get orders for that store using a client-side listener
-  const ordersQuery = useMemoFirebase(() => {
-    if (!firestore || !myStore) return null;
-    return query(
-        collection(firestore, 'orders'), 
-        where('storeId', '==', myStore.id),
-        orderBy('orderDate', 'desc')
-    );
-  }, [firestore, myStore]);
-  const { data: orders, isLoading: areOrdersLoading } = useCollection<Order>(ordersQuery);
+  // 2. Fetch all order types when store is available
+  useEffect(() => {
+    if (!firestore || !myStore) {
+        if (!isUserLoading && !isStoreLoading) setIsLoading(false);
+        return;
+    };
+
+    const fetchOrders = async () => {
+        setIsLoading(true);
+        try {
+            // Fetch regular orders for this store
+            const regularOrdersQuery = query(
+                collection(firestore, 'orders'), 
+                where('storeId', '==', myStore.id),
+                orderBy('orderDate', 'desc')
+            );
+            const regularOrdersSnapshot = await getDocs(regularOrdersQuery);
+            const regularOrders = regularOrdersSnapshot.docs.map(doc => ({...doc.data(), id: doc.id})) as Order[];
+
+            // Fetch unassigned voice orders
+            const voiceOrdersQuery = query(
+                collection(firestore, 'voice-orders'),
+                where('status', '==', 'Pending') // Assuming owners can claim pending voice orders
+            );
+            const voiceOrdersSnapshot = await getDocs(voiceOrdersQuery);
+            const voiceOrders = voiceOrdersSnapshot.docs.map(doc => ({...doc.data(), id: doc.id})) as Order[];
+            
+            // Combine and sort
+            const combinedOrders = [...regularOrders, ...voiceOrders].sort((a, b) => {
+                const dateA = a.orderDate as any;
+                const dateB = b.orderDate as any;
+                return (dateB.seconds || dateB) - (dateA.seconds || dateA);
+            });
+            
+            setAllOrders(combinedOrders);
+        } catch (error) {
+            console.error("Failed to fetch orders:", error);
+            // Proper error handling can be added here
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
+    fetchOrders();
+
+  }, [firestore, myStore, isUserLoading, isStoreLoading]);
 
 
   const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
@@ -134,7 +172,7 @@ export default function OrdersDashboardPage() {
     return format(parseISO(date as string), 'PPP');
   }
 
-  const isLoading = isUserLoading || isStoreLoading || (myStore && areOrdersLoading);
+  const finalLoading = isLoading || isUserLoading || isStoreLoading;
 
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
@@ -143,9 +181,10 @@ export default function OrdersDashboardPage() {
       <Card>
         <CardHeader>
           <CardTitle>{myStore ? `Incoming Orders for ${myStore.name}` : 'Your Orders'}</CardTitle>
+          <CardDescription>A combined view of orders from your store and available voice orders.</CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {finalLoading ? (
             <p>Loading orders...</p>
           ) : !myStore ? (
             <div className="text-center py-12">
@@ -154,13 +193,14 @@ export default function OrdersDashboardPage() {
                 <Link href="/dashboard/owner/my-store">Create Store</Link>
               </Button>
             </div>
-          ) : orders && orders.length === 0 ? (
-            <p className="text-muted-foreground">No orders found.</p>
+          ) : allOrders.length === 0 ? (
+            <p className="text-muted-foreground">No new orders found.</p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Order ID</TableHead>
+                   <TableHead>Type</TableHead>
                   <TableHead>Customer</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Status</TableHead>
@@ -169,9 +209,16 @@ export default function OrdersDashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {orders && orders.map((order) => (
+                {allOrders.map((order) => (
                   <TableRow key={order.id}>
                     <TableCell className="font-medium truncate max-w-[100px]">{order.id}</TableCell>
+                     <TableCell>
+                      {order.voiceMemoUrl ? (
+                        <Badge variant="outline">Voice</Badge>
+                      ) : (
+                        <Badge variant="secondary">Cart</Badge>
+                      )}
+                    </TableCell>
                     <TableCell>{order.customerName}</TableCell>
                     <TableCell>{formatDate(order.orderDate)}</TableCell>
                     <TableCell>
