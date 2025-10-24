@@ -3,7 +3,7 @@
 
 import { useFirebase } from '@/firebase';
 import { Order, Store } from '@/lib/types';
-import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,10 +11,12 @@ import { format, parseISO } from 'date-fns';
 import { useCollection, useMemoFirebase } from '@/firebase';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useTransition } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useRouter } from 'next/navigation';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
 
 
 function OrderDetailsDialog({ order, isOpen, onClose }: { order: Order | null; isOpen: boolean; onClose: () => void }) {
@@ -93,6 +95,31 @@ function OrderDetailsDialog({ order, isOpen, onClose }: { order: Order | null; i
     );
 }
 
+function StatusManager({ order, onStatusChange }: { order: Order; onStatusChange: (orderId: string, collection: 'orders' | 'voice-orders', newStatus: Order['status']) => void; }) {
+    const [isUpdating, startTransition] = useTransition();
+
+    const handleStatusChange = (newStatus: Order['status']) => {
+        startTransition(() => {
+            const collectionName = order.voiceMemoUrl ? 'voice-orders' : 'orders';
+            onStatusChange(order.id, collectionName, newStatus);
+        });
+    }
+
+    return (
+        <Select onValueChange={handleStatusChange} defaultValue={order.status} disabled={isUpdating}>
+            <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Update status" />
+            </SelectTrigger>
+            <SelectContent>
+                <SelectItem value="Pending">Pending</SelectItem>
+                <SelectItem value="Processing">Processing</SelectItem>
+                <SelectItem value="Out for Delivery">Out for Delivery</SelectItem>
+                <SelectItem value="Delivered">Delivered</SelectItem>
+            </SelectContent>
+        </Select>
+    )
+}
+
 
 export default function OrdersDashboardPage() {
   const { firestore, user, isUserLoading } = useFirebase();
@@ -100,6 +127,7 @@ export default function OrdersDashboardPage() {
   const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const { toast } = useToast();
 
   // 1. Redirect if user is not logged in
   useEffect(() => {
@@ -116,59 +144,71 @@ export default function OrdersDashboardPage() {
   const { data: stores, isLoading: isStoreLoading } = useCollection<Store>(storeQuery);
   const myStore = stores?.[0];
 
-  // 3. Fetch all order types when store is available
-  useEffect(() => {
-    // Only proceed if we have a firestore instance and the user's store is loaded and exists.
-    if (!firestore || !myStore) {
-        // If we're done loading and there's no store, stop loading and show the appropriate UI.
-        if (!isUserLoading && !isStoreLoading) {
-            setIsLoading(false);
-        }
-        return;
-    };
-
-    const fetchOrders = async () => {
-        setIsLoading(true);
-        try {
-            // Fetch regular orders for this store
-            const regularOrdersQuery = query(
-                collection(firestore, 'orders'), 
-                where('storeId', '==', myStore.id),
-                orderBy('orderDate', 'desc')
-            );
-            const regularOrdersSnapshot = await getDocs(regularOrdersQuery);
-            const regularOrders = regularOrdersSnapshot.docs.map(doc => ({...doc.data(), id: doc.id})) as Order[];
-
-            // Fetch unassigned voice orders
-            const voiceOrdersQuery = query(
-                collection(firestore, 'voice-orders'),
-                where('status', '==', 'Pending') // Assuming owners can claim pending voice orders
-            );
-            const voiceOrdersSnapshot = await getDocs(voiceOrdersQuery);
-            const voiceOrders = voiceOrdersSnapshot.docs.map(doc => ({...doc.data(), id: doc.id})) as Order[];
-            
-            // Combine and sort
-            const combinedOrders = [...regularOrders, ...voiceOrders].sort((a, b) => {
-                const dateA = a.orderDate as any;
-                const dateB = b.orderDate as any;
-                if (!dateA || !dateB) return 0;
-                const secondsA = dateA.seconds || new Date(dateA).getTime() / 1000;
-                const secondsB = dateB.seconds || new Date(dateB).getTime() / 1000;
-                return secondsB - secondsA;
-            });
-            
-            setAllOrders(combinedOrders);
-        } catch (error) {
-            console.error("Failed to fetch orders:", error);
-            // Proper error handling can be added here
-        } finally {
-            setIsLoading(false);
-        }
-    };
+  const fetchOrders = async () => {
+    if (!firestore || !myStore) return;
     
-    fetchOrders();
+    setIsLoading(true);
+    try {
+        const regularOrdersQuery = query(
+            collection(firestore, 'orders'), 
+            where('storeId', '==', myStore.id),
+            orderBy('orderDate', 'desc')
+        );
+        const regularOrdersSnapshot = await getDocs(regularOrdersQuery);
+        const regularOrders = regularOrdersSnapshot.docs.map(doc => ({...doc.data(), id: doc.id})) as Order[];
 
+        const voiceOrdersQuery = query(
+            collection(firestore, 'voice-orders'),
+            where('status', '==', 'Pending') 
+        );
+        const voiceOrdersSnapshot = await getDocs(voiceOrdersQuery);
+        const voiceOrders = voiceOrdersSnapshot.docs.map(doc => ({...doc.data(), id: doc.id})) as Order[];
+        
+        const combinedOrders = [...regularOrders, ...voiceOrders].sort((a, b) => {
+            const dateA = a.orderDate as any;
+            const dateB = b.orderDate as any;
+            if (!dateA || !dateB) return 0;
+            const secondsA = dateA.seconds || new Date(dateA).getTime() / 1000;
+            const secondsB = dateB.seconds || new Date(dateB).getTime() / 1000;
+            return secondsB - secondsA;
+        });
+        
+        setAllOrders(combinedOrders);
+    } catch (error) {
+        console.error("Failed to fetch orders:", error);
+    } finally {
+        setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isUserLoading && !isStoreLoading) {
+        fetchOrders();
+    }
   }, [firestore, myStore, isUserLoading, isStoreLoading]);
+
+  const handleStatusChange = async (orderId: string, collectionName: 'orders' | 'voice-orders', newStatus: Order['status']) => {
+    if (!firestore) return;
+    
+    const orderDocRef = doc(firestore, collectionName, orderId);
+    
+    try {
+        await updateDoc(orderDocRef, { status: newStatus });
+        toast({
+            title: "Status Updated",
+            description: `Order ${orderId.substring(0,7)} marked as ${newStatus}.`,
+        });
+        // Refetch orders to update the list
+        fetchOrders();
+    } catch (error) {
+        console.error("Failed to update status:", error);
+        toast({
+            variant: "destructive",
+            title: "Update Failed",
+            description: "Could not update the order status.",
+        });
+    }
+  };
 
 
   const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
@@ -185,7 +225,6 @@ export default function OrdersDashboardPage() {
     if (date.seconds) {
       return format(new Date(date.seconds * 1000), 'PPP');
     }
-    // Attempt to parse if it's a string, otherwise it might be a Date object already
     try {
         return format(parseISO(date as string), 'PPP');
     } catch {
@@ -226,7 +265,7 @@ export default function OrdersDashboardPage() {
                   <TableHead>Date</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -243,7 +282,7 @@ export default function OrdersDashboardPage() {
                     <TableCell>{order.customerName}</TableCell>
                     <TableCell>{formatDate(order.orderDate)}</TableCell>
                     <TableCell>
-                      <Badge variant={getStatusVariant(order.status)}>{order.status}</Badge>
+                      <StatusManager order={order} onStatusChange={handleStatusChange} />
                     </TableCell>
                     <TableCell className="text-right">${order.totalAmount.toFixed(2)}</TableCell>
                     <TableCell className="text-right">

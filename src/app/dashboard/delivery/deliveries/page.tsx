@@ -12,13 +12,15 @@ import { collection, query, where } from 'firebase/firestore';
 export default function DeliveriesPage() {
   const { firestore } = useFirebase();
 
-  // This query now targets the 'voice-orders' collection, which is more secure and specific.
-  // This prevents trying to read all documents from the main 'orders' collection.
+  // This query now targets orders that are ready for delivery.
   const deliveriesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return collection(firestore, 'voice-orders');
+    return query(
+        collection(firestore, 'orders'),
+        where('status', '==', 'Out for Delivery')
+    );
   }, [firestore]);
-
+  
   const { data: deliveries, isLoading } = useCollection<Order>(deliveriesQuery);
 
   const openInGoogleMaps = (address: string) => {
@@ -28,16 +30,16 @@ export default function DeliveriesPage() {
 
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
-      <h1 className="text-4xl font-bold mb-8 font-headline">Voice Memo Deliveries</h1>
+      <h1 className="text-4xl font-bold mb-8 font-headline">Available Deliveries</h1>
       <Card>
         <CardHeader>
-          <CardTitle>New Voice Orders to Fulfill</CardTitle>
+          <CardTitle>Orders Ready for Pickup</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <p>Loading deliveries...</p>
           ) : !deliveries || deliveries.length === 0 ? (
-            <p className="text-muted-foreground">No new voice orders are currently available for delivery.</p>
+            <p className="text-muted-foreground">No orders are currently out for delivery.</p>
           ) : (
             <Table>
               <TableHeader>
