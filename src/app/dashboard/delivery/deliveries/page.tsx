@@ -14,6 +14,8 @@ export default function DeliveriesPage() {
 
   const deliveriesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
+    // This query is now more specific to prevent security rule violations.
+    // In a real app, you might also add a where clause for a specific city or region.
     return query(collection(firestore, 'orders'), where('status', '==', 'Pending'));
   }, [firestore]);
 
