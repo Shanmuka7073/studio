@@ -32,7 +32,6 @@ const checkoutSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   address: z.string().min(10, 'Please enter a valid address'),
   phone: z.string().min(10, 'Please enter a valid phone number'),
-  email: z.string().email('Please enter a valid email address'),
 });
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
@@ -128,7 +127,6 @@ export default function CheckoutPage() {
       name: '',
       address: '',
       phone: '',
-      email: '',
     },
   });
 
@@ -156,7 +154,7 @@ export default function CheckoutPage() {
             customerName: data.name,
             deliveryAddress: data.address,
             phone: data.phone,
-            email: data.email,
+            email: user.email,
             orderDate: serverTimestamp(),
             totalAmount: cartTotal,
             status: 'Pending' as 'Pending',
@@ -298,19 +296,6 @@ export default function CheckoutPage() {
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email Address</FormLabel>
-                        <FormControl>
-                          <Input placeholder="john.doe@example.com" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                   <Button type="submit" disabled={isPlacingOrder} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
                     {isPlacingOrder ? 'Placing Order...' : 'Place Order'}
                   </Button>
@@ -399,3 +384,5 @@ export default function CheckoutPage() {
     </div>
   );
 }
+
+    
