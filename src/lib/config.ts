@@ -3,4 +3,4 @@
 // likely using Firebase Auth custom claims.
 // To find your UID, you can log into the app and check the browser console.
 // The useFirebase hook logs the user object which contains the UID.
-export const ADMIN_USER_ID = 'SET_YOUR_ADMIN_UID_HERE';
+export const ADMIN_USER_ID = 'PASTE_YOUR_UID_HERE';
