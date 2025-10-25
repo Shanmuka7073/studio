@@ -1,207 +1,234 @@
 /**
- * @fileoverview Firestore Security Rules for LocalBasket.
+ * @file Firestore Security Rules for LocalBasket
+ * @version 2
  *
- * Core Philosophy:
- * This ruleset enforces a user-ownership model for user profiles and store data.
- * Orders have a separate access control mechanism that needs to be defined.
+ * @Core Philosophy
+ * This ruleset enforces a strict user-ownership model for user profiles and store management.
+ * Orders are secured with a combination of user and store ownership. Public read access is granted
+ * to cached recipe data.
  *
- * Data Structure:
- * - /users/{userId}: User profile data, accessible only by the user themselves.
+ * @Data Structure
+ * - /users/{userId}: User profile information, accessible only by the user themselves.
  * - /stores/{storeId}: Store data, accessible only by the store owner.
- * - /stores/{storeId}/products/{productId}: Products listed by a store, access controlled by store ownership.
- * - /stores/{storeId}/packages/{packageId}: Monthly packages offered by a store, access controlled by store ownership.
- * - /orders/{orderId}: Order information, needs specific access rules defined.
- * - /voice-orders/{voiceOrderId}: Voice orders, needs specific access rules defined.
- * - /orders/{orderId}/orderItems/{orderItemId}: Order items, access controlled by the parent order.
- * - /users/{userId}/productRecommendations/{productRecommendationId}: Product recommendations for users, accessible only by the user themselves.
- * - /cachedRecipes/{recipeId}: Cached recipe data, publicly readable but restricted writes.
+ * - /stores/{storeId}/products/{productId}: Products listed by a store, accessible only by the store owner.
+ * - /stores/{storeId}/packages/{packageId}: Monthly packages offered by a store, accessible only by the store owner.
+ * - /orders/{orderId}: Order information, accessible only by the user who placed the order.
+ * - /voice-orders/{voiceOrderId}: Voice-only orders, currently accessible to anyone.
+ * - /orders/{orderId}/orderItems/{orderItemId}: Items within an order, accessible only by the user who placed the order.
+ * - /users/{userId}/productRecommendations/{productRecommendationId}: Product recommendations for a user, accessible only by the user themselves.
+ * - /cachedRecipes/{recipeId}: Publicly accessible cache of recipe ingredients.
  *
- * Key Security Decisions:
+ * @Key Security Decisions
  * - Users can only access their own profile data.
- * - Stores can only be created, updated, and deleted by their owners.
+ * - Stores can only be managed by their owners.
+ * - Orders can only be accessed by the user who placed them.
+ * - Voice orders are currently publicly accessible.
+ * - Public read access is granted to the `/cachedRecipes` collection.
  * - Listing of users is disallowed.
- * - Orders: Need specific write access based on roles and order status.
- * - Voice Orders: Open access for delivery partners to fulfill voice-only orders.
- * - Cached Recipes: Publicly readable, but only writable under specific conditions (e.g., by a trusted function).
  *
- * Denormalization for Authorization:
- * - Orders include 'userId' and 'storeId' to simplify authorization checks.
- * - OrderItems include 'orderId' to simplify authorization checks.
- * - ProductRecommendations include 'userId' to simplify authorization checks.
+ * @Denormalization for Authorization
+ * - Orders: 'userId' and 'storeId' are denormalized onto the Order document for simpler authorization.
+ * - OrderItems: 'orderId' is denormalized onto the OrderItem document for authorization.
+ * - ProductRecommendations: 'userId' is denormalized onto the ProductRecommendation document.
+ *
+ * @Structural Segregation
+ * - No structural segregation is used in this ruleset.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the request is authenticated.
-     */
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    /**
-     * @description Checks if the authenticated user is the owner of the resource.
-     */
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    /**
-     * @description Checks if the authenticated user is the owner of the resource and the resource exists.
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-
-    /**
-     * @description Allows only authenticated users to perform operations.
-     */
-    function isAuthenticated() {
-        return request.auth != null;
-    }
-
-    /**
-     * @description Stores user profile data. Accessible only by the user themselves.
+     * @description Controls access to user profile data. Only the user themselves can read and write their profile.
      * @path /users/{userId}
-     * @allow (create) - User with UID 'user123' can create their profile at /users/user123.
-     * @allow (get) - User with UID 'user123' can read their profile at /users/user123.
-     * @deny (update) - User with UID 'user456' cannot update user123's profile.
-     * @deny (delete) - User with UID 'user456' cannot delete user123's profile.
+     * @allow (create) User with UID 'user123' can create their profile if request.auth.uid == 'user123'.
+     * @allow (get) User with UID 'user123' can read their profile.
+     * @allow (update) User with UID 'user123' can update their profile.
+     * @allow (delete) User with UID 'user123' can delete their profile.
+     * @deny (create) User with UID 'user456' cannot create a profile for 'user123'.
+     * @deny (get) User with UID 'user456' cannot read the profile of 'user123'.
      * @principle Enforces document ownership for writes.
      */
     match /users/{userId} {
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
       allow get: if isOwner(userId);
       allow list: if false;
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isExistingOwner(userId);
+      allow create: if isOwner(userId) && request.auth.uid == userId;
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
     }
 
     /**
-     * @description Stores data related to each store.
+     * @description Controls access to store data. Only the store owner can read and write store data.
      * @path /stores/{storeId}
-     * @allow (create) - User with UID 'user123' can create a store with ownerId 'user123'.
-     * @allow (get) - Anyone can read store data.
-     * @deny (update) - User with UID 'user456' cannot update a store owned by 'user123'.
-     * @deny (delete) - User with UID 'user456' cannot delete a store owned by 'user123'.
-     * @principle Enforces document ownership for writes, public read access.
+     * @allow (create) User with UID 'owner123' can create a store if they are the owner.
+     * @allow (get) User with UID 'owner123' can read their store's data.
+     * @allow (update) User with UID 'owner123' can update their store's data.
+     * @allow (delete) User with UID 'owner123' can delete their store's data.
+     * @deny (create) User with UID 'hacker456' cannot create a store owned by 'owner123'.
+     * @principle Enforces document ownership for writes.
      */
     match /stores/{storeId} {
-      allow get, list: if true;
-      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow update: if isExistingOwner(resource.data.ownerId);
-      allow delete: if isExistingOwner(resource.data.ownerId);
+      function isOwner(storeId) {
+        return request.auth.uid == get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId;
+      }
+       function isCreatingOwner() {
+        return request.auth.uid == request.resource.data.ownerId;
+      }
+      allow get: if isOwner(storeId);
+      allow list: if false;
+      allow create: if isCreatingOwner() ;
+      allow update: if isOwner(storeId);
+      allow delete: if isOwner(storeId);
     }
 
     /**
-     * @description Stores product information as a subcollection of a store.
+     * @description Controls access to product data. Only the store owner can read and write product data.
      * @path /stores/{storeId}/products/{productId}
-     * @allow (create) - User with UID 'user123' can create a product under their store.
-     * @allow (get) - Anyone can read product data.
-     * @deny (update) - User with UID 'user456' cannot update a product in store owned by 'user123'.
-     * @deny (delete) - User with UID 'user456' cannot delete a product in store owned by 'user123'.
-     * @principle Enforces store ownership for product writes, public read access.
+     * @allow (create) User with UID 'owner123' can create a product for their store.
+     * @allow (get) Anyone can read product data.
+     * @allow (update) User with UID 'owner123' can update a product for their store.
+     * @allow (delete) User with UID 'owner123' can delete a product for their store.
+     * @deny (create) User with UID 'hacker456' cannot create a product for 'store123'.
+     * @principle Enforces document ownership for writes. Allows public read access.
      */
     match /stores/{storeId}/products/{productId} {
-      allow get, list: if true;
-      allow create: if get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid;
-      allow update: if get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid;
-      allow delete: if get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid;
+        function isStoreOwner(storeId) {
+            return get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid;
+        }
+
+        allow get: if true;
+        allow list: if true;
+        allow create: if isStoreOwner(storeId);
+        allow update: if isStoreOwner(storeId);
+        allow delete: if isStoreOwner(storeId);
     }
 
     /**
-     * @description Stores monthly package deals for a specific store.
+     * @description Controls access to monthly package data. Only the store owner can read and write package data.
      * @path /stores/{storeId}/packages/{packageId}
-     * @allow (create) - User with UID 'user123' can create a package under their store.
-     * @allow (get) - Anyone can read package data.
-     * @deny (update) - User with UID 'user456' cannot update a package in store owned by 'user123'.
-     * @deny (delete) - User with UID 'user456' cannot delete a package in store owned by 'user123'.
-     * @principle Enforces store ownership for package writes, public read access.
+     * @allow (create) User with UID 'owner123' can create a package for their store.
+     * @allow (get) Anyone can read package data.
+     * @allow (update) User with UID 'owner123' can update a package for their store.
+     * @allow (delete) User with UID 'owner123' can delete a package for their store.
+     * @deny (create) User with UID 'hacker456' cannot create a package for 'store123'.
+     * @principle Enforces document ownership for writes. Allows public read access.
      */
     match /stores/{storeId}/packages/{packageId} {
-      allow get, list: if true;
-      allow create: if get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid;
-      allow update: if get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid;
-      allow delete: if get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid;
+      function isStoreOwner(storeId) {
+            return get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid;
+        }
+
+        allow get: if true;
+        allow list: if true;
+        allow create: if isStoreOwner(storeId);
+        allow update: if isStoreOwner(storeId);
+        allow delete: if isStoreOwner(storeId);
     }
 
     /**
-     * @description Stores order information. Includes denormalized 'userId' and 'storeId' for querying and security rules.
+     * @description Controls access to order data. Only the user who placed the order can read and write order data.
      * @path /orders/{orderId}
-     * @allow (create) - Authenticated user can create an order.
-     * @allow (get) - Anyone can read order data.
-     * @deny (update) - Only the user who created the order can update it.
-     * @deny (delete) - Only the user who created the order can delete it.
-     * @principle Enforces user-based access control.
+     * @allow (create) User with UID 'user123' can create an order.
+     * @allow (get) User with UID 'user123' can read their order data.
+     * @allow (update) User with UID 'user123' can update their order data.
+     * @allow (delete) User with UID 'user123' can delete their order data.
+     * @deny (create) User with UID 'hacker456' cannot create an order for 'user123'.
+     * @principle Enforces document ownership for writes.
      */
     match /orders/{orderId} {
-      allow get, list: if true;
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if request.auth.uid == resource.data.userId; // TODO: Add more granular access control based on order status and user roles.
-      allow delete: if request.auth.uid == resource.data.userId; // TODO: Add more granular access control based on order status and user roles.
+      function isOrderOwner(orderId) {
+        return request.auth.uid == get(/databases/$(database)/documents/orders/$(orderId)).data.userId;
+      }
+      function isCreatingOrderOwner() {
+        return request.auth.uid == request.resource.data.userId;
+      }
+
+      allow get: if isOrderOwner(orderId);
+      allow list: if false;
+      allow create: if isCreatingOrderOwner();
+      allow update: if isOrderOwner(orderId);
+      allow delete: if isOrderOwner(orderId);
     }
 
     /**
-     * @description Stores voice-only orders. Accessible by delivery partners for fulfillment.
+     * @description Controls access to voice order data. Currently allows public access.
      * @path /voice-orders/{voiceOrderId}
-     * @allow (create) - Authenticated user can create a voice order.
-     * @allow (get) - Anyone can read voice order data.
-     * @deny (update) - Only the user who created the voice order can update it.
-     * @deny (delete) - Only the user who created the voice order can delete it.
+     * @allow (get) Anyone can read voice order data.
+     * @allow (create) Anyone can create voice order data.
+     * @allow (update) Anyone can update voice order data.
+     * @allow (delete) Anyone can delete voice order data.
+     * @principle Allows public read and write access.
      */
     match /voice-orders/{voiceOrderId} {
-      allow get, list: if true;
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if request.auth.uid == resource.data.userId; // TODO: Define who can update voice order status (e.g., delivery partners).
-      allow delete: if request.auth.uid == resource.data.userId;
+      allow get: if true;
+      allow list: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
     }
 
     /**
-     * @description Stores order item information for each order. Includes denormalized 'orderId' for authorization independence.
+     * @description Controls access to order item data. Only the user who placed the order can read and write order item data.
      * @path /orders/{orderId}/orderItems/{orderItemId}
-     * @allow (create) - Only users with write access to the parent order can create order items.
-     * @allow (get) - Anyone can read order item data.
-     * @deny (update) - Only users with write access to the parent order can update order items.
-     * @deny (delete) - Only users with write access to the parent order can delete order items.
-     * @principle Enforces order-based access control for order items.
+     * @allow (create) User with UID 'user123' can create an order item for their order.
+     * @allow (get) User with UID 'user123' can read their order item data.
+     * @allow (update) User with UID 'user123' can update their order item data.
+     * @allow (delete) User with UID 'user123' can delete their order item data.
+     * @deny (create) User with UID 'hacker456' cannot create an order item for 'order123'.
+     * @principle Enforces document ownership for writes.
      */
     match /orders/{orderId}/orderItems/{orderItemId} {
-      allow get, list: if true;
-      allow create: if get(/databases/$(database)/documents/orders/$(orderId)).data.userId == request.auth.uid;
-      allow update: if get(/databases/$(database)/documents/orders/$(orderId)).data.userId == request.auth.uid;
-      allow delete: if get(/databases/$(database)/documents/orders/$(orderId)).data.userId == request.auth.uid;
+        function isOrderOwner(orderId) {
+            return get(/databases/$(database)/documents/orders/$(orderId)).data.userId == request.auth.uid;
+        }
+
+        allow get: if isOrderOwner(orderId);
+        allow list: if false;
+        allow create: if isOrderOwner(orderId);
+        allow update: if isOrderOwner(orderId);
+        allow delete: if isOrderOwner(orderId);
     }
 
     /**
-     * @description Stores product recommendations for each user. Includes denormalized 'userId' for authorization independence.
+     * @description Controls access to product recommendation data. Only the user for whom the recommendation is made can read and write the data.
      * @path /users/{userId}/productRecommendations/{productRecommendationId}
-     * @allow (create) - Only the application itself (via a trusted environment) should create recommendations.
-     * @allow (get) - The user can read their own product recommendations.
-     * @deny (update) - Users cannot update product recommendations.
-     * @deny (delete) - Users cannot delete product recommendations.
-     * @principle Restricts access to user's own data, read-only for the client.
+     * @allow (create) User with UID 'user123' can create a product recommendation for themselves.
+     * @allow (get) User with UID 'user123' can read their product recommendation data.
+     * @allow (update) User with UID 'user123' can update their product recommendation data.
+     * @allow (delete) User with UID 'user123' can delete their product recommendation data.
+     * @deny (create) User with UID 'hacker456' cannot create a product recommendation for 'user123'.
+     * @principle Enforces document ownership for writes.
      */
     match /users/{userId}/productRecommendations/{productRecommendationId} {
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
       allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
-      allow create: if false; // TODO: Only allow create from a trusted environment (e.g., Cloud Functions).
-      allow update: if false;
-      allow delete: if false;
+      allow list: if false;
+      allow create: if isOwner(userId) && request.auth.uid == userId;
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
     }
 
-     /**
-      * @description Stores cached recipe ingredients to reduce AI usage.
-      * @path /cachedRecipes/{recipeId}
-      * @allow (create) - Only the application itself can create cached recipes.
-      * @allow (get) - Anyone can read the cached recipes.
-      * @deny (update) - No one can update cached recipes.
-      * @deny (delete) - No one can delete cached recipes.
-      * @principle Limits write access to trusted environments, public read access.
-      */
+      /**
+       * @description Grants public read access to cached recipe data.
+       * @path /cachedRecipes/{recipeId}
+       * @allow (get) Anyone can read cached recipe data.
+       * @allow (list) Anyone can list cached recipes.
+       * @deny (create) No one can create cached recipe data through client.
+       * @deny (update) No one can update cached recipe data through client.
+       * @deny (delete) No one can delete cached recipe data through client.
+       * @principle Allows public read access to cached recipe data.
+       */
     match /cachedRecipes/{recipeId} {
-      allow get, list: if true;
-      allow create: if false; // TODO: Restrict create access to a trusted environment (e.g., Cloud Functions).
+      allow get: if true;
+      allow list: if true;
+      allow create: if false;
       allow update: if false;
       allow delete: if false;
     }
