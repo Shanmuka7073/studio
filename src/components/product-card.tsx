@@ -33,7 +33,6 @@ export default function ProductCard({ product, image }: ProductCardProps) {
       </CardHeader>
       <CardContent className="p-2 pb-1 flex-1 text-center">
         <CardTitle className="text-sm font-headline truncate">{product.name}</CardTitle>
-        {product.localName && <p className="text-xs text-muted-foreground">({product.localName})</p>}
         <p className="text-lg font-bold text-primary">₹{product.price.toFixed(2)}</p>
       </CardContent>
       <CardFooter className="p-2 pt-0">
