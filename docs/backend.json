@@ -88,6 +88,14 @@
         "imageId": {
           "type": "string",
           "description": "ID for the product's placeholder image."
+        },
+        "imageUrl": {
+            "type": "string",
+            "description": "The URL of the product image, if generated."
+        },
+        "imageHint": {
+            "type": "string",
+            "description": "A hint for the product image content."
         }
       },
       "required": [
@@ -321,6 +329,80 @@
         "recommendationScore",
         "timestamp"
       ]
+    },
+    "MonthlyPackage": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "MonthlyPackage",
+      "type": "object",
+      "description": "Represents a pre-defined monthly shopping package offered by a store.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the package."
+        },
+        "storeId": {
+          "type": "string",
+          "description": "The ID of the store offering this package."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the package (e.g., 'Family Pack for 3')."
+        },
+        "memberCount": {
+          "type": "number",
+          "description": "The number of family members this package is designed for."
+        },
+        "price": {
+          "type": "number",
+          "description": "The total price for the package."
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "quantity": {
+                "type": "string"
+              }
+            },
+            "required": ["name", "quantity"]
+          },
+          "description": "A list of products and their quantities included in the package."
+        }
+      },
+      "required": ["id", "storeId", "name", "memberCount", "price", "items"]
+    },
+     "CachedRecipe": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "CachedRecipe",
+      "type": "object",
+      "description": "Represents a cached list of ingredients for a specific recipe to reduce AI calls.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier, typically the normalized dish name."
+        },
+        "dishName": {
+          "type": "string",
+          "description": "The name of the dish."
+        },
+        "ingredients": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The list of ingredients for the dish."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the recipe was cached."
+        }
+      },
+      "required": ["id", "dishName", "ingredients", "createdAt"]
     }
   },
   "auth": {
@@ -378,6 +460,26 @@
             {
               "name": "productId",
               "description": "The unique identifier of the product."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/stores/{storeId}/packages/{packageId}",
+        "definition": {
+          "entityName": "MonthlyPackage",
+          "schema": {
+            "$ref": "#/backend/entities/MonthlyPackage"
+          },
+          "description": "Stores monthly package deals for a specific store.",
+          "params": [
+            {
+              "name": "storeId",
+              "description": "The unique identifier of the store."
+            },
+            {
+              "name": "packageId",
+              "description": "The unique identifier of the package."
             }
           ]
         }
@@ -453,7 +555,25 @@
             }
           ]
         }
+      },
+       {
+        "path": "/cachedRecipes/{recipeId}",
+        "definition": {
+          "entityName": "CachedRecipe",
+          "schema": {
+            "$ref": "#/backend/entities/CachedRecipe"
+          },
+          "description": "Stores cached recipe ingredients to reduce AI usage.",
+          "params": [
+            {
+              "name": "recipeId",
+              "description": "The unique identifier for the cached recipe, usually the dish name."
+            }
+          ]
+        }
       }
     ]
   }
 }
+
+    

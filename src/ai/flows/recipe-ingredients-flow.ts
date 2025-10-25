@@ -1,7 +1,7 @@
 
 'use server';
 /**
- * @fileOverview A flow to get a list of ingredients for a given recipe.
+ * @fileOverview A flow to get a list of ingredients for a given recipe, with caching.
  * 
  * - getRecipeIngredients - Takes a dish name and returns a list of ingredients.
  */
@@ -9,6 +9,8 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
+import { getCachedRecipe, setCachedRecipe } from '@/lib/recipe-cache';
+import { initializeFirebase } from '@/firebase';
 
 const RecipeInputSchema = z.object({
   dishName: z.string().describe('The name of the dish to get ingredients for.'),
@@ -49,8 +51,29 @@ const recipeIngredientsFlow = ai.defineFlow(
     outputSchema: RecipeOutputSchema.nullable(),
   },
   async ({ dishName }) => {
+    const { firestore } = initializeFirebase();
+
+    // 1. Check cache first
+    const cachedRecipe = await getCachedRecipe(firestore, dishName);
+    if (cachedRecipe) {
+      console.log(`[Cache Hit] Found ingredients for ${dishName} in Firestore.`);
+      return {
+        dishName: cachedRecipe.dishName,
+        ingredients: cachedRecipe.ingredients,
+      };
+    }
+
+    console.log(`[Cache Miss] Calling AI to get ingredients for ${dishName}.`);
+    
+    // 2. If not in cache, call AI
     try {
       const { output } = await recipePrompt({ dishName });
+      
+      // 3. If AI returns a result, save it to the cache
+      if (output) {
+        await setCachedRecipe(firestore, output);
+      }
+      
       return output;
     } catch (e) {
       console.error(`Failed to get ingredients for ${dishName}:`, e);
@@ -58,3 +81,5 @@ const recipeIngredientsFlow = ai.defineFlow(
     }
   }
 );
+
+    
