@@ -43,42 +43,41 @@ const imageGeneratorFlow = ai.defineFlow(
     // 1. Get all unique product names from our grocery data
     const allProducts = groceryData.categories.flatMap(category => category.items || []);
     const uniqueProductNames = Array.from(new Set(allProducts));
+    
+    const generatedImages: ImageInfo[] = [];
 
-    // 2. For each product, generate an image
-    const imagePromises = uniqueProductNames.map(async (productName) => {
+    // 2. Process products sequentially to avoid timeouts and rate limits
+    for (const productName of uniqueProductNames) {
         try {
+            console.log(`Generating image for: ${productName}`);
             const { media } = await ai.generate({
                 model: googleAI.model('imagen-4.0-fast-generate-001'),
                 prompt: `A high-quality, professional photograph of "${productName}", on a clean, plain white background. The item should be centered and well-lit. Studio quality.`,
             });
             
             if (!media || !media.url) {
-                throw new Error(`No image generated for ${productName}`);
+                console.warn(`No image generated for ${productName}`);
+                continue; // Skip to the next product
             }
 
             // Create hint: "sweet potato" -> "sweet potato"
             const hint = productName.split('(')[0].trim().toLowerCase();
 
-            return {
+            generatedImages.push({
                 id: `prod-${createSlug(productName)}`,
-                imageUrl: media.url, // This is the data URI (e.g., "data:image/png;base64,...")
+                imageUrl: media.url, // This is the data URI
                 imageHint: hint,
-            };
+            });
         } catch(e) {
             console.error(`Failed to generate image for ${productName}:`, e);
-            return null; // Return null on failure so we can filter it out
+            // Continue to the next product even if one fails
         }
-    });
+    }
 
-    // 3. Wait for all image generation tasks to complete
-    const results = await Promise.all(imagePromises);
-    
-    // 4. Filter out any failed generations and return the successful ones
-    const successfulImages = results.filter((result): result is ImageInfo => result !== null);
-
-    // Also include the store images, which we don't need to regenerate
+    // 3. Also include the store images, which we don't need to regenerate
     const storeImages = (groceryData as any).placeholderImages?.filter((img: any) => img.id.startsWith('store-')) || [];
 
-    return [...storeImages, ...successfulImages];
+    // 4. Return the combined list of store images and newly generated product images
+    return [...storeImages, ...generatedImages];
   }
 );
