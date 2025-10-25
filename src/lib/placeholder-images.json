@@ -3,94 +3,99 @@
     {
       "id": "store-1",
       "description": "Green Valley Organics storefront",
-      "imageUrl": "https://picsum.photos/seed/store1/400/300",
+      "imageUrl": "https://images.unsplash.com/photo-1554223745-ad862492c213?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxvcmdhbmljJTIwbWFya2V0fGVufDB8fHx8MTc2MTI5Mzc0NXww&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "organic market"
     },
     {
       "id": "store-2",
       "description": "City Fresh Produce stall",
-      "imageUrl": "https://picsum.photos/seed/store2/400/300",
+      "imageUrl": "https://images.unsplash.com/photo-1591586116988-62fe65164f8d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxmYXJtZXJzJTIwbWFya2V0fGVufDB8fHx8MTc2MTI3NDA4NHww&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "farmers market"
     },
     {
       "id": "store-3",
       "description": "The Corner Grocer exterior",
-      "imageUrl": "https://picsum.photos/seed/store3/400/300",
+      "imageUrl": "https://images.unsplash.com/photo-1534804101463-987ef0c79d54?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxjb3JuZXIlMjBzdG9yZXxlbnwwfHx8fDE3NjEzNzAxMTV8MA&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "corner store"
     },
     {
+      "id": "prod-palm-oil",
+      "imageUrl": "https://images.unsplash.com/photo-1552710218-bd32b0c98626?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxwYWxtJTIwb2lsfGVufDB8fHx8MTc2MTM3MDExNXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "palm oil"
+    },
+    {
       "id": "prod-1",
-      "imageUrl": "https://picsum.photos/seed/prod1/300/300",
+      "imageUrl": "https://images.unsplash.com/photo-1576179635662-9d1983e97e1e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8YXBwbGV8ZW58MHx8fHwxNzYxMjg3ODg5fDA&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "apple"
     },
     {
       "id": "prod-2",
-      "imageUrl": "https://picsum.photos/seed/prod2/300/300",
+      "imageUrl": "https://images.unsplash.com/photo-1593280443077-ae46e0100ad1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxiYW5hbmF8ZW58MHx8fHwxNzYxMzcwMTE2fDA&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "banana"
     },
     {
       "id": "prod-3",
-      "imageUrl": "https://picsum.photos/seed/prod3/300/300",
+      "imageUrl": "https://images.unsplash.com/photo-1534620808146-d33bb39128b2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxicmVhZHxlbnwwfHx8fDE3NjEyODc4ODl8MA&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "bread"
     },
     {
       "id": "prod-4",
-      "imageUrl": "https://picsum.photos/seed/prod4/300/300",
+      "imageUrl": "https://images.unsplash.com/photo-1639151082235-406d8eb262b9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxtaWxrfGVufDB8fHx8MTc2MTM3MDExNXww&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "milk"
     },
     {
       "id": "prod-5",
-      "imageUrl": "https://picsum.photos/seed/prod5/300/300",
+      "imageUrl": "https://images.unsplash.com/photo-1582169505937-b9992bd01ed9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxlZ2dzfGVufDB8fHx8MTc2MTI4ODQ5MXww&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "eggs"
     },
     {
       "id": "prod-6",
-      "imageUrl": "https://picsum.photos/seed/prod6/300/300",
+      "imageUrl": "https://images.unsplash.com/photo-1671193237723-8668a0156277?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxjYXJyb3RzfGVufDB8fHx8MTc2MTI4MTI2Mnww&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "carrots"
     },
     {
       "id": "prod-7",
-      "imageUrl": "https://picsum.photos/seed/prod7/300/300",
+      "imageUrl": "https://images.unsplash.com/photo-1723110569402-6eec857daa4d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxsZXR0dWNlfGVufDB8fHx8MTc2MTM0Mzc1NXww&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "lettuce"
     },
     {
       "id": "prod-8",
-      "imageUrl": "https://picsum.photos/seed/prod8/300/300",
+      "imageUrl": "https://images.unsplash.com/photo-1596199050105-6d5d32222916?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHx0b21hdG9lc3xlbnwwfHx8fDE3NjEzNzAxMTV8MA&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "tomatoes"
     },
     {
       "id": "prod-9",
-      "imageUrl": "https://picsum.photos/seed/prod9/300/300",
+      "imageUrl": "https://images.unsplash.com/photo-1660808600062-defd9cc275d3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxjaGlja2VuJTIwYnJlYXN0fGVufDB8fHx8MTc2MTI1MjI3OHww&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "chicken breast"
     },
     {
       "id": "prod-10",
-      "imageUrl": "https://picsum.photos/seed/prod10/300/300",
+      "imageUrl": "https://images.unsplash.com/photo-1552767059-ce182ead6c1b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8Y2hlZXNlfGVufDB8fHx8MTc2MTI2MzI5N3ww&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "cheese"
     },
     {
       "id": "prod-11",
-      "imageUrl": "https://picsum.photos/seed/prod11/300/300",
+      "imageUrl": "https://images.unsplash.com/photo-1564149503905-7fef56abc1f2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHx5b2d1cnR8ZW58MHx8fHwxNzYxMzcwMTE1fDA&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "yogurt"
     },
     {
       "id": "prod-12",
-      "imageUrl": "https://picsum.photos/seed/prod12/300/300",
+      "imageUrl": "https://images.unsplash.com/photo-1551892374-ecf8754cf8b0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxwYXN0YXxlbnwwfHx8fDE3NjEyODU1ODl8MA&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "pasta"
     },
     {
       "id": "prod-13",
-      "imageUrl": "https://picsum.photos/seed/prod13/300/300",
+      "imageUrl": "https://images.unsplash.com/photo-1635562985686-4f8bb9c0d3bf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxyaWNlfGVufDB8fHx8MTc2MTMxNDYyNXww&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "rice"
     },
     {
       "id": "prod-14",
-      "imageUrl": "https://picsum.photos/seed/prod14/300/300",
+      "imageUrl": "https://images.unsplash.com/photo-1582401656496-9d75f95f9018?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxjZXJlYWx8ZW58MHx8fHwxNzYxMzcwMTE1fDA&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "cereal"
     },
     {
       "id": "prod-15",
-      "imageUrl": "https://picsum.photos/seed/prod15/300/300",
+      "imageUrl": "https://images.unsplash.com/photo-1599360889420-da1afaba9edc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8b3JhbmdlJTIwanVpY2V8ZW58MHx8fHwxNzYxMjY2NDM5fDA&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "orange juice"
     }
   ]

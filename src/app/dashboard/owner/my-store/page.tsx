@@ -70,6 +70,17 @@ type StoreFormValues = z.infer<typeof storeSchema>;
 type ProductFormValues = z.infer<typeof productSchema>;
 type LocationFormValues = z.infer<typeof locationSchema>;
 
+// Helper to create a URL-friendly slug from a string
+const createSlug = (text: string) => {
+    return text
+      .toLowerCase()
+      .replace(/\s+/g, '-') // Replace spaces with -
+      .replace(/[^\w-]+/g, '') // Remove all non-word chars
+      .replace(/--+/g, '-') // Replace multiple - with single -
+      .replace(/^-+/, '') // Trim - from start of text
+      .replace(/-+$/, ''); // Trim - from end of text
+  };
+
 function ProductChecklist({ storeId, onProductsAdded }: { storeId: string; onProductsAdded: () => void }) {
   const { toast } = useToast();
   const [isAdding, startTransition] = useTransition();
@@ -99,12 +110,13 @@ function ProductChecklist({ storeId, onProductsAdded }: { storeId: string; onPro
         productNames.forEach(name => {
           const newProductRef = doc(collection(firestore, 'stores', storeId, 'products'));
           const category = groceryData.categories.find(c => Array.isArray(c.items) && c.items.includes(name))?.categoryName || 'Miscellaneous';
+          const imageId = `prod-${createSlug(name)}`;
           batch.set(newProductRef, {
             name,
             price: 0.99, // Default price
             description: '',
             storeId: storeId,
-            imageId: `prod-${Math.floor(Math.random() * 20)}`,
+            imageId: imageId,
             quantity: 100, // Default quantity
             category: category,
           });
@@ -192,10 +204,11 @@ function AddProductForm({ storeId }: { storeId: string }) {
     if (!firestore) return;
 
     startTransition(() => {
+        const imageId = `prod-${createSlug(data.name)}`;
         const productData = {
             ...data,
             storeId,
-            imageId: `prod-${Math.floor(Math.random() * 20)}`,
+            imageId: imageId,
             quantity: 1, // Default quantity
         };
         
@@ -600,12 +613,13 @@ function CreateStoreForm({ user }) {
                 productNames.forEach(name => {
                     const newProductRef = doc(collection(firestore, 'stores', storeRef.id, 'products'));
                     const category = groceryData.categories.find(c => Array.isArray(c.items) && c.items.includes(name))?.categoryName || 'Miscellaneous';
+                    const imageId = `prod-${createSlug(name)}`;
                     batch.set(newProductRef, {
                     name,
                     price: 0.99,
                     description: '',
                     storeId: storeRef.id,
-                    imageId: `prod-${Math.floor(Math.random() * 20)}`,
+                    imageId: imageId,
                     quantity: 100,
                     category: category,
                     });
