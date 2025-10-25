@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Package2, Menu, UserCircle, Store, ShoppingBag, Truck, Mic, LayoutDashboard } from 'lucide-react';
+import { Package2, Menu, UserCircle, Store, ShoppingBag, Truck, Mic, LayoutDashboard, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { getAuth, signOut } from 'firebase/auth';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ADMIN_USER_ID } from '@/lib/config';
 
 const navLinks = [
   { href: '/', label: 'Home' },
@@ -58,6 +59,7 @@ function AssistantToggle() {
 
 function UserMenu() {
   const { user, isUserLoading } = useFirebase();
+  const isAdmin = user && user.uid === ADMIN_USER_ID;
 
   const handleLogout = async () => {
     const auth = getAuth();
@@ -104,6 +106,18 @@ function UserMenu() {
                 </DropdownMenuItem>
              </Link>
         ))}
+        {isAdmin && (
+            <>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Admin</DropdownMenuLabel>
+                 <Link href="/dashboard/site-config" passHref>
+                    <DropdownMenuItem>
+                        <Settings className="mr-2 h-4 w-4" />
+                        <span>Site Config</span>
+                    </DropdownMenuItem>
+                 </Link>
+            </>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
       </DropdownMenuContent>
@@ -114,6 +128,7 @@ function UserMenu() {
 export function Header() {
   const pathname = usePathname();
   const { user } = useFirebase();
+  const isAdmin = user && user.uid === ADMIN_USER_ID;
 
   return (
     <header className="sticky top-0 z-50 flex h-16 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:px-6">
@@ -187,6 +202,17 @@ export function Header() {
                         </Link>
                     </SheetClose>
                     ))}
+                    {isAdmin && (
+                         <SheetClose asChild>
+                            <Link
+                                href="/dashboard/site-config"
+                                className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+                            >
+                                <Settings className="h-4 w-4" />
+                                Site Config
+                            </Link>
+                        </SheetClose>
+                    )}
                 </div>
             </div>
           </div>
