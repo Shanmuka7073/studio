@@ -53,7 +53,7 @@ export async function updatePriceForProductByName(productName: string, newPrice:
     try {
         const { firestore } = await initServerApp();
         const productsQuery = firestore.collectionGroup('products').where('name', '==', productName);
-        const productsSnapshot = await getDocs(productsQuery);
+        const productsSnapshot = await productsQuery.get();
 
         if (productsSnapshot.empty) {
             return { success: false, updatedCount: 0, error: `No products named "${productName}" found to update.` };
@@ -68,6 +68,8 @@ export async function updatePriceForProductByName(productName: string, newPrice:
         
         revalidatePath('/stores', 'layout');
         revalidatePath('/cart');
+        revalidatePath('/dashboard/admin');
+
 
         return { success: true, updatedCount: productsSnapshot.size };
 
@@ -81,7 +83,7 @@ export async function getUniqueProductNames(): Promise<Record<string, number>> {
     try {
         const { firestore } = await initServerApp();
         const productsQuery = firestore.collectionGroup('products');
-        const productsSnapshot = await getDocs(productsQuery);
+        const productsSnapshot = await productsQuery.get();
 
         if (productsSnapshot.empty) {
             return {};
