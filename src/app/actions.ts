@@ -5,7 +5,7 @@ import type { Order, Product } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { initializeFirebase } from '@/firebase';
+import { initServerApp } from '@/firebase/server-init';
 import { collectionGroup, getDocs, writeBatch, query } from 'firebase/firestore';
 import { translateProductNames } from '@/ai/flows/translation-flow';
 import groceryData from '@/lib/grocery-data.json';
@@ -50,7 +50,7 @@ export async function updateImages(images: ImageData[]): Promise<{ success: bool
 }
 
 export async function translateAndSaveAllProductNames(): Promise<{ success: boolean; count?: number; error?: string }> {
-    const { firestore } = initializeFirebase();
+    const { firestore } = await initServerApp();
     if (!firestore) {
         return { success: false, error: 'Firestore not initialized.' };
     }
@@ -100,4 +100,3 @@ export async function translateAndSaveAllProductNames(): Promise<{ success: bool
         return { success: false, error: error.message || 'An unexpected error occurred during translation.' };
     }
 }
-
