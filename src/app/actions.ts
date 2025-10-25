@@ -65,9 +65,15 @@ export async function updatePriceForProductByName(productName: string, newPrice:
 
         await batch.commit();
         
-        revalidatePath('/stores', 'layout');
-        revalidatePath('/cart');
-        revalidatePath('/dashboard/admin');
+        // Revalidate paths to show changes
+        try {
+            revalidatePath('/stores');
+            revalidatePath('/cart');
+            revalidatePath('/dashboard/admin');
+        } catch (revalError) {
+            console.error('Failed to revalidate paths:', revalError);
+            // Don't fail the whole operation if revalidation fails
+        }
 
 
         return { success: true, updatedCount: productsSnapshot.size };
