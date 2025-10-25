@@ -28,7 +28,7 @@ import { useRouter } from 'next/navigation';
 import placeholderImagesData from '@/lib/placeholder-images.json';
 import { updateImages } from '@/app/actions';
 import { Trash2, Sparkles, Loader2 } from 'lucide-react';
-import { generateAllImages } from '@/ai/flows/image-generator-flow';
+import { generateSingleImage, type ImageInfo } from '@/ai/flows/image-generator-flow';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 
@@ -46,12 +46,61 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+function SingleImageGenerator({ index, onImageGenerated, productName }: { index: number; onImageGenerated: (index: number, newImage: ImageInfo) => void; productName: string; }) {
+    const [isGenerating, startGenerateTransition] = useTransition();
+    const { toast } = useToast();
+
+    const handleGenerate = () => {
+        startGenerateTransition(async () => {
+            try {
+                const newImage = await generateSingleImage(productName);
+                if (newImage) {
+                    onImageGenerated(index, newImage);
+                    toast({
+                        title: 'Image Generated!',
+                        description: `New image for "${productName}" is ready.`,
+                    });
+                } else {
+                     toast({
+                        variant: 'destructive',
+                        title: 'Generation Failed',
+                        description: 'Could not generate an image for this item.',
+                    });
+                }
+            } catch (error) {
+                console.error('AI Single Image Generation Failed:', error);
+                toast({
+                    variant: 'destructive',
+                    title: 'AI Generation Failed',
+                    description: 'An error occurred during image generation.',
+                });
+            }
+        });
+    };
+
+    return (
+        <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleGenerate}
+            disabled={isGenerating}
+        >
+            {isGenerating ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+                <Sparkles className="mr-2 h-4 w-4" />
+            )}
+            Generate with AI
+        </Button>
+    )
+}
+
 export default function SiteConfigPage() {
   const { user, isUserLoading } = useFirebase();
   const router = useRouter();
   const { toast } = useToast();
   const [isSaving, startSaveTransition] = useTransition();
-  const [isGenerating, startGenerateTransition] = useTransition();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -60,7 +109,7 @@ export default function SiteConfigPage() {
     },
   });
 
-  const { fields, append, remove, replace } = useFieldArray({
+  const { fields, append, remove, setValue } = useFieldArray({
     control: form.control,
     name: 'images',
   });
@@ -92,32 +141,9 @@ export default function SiteConfigPage() {
     });
   };
 
-  const handleAiGenerate = () => {
-    startGenerateTransition(async () => {
-        try {
-            const newImages = await generateAllImages();
-            if (newImages.length > 0) {
-                replace(newImages);
-                toast({
-                    title: `Generated ${newImages.length} images!`,
-                    description: 'Review the new images below and save your changes.',
-                });
-            } else {
-                 toast({
-                    variant: 'destructive',
-                    title: 'Generation Failed',
-                    description: `Could not generate any images.`,
-                });
-            }
-        } catch (error) {
-            console.error(`AI Image Generation Failed:`, error);
-            toast({
-                variant: 'destructive',
-                title: `AI Generation Failed`,
-                description: 'The process timed out or an error occurred. Please check the logs and try again.',
-            });
-        }
-    });
+  const handleImageGenerated = (index: number, newImage: ImageInfo) => {
+    setValue(`images.${index}.imageUrl`, newImage.imageUrl);
+    setValue(`images.${index}.imageHint`, newImage.imageHint);
   };
   
   if (isUserLoading || !user) {
@@ -126,60 +152,29 @@ export default function SiteConfigPage() {
 
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
-      <h1 className="text-4xl font-bold font-headline mb-8">
+      <h1 className="text-4xl font-bold font-headline mb-2">
         Site Configuration
       </h1>
+       <p className="text-lg text-muted-foreground mb-8">
+            Update the URLs and hints for all placeholder images used across the site.
+        </p>
 
-      <div className="grid md:grid-cols-3 gap-8">
-        <div className="md:col-span-1">
-            <Card>
-                <CardHeader>
-                    <CardTitle>AI Image Generation</CardTitle>
-                    <CardDescription>Use AI to generate images for all products in the catalog.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Alert>
-                        <Sparkles className="h-4 w-4" />
-                        <AlertTitle>One-Time Generation</AlertTitle>
-                        <AlertDescription>
-                            This will generate images for all products. This may take several minutes and will incur a one-time cost.
-                        </AlertDescription>
-                    </Alert>
-                    <Button
-                        type="button"
-                        onClick={handleAiGenerate}
-                        disabled={isGenerating || isSaving}
-                        className="w-full mt-4"
-                    >
-                        {isGenerating ? (
-                            <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Generating... (this may take a while)
-                            </>
-                        ) : (
-                           <>
-                             <Sparkles className="mr-2 h-4 w-4" />
-                             Generate All Images with AI
-                           </>
-                        )}
-                    </Button>
-                </CardContent>
-            </Card>
-        </div>
-        <div className="md:col-span-2">
-            <Card>
-                <CardHeader>
-                <CardTitle>Image Catalog Management</CardTitle>
-                <CardDescription>
-                    Update the URLs and hints for all placeholder images used across the site.
-                </CardDescription>
-                </CardHeader>
-                <CardContent>
-                <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-                    
-                    <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-4">
-                        {fields.map((field, index) => (
+      <Card>
+        <CardHeader>
+        <CardTitle>Image Catalog Management</CardTitle>
+        <CardDescription>
+            For each entry, you can paste in an image URL or use AI to generate one.
+        </CardDescription>
+        </CardHeader>
+        <CardContent>
+        <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+            
+            <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-4">
+                {fields.map((field, index) => {
+                    // Extract product name from ID like 'prod-sweet-potato' -> 'sweet potato'
+                    const productName = field.id.replace(/^prod-/, '').replace(/-/g, ' ');
+                    return (
                         <Card key={field.id} className="p-4">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                             <FormField
@@ -232,28 +227,34 @@ export default function SiteConfigPage() {
                                 )}
                                 />
                             </div>
+                             <div className="mt-4 flex justify-end">
+                                <SingleImageGenerator 
+                                    index={index}
+                                    productName={productName}
+                                    onImageGenerated={handleImageGenerated}
+                                />
+                            </div>
                         </Card>
-                        ))}
-                    </div>
+                    )
+                })}
+            </div>
 
-                    <div className="flex justify-between items-center pt-4 border-t">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => append({ id: `new-image-${fields.length}`, imageUrl: '', imageHint: '' })}
-                        >
-                            Add New Image
-                        </Button>
-                        <Button type="submit" disabled={isSaving || isGenerating}>
-                            {isSaving ? 'Saving...' : 'Save All Changes'}
-                        </Button>
-                    </div>
-                    </form>
-                </Form>
-                </CardContent>
-            </Card>
-        </div>
-      </div>
+            <div className="flex justify-between items-center pt-4 border-t">
+                <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => append({ id: `new-image-${fields.length}`, imageUrl: '', imageHint: '' })}
+                >
+                    Add New Image
+                </Button>
+                <Button type="submit" disabled={isSaving}>
+                    {isSaving ? 'Saving...' : 'Save All Changes'}
+                </Button>
+            </div>
+            </form>
+        </Form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
