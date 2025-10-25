@@ -28,10 +28,8 @@ import { useRouter } from 'next/navigation';
 import placeholderImagesData from '@/lib/placeholder-images.json';
 import { updateImages } from '@/app/actions';
 import { Trash2, Sparkles, Loader2 } from 'lucide-react';
-import { generateImagesForCategory } from '@/ai/flows/image-generator-flow';
+import { generateAllImages } from '@/ai/flows/image-generator-flow';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import groceryData from '@/lib/grocery-data.json';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 
 const ADMIN_EMAIL = 'admin@gmail.com';
@@ -53,7 +51,7 @@ export default function SiteConfigPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isSaving, startSaveTransition] = useTransition();
-  const [generatingCategory, setGeneratingCategory] = useState<string | null>(null);
+  const [isGenerating, startGenerateTransition] = useTransition();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -94,45 +92,31 @@ export default function SiteConfigPage() {
     });
   };
 
-  const handleAiGenerate = (categoryName: string) => {
-    setGeneratingCategory(categoryName);
-    
-    generateImagesForCategory(categoryName).then(newImages => {
-        if (newImages.length > 0) {
-            const currentImages = form.getValues('images');
-            const currentImageIds = new Set(currentImages.map(img => img.id));
-            const imagesToAdd = newImages.filter(img => !currentImageIds.has(img.id));
-            
-            // Replace existing images, add new ones
-            const updatedImages = currentImages.map(existingImg => {
-                const newVersion = newImages.find(newImg => newImg.id === existingImg.id);
-                return newVersion || existingImg;
-            });
-
-            const finalImages = [...updatedImages, ...imagesToAdd];
-
-            replace(finalImages);
-            
-            toast({
-                title: `Generated ${newImages.length} images for ${categoryName}!`,
-                description: 'Review the new images below and save your changes.',
-            });
-        } else {
+  const handleAiGenerate = () => {
+    startGenerateTransition(async () => {
+        try {
+            const newImages = await generateAllImages();
+            if (newImages.length > 0) {
+                replace(newImages);
+                toast({
+                    title: `Generated ${newImages.length} images!`,
+                    description: 'Review the new images below and save your changes.',
+                });
+            } else {
+                 toast({
+                    variant: 'destructive',
+                    title: 'Generation Failed',
+                    description: `Could not generate any images.`,
+                });
+            }
+        } catch (error) {
+            console.error(`AI Image Generation Failed:`, error);
             toast({
                 variant: 'destructive',
-                title: 'Generation Failed',
-                description: `Could not generate any images for ${categoryName}.`,
+                title: `AI Generation Failed`,
+                description: 'The process timed out or an error occurred. Please check the logs and try again.',
             });
         }
-    }).catch(error => {
-        console.error(`AI Image Generation Failed for ${categoryName}:`, error);
-        toast({
-            variant: 'destructive',
-            title: `AI Generation Failed for ${categoryName}`,
-            description: 'An error occurred. Please check the console and try again.',
-        });
-    }).finally(() => {
-        setGeneratingCategory(null);
     });
   };
   
@@ -150,40 +134,35 @@ export default function SiteConfigPage() {
         <div className="md:col-span-1">
             <Card>
                 <CardHeader>
-                    <CardTitle>Generate Images by Category</CardTitle>
-                    <CardDescription>Use AI to generate images for one category at a time. This prevents server timeouts.</CardDescription>
+                    <CardTitle>AI Image Generation</CardTitle>
+                    <CardDescription>Use AI to generate images for all products in the catalog.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <Accordion type="single" collapsible className="w-full">
-                        {groceryData.categories.map(category => (
-                            <AccordionItem value={category.categoryName} key={category.categoryName}>
-                                <AccordionTrigger>{category.categoryName}</AccordionTrigger>
-                                <AccordionContent>
-                                    <div className="flex flex-col items-start p-4 bg-muted/50 rounded-md">
-                                        <p className="text-sm mb-4">This will generate images for all {category.items.length} products in this category.</p>
-                                        <Button
-                                            type="button"
-                                            onClick={() => handleAiGenerate(category.categoryName)}
-                                            disabled={!!generatingCategory}
-                                            className="w-full"
-                                        >
-                                            {generatingCategory === category.categoryName ? (
-                                                <>
-                                                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                   Generating...
-                                                </>
-                                            ) : (
-                                               <>
-                                                 <Sparkles className="mr-2 h-4 w-4" />
-                                                 Generate
-                                               </>
-                                            )}
-                                        </Button>
-                                    </div>
-                                </AccordionContent>
-                            </AccordionItem>
-                        ))}
-                    </Accordion>
+                    <Alert>
+                        <Sparkles className="h-4 w-4" />
+                        <AlertTitle>One-Time Generation</AlertTitle>
+                        <AlertDescription>
+                            This will generate images for all products. This may take several minutes and will incur a one-time cost.
+                        </AlertDescription>
+                    </Alert>
+                    <Button
+                        type="button"
+                        onClick={handleAiGenerate}
+                        disabled={isGenerating || isSaving}
+                        className="w-full mt-4"
+                    >
+                        {isGenerating ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Generating... (this may take a while)
+                            </>
+                        ) : (
+                           <>
+                             <Sparkles className="mr-2 h-4 w-4" />
+                             Generate All Images with AI
+                           </>
+                        )}
+                    </Button>
                 </CardContent>
             </Card>
         </div>
@@ -265,7 +244,7 @@ export default function SiteConfigPage() {
                         >
                             Add New Image
                         </Button>
-                        <Button type="submit" disabled={isSaving || !!generatingCategory}>
+                        <Button type="submit" disabled={isSaving || isGenerating}>
                             {isSaving ? 'Saving...' : 'Save All Changes'}
                         </Button>
                     </div>

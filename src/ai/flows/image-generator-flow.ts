@@ -1,7 +1,7 @@
 
 'use server';
 /**
- * @fileOverview A flow to generate images for products within a specific category.
+ * @fileOverview A flow to generate images for all products in the grocery catalog.
  */
 
 import { ai } from '@/ai/genkit';
@@ -19,11 +19,6 @@ const ImageListSchema = z.array(ImageInfoSchema);
 
 export type ImageInfo = z.infer<typeof ImageInfoSchema>;
 
-const ImageGeneratorInputSchema = z.object({
-    category: z.string().describe("The product category to generate images for."),
-});
-
-
 // Helper to create a URL-friendly slug from a string
 const createSlug = (text: string) => {
   return text
@@ -35,32 +30,27 @@ const createSlug = (text: string) => {
     .replace(/-+$/, ''); // Trim - from end of text
 };
 
-export async function generateImagesForCategory(category: string): Promise<ImageInfo[]> {
-    return await imageGeneratorFlow({ category });
+export async function generateAllImages(): Promise<ImageInfo[]> {
+    return await imageGeneratorFlow({});
 }
 
 const imageGeneratorFlow = ai.defineFlow(
   {
     name: 'imageGeneratorFlow',
-    inputSchema: ImageGeneratorInputSchema,
+    inputSchema: z.object({}),
     outputSchema: ImageListSchema,
   },
-  async ({ category }) => {
+  async () => {
     
-    const categoryData = groceryData.categories.find(c => c.categoryName === category);
+    // Get a flat, unique list of all product names
+    const allProductNames = Array.from(new Set(groceryData.categories.flatMap(c => c.items || [])));
 
-    if (!categoryData || !categoryData.items) {
-        console.warn(`Category "${category}" not found or has no items.`);
-        return [];
-    }
-
-    const productsToGenerate = categoryData.items;
     const generatedImages: ImageInfo[] = [];
 
     // Process products sequentially to avoid timeouts and rate limits
-    for (const productName of productsToGenerate) {
+    for (const productName of allProductNames) {
         try {
-            console.log(`Generating image for: ${productName} in category: ${category}`);
+            console.log(`Generating image for: ${productName}`);
             const { media } = await ai.generate({
                 model: googleAI.model('imagen-4.0-fast-generate-001'),
                 prompt: `A high-quality, professional photograph of "${productName}", on a clean, plain white background. Studio quality.`,
