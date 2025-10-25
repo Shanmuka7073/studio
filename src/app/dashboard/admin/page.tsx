@@ -2,7 +2,7 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Settings, ArrowRight,Languages } from 'lucide-react';
+import { Settings, ArrowRight,Languages, Pricetag, PriceTag } from 'lucide-react';
 import Link from 'next/link';
 import { useFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
@@ -10,8 +10,10 @@ import placeholderImagesData from '@/lib/placeholder-images.json';
 import groceryData from '@/lib/grocery-data.json';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { useTransition } from 'react';
+import { useTransition, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { Input } from '@/components/ui/input';
+import { updateAllProductPrices } from '@/app/actions';
 
 const ADMIN_EMAIL = 'admin@gmail.com';
 
@@ -23,6 +25,68 @@ const adminCards = [
         icon: Settings,
     },
 ];
+
+function BulkPriceUpdater() {
+    const [isUpdating, startUpdateTransition] = useTransition();
+    const [price, setPrice] = useState('');
+    const { toast } = useToast();
+
+    const handleUpdatePrices = () => {
+        const newPrice = parseFloat(price);
+        if (isNaN(newPrice) || newPrice <= 0) {
+            toast({
+                variant: 'destructive',
+                title: 'Invalid Price',
+                description: 'Please enter a valid, positive number for the price.',
+            });
+            return;
+        }
+
+        startUpdateTransition(async () => {
+            const result = await updateAllProductPrices(newPrice);
+            if (result.success) {
+                toast({
+                    title: 'Prices Updated!',
+                    description: `Successfully updated ${result.updatedCount} products to ₹${newPrice.toFixed(2)}.`,
+                });
+                setPrice('');
+            } else {
+                toast({
+                    variant: 'destructive',
+                    title: 'Update Failed',
+                    description: result.error || 'An unexpected error occurred.',
+                });
+            }
+        });
+    };
+
+    return (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-2xl font-bold font-headline">Bulk Price Update</CardTitle>
+                <PriceTag className="h-8 w-8 text-primary" />
+            </CardHeader>
+            <CardContent>
+                <CardDescription className="mb-4">
+                    Set a new price for every single product across all stores. This action cannot be undone.
+                </CardDescription>
+                <div className="flex gap-2">
+                    <Input
+                        type="number"
+                        placeholder="Enter new price (e.g., 99.99)"
+                        value={price}
+                        onChange={(e) => setPrice(e.target.value)}
+                        disabled={isUpdating}
+                    />
+                    <Button onClick={handleUpdatePrices} disabled={isUpdating}>
+                        {isUpdating ? 'Updating...' : 'Update All Prices'}
+                    </Button>
+                </div>
+            </CardContent>
+        </Card>
+    )
+}
+
 
 const createSlug = (text: string) => {
   return text
@@ -58,7 +122,7 @@ export default function AdminDashboardPage() {
                 <h1 className="text-4xl font-bold font-headline">Admin Dashboard</h1>
                 <p className="text-lg text-muted-foreground mt-2">Manage your application's settings and view all products.</p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto mb-12">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto mb-12">
                 {adminCards.map((card) => (
                      <Link href={card.href} key={card.title} className="block hover:shadow-xl transition-shadow rounded-lg">
                         <Card className="h-full flex flex-col">
@@ -76,6 +140,7 @@ export default function AdminDashboardPage() {
                         </Card>
                     </Link>
                 ))}
+                <BulkPriceUpdater />
             </div>
             <Card>
                 <CardHeader>

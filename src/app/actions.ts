@@ -5,6 +5,8 @@ import type { Order, Product } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { initServerApp } from '@/firebase/server-init';
+import { collectionGroup, getDocs, writeBatch } from 'firebase-admin/firestore';
 
 export async function revalidateStorePaths() {
   revalidatePath('/');
@@ -41,5 +43,36 @@ export async function updateImages(images: ImageData[]): Promise<{ success: bool
     } catch (error) {
       console.error('Failed to write to placeholder-images.json:', error);
       return { success: false, error: 'Failed to save image catalog.' };
+    }
+}
+
+export async function updateAllProductPrices(newPrice: number): Promise<{ success: boolean, updatedCount: number, error?: string }> {
+    if (typeof newPrice !== 'number' || newPrice <= 0) {
+        return { success: false, updatedCount: 0, error: 'Invalid price provided.' };
+    }
+
+    try {
+        const { firestore } = await initServerApp();
+        const productsSnapshot = await firestore.collectionGroup('products').get();
+
+        if (productsSnapshot.empty) {
+            return { success: false, updatedCount: 0, error: 'No products found to update.' };
+        }
+
+        const batch = firestore.batch();
+        productsSnapshot.docs.forEach(doc => {
+            batch.update(doc.ref, { price: newPrice });
+        });
+
+        await batch.commit();
+        
+        revalidatePath('/stores', 'layout');
+        revalidatePath('/cart');
+
+        return { success: true, updatedCount: productsSnapshot.size };
+
+    } catch (error) {
+        console.error('Failed to update all product prices:', error);
+        return { success: false, updatedCount: 0, error: 'A server error occurred during the price update.' };
     }
 }
