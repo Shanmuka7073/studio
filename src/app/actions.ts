@@ -6,7 +6,6 @@ import { revalidatePath } from 'next/cache';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { initServerApp } from '@/firebase/server-init';
-import { collectionGroup, getDocs, writeBatch, query } from 'firebase/firestore';
 import { translateProductNames } from '@/ai/flows/translation-flow';
 import groceryData from '@/lib/grocery-data.json';
 
@@ -65,15 +64,15 @@ export async function translateAndSaveAllProductNames(): Promise<{ success: bool
         const translationMap = new Map(translations.map(t => [t.englishName, t.teluguName]));
 
         // 3. Get all product documents from all stores
-        const productsQuery = query(collectionGroup(firestore, 'products'));
-        const productSnapshots = await getDocs(productsQuery);
+        const productsQuery = firestore.collectionGroup('products');
+        const productSnapshots = await productsQuery.get();
         
         if (productSnapshots.empty) {
             return { success: true, count: 0, error: "No products found to translate." };
         }
 
         // 4. Create a batch write to update all products
-        const batch = writeBatch(firestore);
+        const batch = firestore.batch();
         let updatedCount = 0;
 
         productSnapshots.forEach(productDoc => {
