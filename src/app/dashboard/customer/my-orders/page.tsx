@@ -19,22 +19,22 @@ export default function MyOrdersPage() {
   const { user, isUserLoading, firestore } = useFirebase();
   
   const regularOrdersQuery = useMemoFirebase(() => {
-    if (!firestore || !user?.uid) return null;
+    if (!firestore || !user || !user.uid) return null; // Defensive check
     return query(
         collection(firestore, 'orders'),
         where('userId', '==', user.uid),
         orderBy('orderDate', 'desc')
     );
-  }, [firestore, user?.uid]);
+  }, [firestore, user]);
 
   const voiceOrdersQuery = useMemoFirebase(() => {
-    if (!firestore || !user?.uid) return null;
+    if (!firestore || !user || !user.uid) return null; // Defensive check
     return query(
         collection(firestore, 'voice-orders'),
         where('userId', '==', user.uid),
         orderBy('orderDate', 'desc')
     );
-  }, [firestore, user?.uid]);
+  }, [firestore, user]);
 
   const { data: regularOrders, isLoading: regularOrdersLoading } = useCollection<Order>(regularOrdersQuery);
   const { data: voiceOrders, isLoading: voiceOrdersLoading } = useCollection<Order>(voiceOrdersQuery);
