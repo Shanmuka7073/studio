@@ -31,7 +31,7 @@ const createSlug = (text: string) => {
     .replace(/-+$/, ''); // Trim - from end of text
 };
 
-const allProducts = groceryData.categories.flatMap(category => category.items);
+const allProducts = groceryData.categories.flatMap(category => Array.isArray(category.items) ? category.items : []);
 const imageMap = new Map(placeholderImagesData.placeholderImages.map(img => [img.id, img]));
 
 
@@ -79,7 +79,7 @@ export default function AdminDashboardPage() {
                     <CardDescription>A complete catalog of all products in the system and their current images.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4">
                         {allProducts.map(productName => {
                             const imageId = `prod-${createSlug(productName)}`;
                             const image = imageMap.get(imageId) || { imageUrl: 'https://placehold.co/300x300/E2E8F0/64748B?text=No+Image', imageHint: 'none' };
