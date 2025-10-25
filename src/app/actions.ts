@@ -6,7 +6,6 @@ import { revalidatePath } from 'next/cache';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { initServerApp } from '@/firebase/server-init';
-import { collectionGroup, getDocs, writeBatch } from 'firebase-admin/firestore';
 
 export async function revalidateStorePaths() {
   revalidatePath('/');
