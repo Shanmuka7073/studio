@@ -27,6 +27,7 @@ import {
 import { getAuth, signOut } from 'firebase/auth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ADMIN_USER_ID } from '@/lib/config';
+import { useEffect } from 'react';
 
 const navLinks = [
   { href: '/', label: 'Home' },
@@ -60,6 +61,13 @@ function AssistantToggle() {
 function UserMenu() {
   const { user, isUserLoading } = useFirebase();
   const isAdmin = user && user.uid === ADMIN_USER_ID;
+
+  useEffect(() => {
+    if (user) {
+      console.log('Your User Info (for Admin Setup):', user);
+      console.log('Your Admin UID is:', user.uid);
+    }
+  }, [user]);
 
   const handleLogout = async () => {
     const auth = getAuth();
