@@ -4,7 +4,6 @@ import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore'
-import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
@@ -26,17 +25,6 @@ export function initializeFirebase() {
       firebaseApp = initializeApp(firebaseConfig);
     }
     
-    // Initialize App Check
-    if (typeof window !== 'undefined') {
-        // You can get a reCAPTCHA v3 site key from the Google Cloud console.
-        // Make sure to replace the placeholder below.
-        initializeAppCheck(firebaseApp, {
-            provider: new ReCaptchaV3Provider('6Ld-pPspAAAAAN3Vqj9c2h6r4tEVpGkE-3J5xX_U'),
-            isTokenAutoRefreshEnabled: true
-        });
-    }
-
-
     return getSdks(firebaseApp);
   }
 
