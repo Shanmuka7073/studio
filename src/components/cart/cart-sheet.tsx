@@ -10,9 +10,56 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { getProductImage } from '@/lib/data';
 import { Input } from '../ui/input';
+import { useEffect, useState } from 'react';
+
+// A component to render each item, handling the async image fetching
+function CartSheetItem({ item }) {
+    const { removeItem, updateQuantity } = useCart();
+    const { product, quantity } = item;
+    const [image, setImage] = useState({ imageUrl: 'https://placehold.co/64x64/E2E8F0/64748B?text=...', imageHint: 'loading' });
+
+    useEffect(() => {
+        const fetchImage = async () => {
+            const fetchedImage = await getProductImage(product.imageId);
+            setImage(fetchedImage);
+        };
+        fetchImage();
+    }, [product.imageId]);
+
+    return (
+        <div className="flex items-center gap-4 w-full">
+            <Image
+                src={image.imageUrl}
+                alt={product.name}
+                data-ai-hint={image.imageHint}
+                width={64}
+                height={64}
+                className="rounded-md object-cover"
+            />
+            <div className="flex-1 grid gap-1.5">
+                <p className="font-medium leading-tight">{product.name}</p>
+                <div className="flex items-center gap-2">
+                    <Input
+                        type="number"
+                        min="1"
+                        value={quantity}
+                        onChange={(e) => updateQuantity(product.id, parseInt(e.target.value) || 1)}
+                        className="w-16 h-8 text-center"
+                        aria-label={`Quantity for ${product.name}`}
+                    />
+                    <p className="text-sm font-semibold">${(product.price * quantity).toFixed(2)}</p>
+                </div>
+            </div>
+            <Button variant="ghost" size="icon" onClick={() => removeItem(product.id)}>
+                <Trash2 className="h-4 w-4" />
+                <span className="sr-only">Remove {product.name}</span>
+            </Button>
+        </div>
+    );
+}
 
 export function CartSheetContent() {
-  const { cartItems, removeItem, updateQuantity, cartTotal, cartCount } = useCart();
+  const { cartItems, cartTotal, cartCount } = useCart();
 
   return (
     <>
@@ -27,38 +74,9 @@ export function CartSheetContent() {
         {cartItems.length > 0 ? (
         <ScrollArea className="flex-1 pr-1">
             <div className="flex flex-col gap-4 py-4">
-              {cartItems.map(({ product, quantity }) => {
-                  const image = getProductImage(product.imageId);
-                  return(
-                <div key={product.id} className="flex items-center gap-4 w-full">
-                  <Image
-                    src={image.imageUrl}
-                    alt={product.name}
-                    data-ai-hint={image.imageHint}
-                    width={64}
-                    height={64}
-                    className="rounded-md object-cover"
-                  />
-                  <div className="flex-1 grid gap-1.5">
-                    <p className="font-medium leading-tight">{product.name}</p>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        min="1"
-                        value={quantity}
-                        onChange={(e) => updateQuantity(product.id, parseInt(e.target.value) || 1)}
-                        className="w-16 h-8 text-center"
-                        aria-label={`Quantity for ${product.name}`}
-                      />
-                      <p className="text-sm font-semibold">${(product.price * quantity).toFixed(2)}</p>
-                    </div>
-                  </div>
-                  <Button variant="ghost" size="icon" onClick={() => removeItem(product.id)}>
-                    <Trash2 className="h-4 w-4" />
-                    <span className="sr-only">Remove {product.name}</span>
-                  </Button>
-                </div>
-              )})}
+              {cartItems.map((item) => (
+                <CartSheetItem key={item.product.id} item={item} />
+              ))}
             </div>
         </ScrollArea>
         ) : (

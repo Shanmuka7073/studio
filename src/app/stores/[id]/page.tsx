@@ -85,6 +85,7 @@ export default function StoreDetailPage() {
   const [store, setStore] = useState<Store | null>(null);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<{ categories: string[], searchTerm: string }>({ categories: [], searchTerm: '' });
+  const [storeImage, setStoreImage] = useState({ imageUrl: 'https://placehold.co/250x250/E2E8F0/64748B?text=Loading...', imageHint: 'loading' });
   
   const productsQuery = useMemoFirebase(() => {
     if (!firestore || !id) return null;
@@ -100,6 +101,8 @@ export default function StoreDetailPage() {
         const storeData = await getStore(firestore, id);
         if (storeData) {
           setStore(storeData as Store);
+          const image = await getStoreImage(storeData.imageId);
+          setStoreImage(image);
         } else {
           notFound();
         }
@@ -144,8 +147,6 @@ export default function StoreDetailPage() {
   if (!store) {
     return notFound();
   }
-
-  const image = getStoreImage(store.imageId);
   
   const sidebarContent = <ProductFilterSidebar onFilterChange={handleFilterChange} />;
 
@@ -157,9 +158,9 @@ export default function StoreDetailPage() {
         <div className="container mx-auto py-12 px-4 md:px-6 flex-1">
           <div className="flex flex-col md:flex-row gap-8 mb-12">
             <Image
-              src={image.imageUrl}
+              src={storeImage.imageUrl}
               alt={store.name}
-              data-ai-hint={image.imageHint}
+              data-ai-hint={storeImage.imageHint}
               width={250}
               height={250}
               className="rounded-lg object-cover"

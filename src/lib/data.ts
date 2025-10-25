@@ -1,5 +1,5 @@
 import type { Store, Product } from './types';
-import placeholderData from './placeholder-images.json';
+// Do not import placeholderData directly anymore to avoid caching issues.
 import {
   collection,
   doc,
@@ -9,10 +9,15 @@ import {
   Firestore,
 } from 'firebase/firestore';
 
-const { placeholderImages } = placeholderData;
+async function getImages() {
+    // Dynamically import the JSON file to get the latest version.
+    const placeholderData = await import('./placeholder-images.json');
+    return placeholderData.placeholderImages;
+}
 
-const getImage = (id: string) => {
-  const image = placeholderImages.find((img) => img.id === id);
+const getImage = async (id: string) => {
+  const images = await getImages();
+  const image = images.find((img) => img.id === id);
   return (
     image || {
       imageUrl: 'https://picsum.photos/seed/placeholder/300/300',
@@ -73,5 +78,5 @@ export async function getProduct(
 
 // --- Keeping placeholder image functions ---
 
-export const getProductImage = (imageId: string) => getImage(imageId);
-export const getStoreImage = (imageId: string) => getImage(imageId);
+export const getProductImage = async (imageId: string) => await getImage(imageId);
+export const getStoreImage = async (imageId: string) => await getImage(imageId);

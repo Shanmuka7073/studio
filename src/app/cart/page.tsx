@@ -9,9 +9,61 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { getProductImage } from '@/lib/data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { useEffect, useState } from 'react';
+
+// A component to render each row, handling the async image fetching
+function CartRow({ item }) {
+    const { removeItem, updateQuantity } = useCart();
+    const { product, quantity } = item;
+    const [image, setImage] = useState({ imageUrl: 'https://placehold.co/64x64/E2E8F0/64748B?text=...', imageHint: 'loading' });
+
+    useEffect(() => {
+        const fetchImage = async () => {
+            const fetchedImage = await getProductImage(product.imageId);
+            setImage(fetchedImage);
+        };
+        fetchImage();
+    }, [product.imageId]);
+
+    return (
+        <TableRow>
+            <TableCell>
+                <div className="flex items-center gap-4">
+                    <Image
+                        src={image.imageUrl}
+                        alt={product.name}
+                        data-ai-hint={image.imageHint}
+                        width={64}
+                        height={64}
+                        className="rounded-md object-cover"
+                    />
+                    <span className="font-medium">{product.name}</span>
+                </div>
+            </TableCell>
+            <TableCell>${product.price.toFixed(2)}</TableCell>
+            <TableCell>
+                <Input
+                    type="number"
+                    min="0"
+                    value={quantity}
+                    onChange={(e) => updateQuantity(product.id, parseInt(e.target.value) || 0)}
+                    className="w-20 text-center mx-auto"
+                    aria-label={`Quantity for ${product.name}`}
+                />
+            </TableCell>
+            <TableCell className="text-right">${(product.price * quantity).toFixed(2)}</TableCell>
+            <TableCell>
+                <Button variant="ghost" size="icon" onClick={() => removeItem(product.id)}>
+                    <Trash2 className="h-4 w-4" />
+                    <span className="sr-only">Remove {product.name}</span>
+                </Button>
+            </TableCell>
+        </TableRow>
+    );
+}
 
 export default function CartPage() {
-  const { cartItems, removeItem, updateQuantity, cartTotal, cartCount } = useCart();
+  const { cartItems, cartTotal, cartCount } = useCart();
   
   if (cartCount === 0) {
     return (
@@ -52,44 +104,9 @@ export default function CartPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {cartItems.map(({ product, quantity }) => {
-                    const image = getProductImage(product.imageId);
-                    return (
-                      <TableRow key={product.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-4">
-                            <Image
-                              src={image.imageUrl}
-                              alt={product.name}
-                              data-ai-hint={image.imageHint}
-                              width={64}
-                              height={64}
-                              className="rounded-md object-cover"
-                            />
-                            <span className="font-medium">{product.name}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>${product.price.toFixed(2)}</TableCell>
-                        <TableCell>
-                           <Input
-                              type="number"
-                              min="0"
-                              value={quantity}
-                              onChange={(e) => updateQuantity(product.id, parseInt(e.target.value) || 0)}
-                              className="w-20 text-center mx-auto"
-                              aria-label={`Quantity for ${product.name}`}
-                            />
-                        </TableCell>
-                        <TableCell className="text-right">${(product.price * quantity).toFixed(2)}</TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="icon" onClick={() => removeItem(product.id)}>
-                            <Trash2 className="h-4 w-4" />
-                            <span className="sr-only">Remove {product.name}</span>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
+                  {cartItems.map((item) => (
+                      <CartRow key={item.product.id} item={item} />
+                  ))}
                 </TableBody>
               </Table>
             </CardContent>

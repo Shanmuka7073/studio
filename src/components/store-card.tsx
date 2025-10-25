@@ -8,13 +8,27 @@ import { Button } from '@/components/ui/button';
 import type { Store } from '@/lib/types';
 import { getStoreImage } from '@/lib/data';
 import { ArrowRight, MapPin } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 interface StoreCardProps {
   store: Store;
 }
 
+interface ImageInfo {
+    imageUrl: string;
+    imageHint: string;
+}
+
 export default function StoreCard({ store }: StoreCardProps) {
-  const image = getStoreImage(store.imageId);
+    const [image, setImage] = useState<ImageInfo>({ imageUrl: 'https://placehold.co/400x300/E2E8F0/64748B?text=Loading...', imageHint: 'loading' });
+
+    useEffect(() => {
+        const fetchImage = async () => {
+            const fetchedImage = await getStoreImage(store.imageId);
+            setImage(fetchedImage);
+        }
+        fetchImage();
+    }, [store.imageId]);
 
   return (
     <Card className="flex flex-col h-full overflow-hidden transition-all hover:shadow-lg">

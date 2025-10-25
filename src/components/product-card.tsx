@@ -7,14 +7,29 @@ import { useCart } from '@/lib/cart';
 import type { Product } from '@/lib/types';
 import { getProductImage } from '@/lib/data';
 import { ShoppingCart } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 interface ProductCardProps {
   product: Product;
 }
 
+interface ImageInfo {
+    imageUrl: string;
+    imageHint: string;
+}
+
 export default function ProductCard({ product }: ProductCardProps) {
   const { addItem } = useCart();
-  const image = getProductImage(product.imageId);
+  const [image, setImage] = useState<ImageInfo>({ imageUrl: 'https://placehold.co/300x300/E2E8F0/64748B?text=Loading...', imageHint: 'loading' });
+
+  useEffect(() => {
+    const fetchImage = async () => {
+        const fetchedImage = await getProductImage(product.imageId);
+        setImage(fetchedImage);
+    }
+    fetchImage();
+  }, [product.imageId]);
+
 
   return (
     <Card className="flex flex-col h-full overflow-hidden transition-all hover:shadow-lg">
