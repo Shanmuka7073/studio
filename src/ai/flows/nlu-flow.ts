@@ -21,6 +21,7 @@ const interpretedCommandSchema = z.object({
       'findProduct',
       'addProductToCart',
       'navigateTo',
+      'createVoiceOrder',
       'confirm',
       'cancel',
       'unknown',
@@ -30,6 +31,7 @@ const interpretedCommandSchema = z.object({
     productName: z.string().optional().describe('The name of a product.'),
     storeName: z.string().optional().describe('The name of a store.'),
     pageName: z.string().optional().describe("The name of a page to navigate to (e.g., home, stores, cart, my orders, my store, deliveries)."),
+    shoppingList: z.string().optional().describe("A shopping list of items."),
   }).describe('Key entities extracted from the user command.'),
   originalText: z.string().describe('The original text from the user.'),
 });
@@ -52,36 +54,33 @@ const nluPrompt = ai.definePrompt({
     The user is interacting with the app via voice.
 
     **Intents:**
-    - findProduct: User wants to find a product. They might specify a store.
+    - findProduct: User wants to find a specific product. They might specify a store.
     - addProductToCart: User confirms adding a specific product to the cart.
+    - createVoiceOrder: User wants to create an order by listing items. This is for open-ended shopping lists.
     - navigateTo: User wants to go to a specific page.
     - confirm: User gives a positive confirmation (e.g., "yes", "confirm", "do it").
     - cancel: User gives a negative confirmation (e.g., "no", "cancel").
     - unknown: The command is unclear or not related to the app's functions.
 
     **Entities:**
-    - productName: The name of the grocery item.
+    - productName: The name of a single grocery item.
     - storeName: The name of the store.
     - pageName: The destination page. Examples: 'home', 'stores', 'cart' or 'shopping cart', 'my orders', 'my store', 'store orders', 'deliveries'.
+    - shoppingList: The full text of a shopping list provided by the user.
 
     **Examples:**
     - "Find apples in Patel Kirana Store" -> intent: findProduct, entities: { productName: "apples", storeName: "Patel Kirana Store" }
-    - "order apples from shanmuka shop" -> intent: findProduct, entities: { productName: "apples", storeName: "shanmuka shop" }
+    - "I need onions, potatoes, and some milk" -> intent: createVoiceOrder, entities: { shoppingList: "onions, potatoes, and some milk" }
     - "get me some bananas at City Fresh Produce" -> intent: findProduct, entities: { productName: "bananas", storeName: "City Fresh Produce" }
-    - "show me bananas" -> intent: findProduct, entities: { productName: "bananas" }
     - "Yes, add it" -> intent: confirm, entities: {}
     - "go to my cart" -> intent: navigateTo, entities: { pageName: "cart" }
-    - "go to my orders" -> intent: navigateTo, entities: { pageName: "my orders" }
     - "take me home" -> intent: navigateTo, entities: { pageName: "home" }
-    - "go to my store" -> intent: navigateTo, entities: { pageName: "my store" }
-    - "show me the store orders" -> intent: navigateTo, entities: { pageName: "store orders" }
-    - "open the deliveries page" -> intent: navigateTo, entities: { pageName: "deliveries" }
     - "what's the weather like" -> intent: unknown, entities: {}
 
     **Command to interpret:**
     "{{{text}}}"
 
-    Return the structured JSON output. Set originalText to the input text.
+    Return the structured JSON output. Set originalText to the input text. If the intent is 'createVoiceOrder', populate the shoppingList entity with the user's dictated list.
     `,
   config: {
     temperature: 0.1,
@@ -106,7 +105,3 @@ const interpretCommandFlow = ai.defineFlow(
     return { ...output, originalText: text };
   }
 );
-
-
-
-
