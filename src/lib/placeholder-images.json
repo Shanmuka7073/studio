@@ -2,101 +2,923 @@
   "placeholderImages": [
     {
       "id": "store-1",
-      "description": "Green Valley Organics storefront",
-      "imageUrl": "https://images.unsplash.com/photo-1554223745-ad862492c213?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxvcmdhbmljJTIwbWFya2V0fGVufDB8fHx8MTc2MTI5Mzc0NXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageUrl": "https://images.unsplash.com/photo-1554223745-ad862492c213?w=600&h=400&fit=crop",
       "imageHint": "organic market"
     },
     {
       "id": "store-2",
-      "description": "City Fresh Produce stall",
-      "imageUrl": "https://images.unsplash.com/photo-1591586116988-62fe65164f8d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxmYXJtZXJzJTIwbWFya2V0fGVufDB8fHx8MTc2MTI3NDA4NHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageUrl": "https://images.unsplash.com/photo-1591586116988-62fe65164f8d?w=600&h=400&fit=crop",
       "imageHint": "farmers market"
     },
     {
       "id": "store-3",
-      "description": "The Corner Grocer exterior",
-      "imageUrl": "https://images.unsplash.com/photo-1534804101463-987ef0c79d54?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxjb3JuZXIlMjBzdG9yZXxlbnwwfHx8fDE3NjEzNzAxMTV8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageUrl": "https://images.unsplash.com/photo-1534804101463-987ef0c79d54?w=600&h=400&fit=crop",
       "imageHint": "corner store"
     },
     {
-      "id": "prod-palm-oil",
-      "imageUrl": "https://images.unsplash.com/photo-1552710218-bd32b0c98626?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxwYWxtJTIwb2lsfGVufDB8fHx8MTc2MTM3MDExNXww&ixlib=rb-4.1.0&q=80&w=1080",
-      "imageHint": "palm oil"
+      "id": "prod-potatoes",
+      "imageUrl": "https://images.unsplash.com/photo-1675501344642-92d35d90fe51?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxwb3RhdG9lc3xlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "potatoes"
     },
     {
-      "id": "prod-1",
-      "imageUrl": "https://images.unsplash.com/photo-1576179635662-9d1983e97e1e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8YXBwbGV8ZW58MHx8fHwxNzYxMjg3ODg5fDA&ixlib=rb-4.1.0&q=80&w=1080",
-      "imageHint": "apple"
+      "id": "prod-onions",
+      "imageUrl": "https://images.unsplash.com/photo-1667720250309-abf176d77333?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8b25pb25zfGVufDB8fHx8MTc2MTI4ODQ5MXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "onions"
     },
     {
-      "id": "prod-2",
-      "imageUrl": "https://images.unsplash.com/photo-1593280443077-ae46e0100ad1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxiYW5hbmF8ZW58MHx8fHwxNzYxMzcwMTE2fDA&ixlib=rb-4.1.0&q=80&w=1080",
-      "imageHint": "banana"
-    },
-    {
-      "id": "prod-3",
-      "imageUrl": "https://images.unsplash.com/photo-1534620808146-d33bb39128b2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxicmVhZHxlbnwwfHx8fDE3NjEyODc4ODl8MA&ixlib=rb-4.1.0&q=80&w=1080",
-      "imageHint": "bread"
-    },
-    {
-      "id": "prod-4",
-      "imageUrl": "https://images.unsplash.com/photo-1639151082235-406d8eb262b9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxtaWxrfGVufDB8fHx8MTc2MTM3MDExNXww&ixlib=rb-4.1.0&q=80&w=1080",
-      "imageHint": "milk"
-    },
-    {
-      "id": "prod-5",
-      "imageUrl": "https://images.unsplash.com/photo-1582169505937-b9992bd01ed9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxlZ2dzfGVufDB8fHx8MTc2MTI4ODQ5MXww&ixlib=rb-4.1.0&q=80&w=1080",
-      "imageHint": "eggs"
-    },
-    {
-      "id": "prod-6",
-      "imageUrl": "https://images.unsplash.com/photo-1671193237723-8668a0156277?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxjYXJyb3RzfGVufDB8fHx8MTc2MTI4MTI2Mnww&ixlib=rb-4.1.0&q=80&w=1080",
-      "imageHint": "carrots"
-    },
-    {
-      "id": "prod-7",
-      "imageUrl": "https://images.unsplash.com/photo-1723110569402-6eec857daa4d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxsZXR0dWNlfGVufDB8fHx8MTc2MTM0Mzc1NXww&ixlib=rb-4.1.0&q=80&w=1080",
-      "imageHint": "lettuce"
-    },
-    {
-      "id": "prod-8",
-      "imageUrl": "https://images.unsplash.com/photo-1596199050105-6d5d32222916?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHx0b21hdG9lc3xlbnwwfHx8fDE3NjEzNzAxMTV8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "id": "prod-tomatoes",
+      "imageUrl": "https://images.unsplash.com/photo-1467020323552-36f7bf0e30e6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHx0b21hdG9lc3xlbnwwfHx8fDE3NjEzNzAxMTV8MA&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "tomatoes"
     },
     {
-      "id": "prod-9",
-      "imageUrl": "https://images.unsplash.com/photo-1660808600062-defd9cc275d3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxjaGlja2VuJTIwYnJlYXN0fGVufDB8fHx8MTc2MTI1MjI3OHww&ixlib=rb-4.1.0&q=80&w=1080",
-      "imageHint": "chicken breast"
+      "id": "prod-carrots",
+      "imageUrl": "https://images.unsplash.com/photo-1447175008436-054170c2e979?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxjYXJyb3RzfGVufDB8fHx8MTc2MTI4MTI2Mnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "carrots"
     },
     {
-      "id": "prod-10",
-      "imageUrl": "https://images.unsplash.com/photo-1552767059-ce182ead6c1b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8Y2hlZXNlfGVufDB8fHx8MTc2MTI2MzI5N3ww&ixlib=rb-4.1.0&q=80&w=1080",
-      "imageHint": "cheese"
+      "id": "prod-cabbage",
+      "imageUrl": "https://images.unsplash.com/photo-1579584705540-46ebde56da8d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxjYWJiYWdlfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "cabbage"
     },
     {
-      "id": "prod-11",
+      "id": "prod-cauliflower",
+      "imageUrl": "https://images.unsplash.com/photo-1566842600175-97dca489844f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxjYXVsaWZsb3dlcnxlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "cauliflower"
+    },
+    {
+      "id": "prod-capsicum-bell-pepper",
+      "imageUrl": "https://images.unsplash.com/photo-1506365069540-904bcc762636?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxiZWxsJTIwcGVwcGVyfGVufDB8fHx8MTc2MTI4ODQ5MXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "bell pepper"
+    },
+    {
+      "id": "prod-green-chilies",
+      "imageUrl": "https://images.unsplash.com/photo-1718874635150-85070e62fcf1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxncmVlbiUyMGNoaWxpZXN8ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "green chilies"
+    },
+    {
+      "id": "prod-ginger",
+      "imageUrl": "https://images.unsplash.com/photo-1573414405995-2012861b74e0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8Z2luZ2VyfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "ginger"
+    },
+    {
+      "id": "prod-garlic",
+      "imageUrl": "https://images.unsplash.com/photo-1503097325940-ae094fdb97ba?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxnYXJsaWN8ZW58MHx8fHwxNzYxMjg4NDkxfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "garlic"
+    },
+    {
+      "id": "prod-beans",
+      "imageUrl": "https://images.unsplash.com/photo-1513868853742-e7fb786265db?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxiZWFuc3xlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "beans"
+    },
+    {
+      "id": "prod-peas",
+      "imageUrl": "https://images.unsplash.com/photo-1690023614293-ac2ba2eb0731?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxwZWFzfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "peas"
+    },
+    {
+      "id": "prod-brinjal-eggplant",
+      "imageUrl": "https://images.unsplash.com/photo-1528826007177-f38517ce9a8a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxlZ2dwbGFudHxlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "eggplant"
+    },
+    {
+      "id": "prod-okra-ladys-finger",
+      "imageUrl": "https://images.unsplash.com/photo-1551207195-70cb13347c1a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8b2tyYXxlbnwwfHx8fDE3NjEzNzAzOTd8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "okra"
+    },
+    {
+      "id": "prod-spinach",
+      "imageUrl": "https://images.unsplash.com/photo-1616169775818-9f7115b8821e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxzcGluYWNofGVufDB8fHx8MTc2MTMwNzUwMHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "spinach"
+    },
+    {
+      "id": "prod-coriander-leaves",
+      "imageUrl": "https://images.unsplash.com/photo-1609149272289-9a5030d0e6c5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxjb3JpYW5kZXIlMjBsZWF2ZXN8ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "coriander leaves"
+    },
+    {
+      "id": "prod-mint-leaves",
+      "imageUrl": "https://images.unsplash.com/photo-1618130070080-91f4d55a2383?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxtaW50JTIwbGVhdmVzfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "mint leaves"
+    },
+    {
+      "id": "prod-drumstick",
+      "imageUrl": "https://images.unsplash.com/photo-1730312382990-46849973ca37?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxkcnVtc3RpY2slMjB2ZWdldGFibGV8ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "drumstick vegetable"
+    },
+    {
+      "id": "prod-radish",
+      "imageUrl": "https://images.unsplash.com/photo-1585369496137-6b539c324adc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8cmFkaXNofGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "radish"
+    },
+    {
+      "id": "prod-beetroot",
+      "imageUrl": "https://images.unsplash.com/photo-1527790806964-dfa3c2c7e032?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxiZWV0cm9vdHxlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "beetroot"
+    },
+    {
+      "id": "prod-bottle-gourd",
+      "imageUrl": "https://images.unsplash.com/photo-1581776170816-f25e78af3bcb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxib3R0bGUlMjBnb3VyZHxlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "bottle gourd"
+    },
+    {
+      "id": "prod-ridge-gourd",
+      "imageUrl": "https://images.unsplash.com/photo-1650276061963-12d36d3799c9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxyaWRnZSUyMGdvdXJkfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "ridge gourd"
+    },
+    {
+      "id": "prod-bitter-gourd",
+      "imageUrl": "https://images.unsplash.com/photo-1739903760931-bed27f3fe9b1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxiaXR0ZXIlMjBnb3VyZHxlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "bitter gourd"
+    },
+    {
+      "id": "prod-pumpkin",
+      "imageUrl": "https://images.unsplash.com/photo-1459260216545-994dda21d51a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxwdW1wa2lufGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "pumpkin"
+    },
+    {
+      "id": "prod-cucumber",
+      "imageUrl": "https://images.unsplash.com/photo-1508910238952-0dfebf373ecf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxjdWN1bWJlcnxlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "cucumber"
+    },
+    {
+      "id": "prod-raw-banana",
+      "imageUrl": "https://images.unsplash.com/photo-1559394508-84f4601e2d8a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8cmF3JTIwYmFuYW5hfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "raw banana"
+    },
+    {
+      "id": "prod-yam",
+      "imageUrl": "https://images.unsplash.com/photo-1673728684118-1538dc640b8a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHx5YW18ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "yam"
+    },
+    {
+      "id": "prod-sweet-potato",
+      "imageUrl": "https://images.unsplash.com/photo-1585443835125-d85820a16e89?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxzd2VldCUyMHBvdGF0b3xlbnwwfHx8fDE3NjEyNjMyOTd8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "sweet potato"
+    },
+    {
+      "id": "prod-broccoli",
+      "imageUrl": "https://images.unsplash.com/photo-1518164147695-36c13dd568f5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxicm9jY29saXxlbnwwfHx8fDE3NjEyODg0OTF8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "broccoli"
+    },
+    {
+      "id": "prod-zucchini",
+      "imageUrl": "https://images.unsplash.com/photo-1596056094719-10ba4f7ea650?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHx6dWNjaGluaXxlbnwwfHx8fDE3NjEyODEyNjJ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "zucchini"
+    },
+    {
+      "id": "prod-apples",
+      "imageUrl": "https://images.unsplash.com/photo-1512578659172-63a4634c05ec?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxhcHBsZXN8ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "apples"
+    },
+    {
+      "id": "prod-bananas",
+      "imageUrl": "https://images.unsplash.com/photo-1668968554885-c08ad72c2133?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxiYW5hbmFzfGVufDB8fHx8MTc2MTM3MDM5N3ww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "bananas"
+    },
+    {
+      "id": "prod-oranges",
+      "imageUrl": "https://images.unsplash.com/photo-1597714026720-8f74c62310ba?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxvcmFuZ2VzfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "oranges"
+    },
+    {
+      "id": "prod-grapes",
+      "imageUrl": "https://images.unsplash.com/photo-1537640538966-79f369143f8f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxncmFwZXN8ZW58MHx8fHwxNzYxMzA3NDE2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "grapes"
+    },
+    {
+      "id": "prod-mangoes",
+      "imageUrl": "https://images.unsplash.com/photo-1501746877-14782df58970?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxtYW5nb2VzfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "mangoes"
+    },
+    {
+      "id": "prod-papaya",
+      "imageUrl": "https://images.unsplash.com/photo-1562959148-2021870ff3f4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxwYXBheWF8ZW58MHx8fHwxNzYxMzcwMzk3fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "papaya"
+    },
+    {
+      "id": "prod-pineapple",
+      "imageUrl": "https://images.unsplash.com/photo-1490885578174-acda8905c2c6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxwaW5lYXBwbGV8ZW58MHx8fHwxNzYxMzM2MTIwfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "pineapple"
+    },
+    {
+      "id": "prod-watermelon",
+      "imageUrl": "https://images.unsplash.com/photo-1652031552021-50bcc01121a7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHx3YXRlcm1lbG9ufGVufDB8fHx8MTc2MTMwNzQxNnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "watermelon"
+    },
+    {
+      "id": "prod-muskmelon",
+      "imageUrl": "https://images.unsplash.com/photo-1732565277370-874e0dc0aac5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxtdXNrbWVsb258ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "muskmelon"
+    },
+    {
+      "id": "prod-guava",
+      "imageUrl": "https://images.unsplash.com/photo-1536511132770-e5058c7e8c46?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxndWF2YXxlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "guava"
+    },
+    {
+      "id": "prod-pomegranate",
+      "imageUrl": "https://images.unsplash.com/photo-1615485925600-97237c4fc1ec?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxwb21lZ3JhbmF0ZXxlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "pomegranate"
+    },
+    {
+      "id": "prod-chikoo-sapota",
+      "imageUrl": "https://images.unsplash.com/photo-1562753203-6d96e4af0dc2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxzYXBvdGF8ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "sapota"
+    },
+    {
+      "id": "prod-strawberries",
+      "imageUrl": "https://images.unsplash.com/photo-1543158181-e6f9f6712055?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxzdHJhd2JlcnJpZXN8ZW58MHx8fHwxNzYxMjg4NDkxfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "strawberries"
+    },
+    {
+      "id": "prod-kiwi",
+      "imageUrl": "https://images.unsplash.com/photo-1572565638061-ecff52429d86?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8a2l3aXxlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "kiwi"
+    },
+    {
+      "id": "prod-pears",
+      "imageUrl": "https://images.unsplash.com/photo-1601876814226-443511d81ddc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxwZWFyc3xlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "pears"
+    },
+    {
+      "id": "prod-plums",
+      "imageUrl": "https://images.unsplash.com/photo-1627544282015-38a64d2ce8c1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxwbHVtc3xlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "plums"
+    },
+    {
+      "id": "prod-dates",
+      "imageUrl": "https://images.unsplash.com/photo-1663505305541-568514a89711?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxkYXRlc3xlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "dates"
+    },
+    {
+      "id": "prod-dry-figs",
+      "imageUrl": "https://images.unsplash.com/photo-1737098192021-f3392d31685e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8ZHJ5JTIwZmlnc3xlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "dry figs"
+    },
+    {
+      "id": "prod-coconut",
+      "imageUrl": "https://images.unsplash.com/photo-1588413335653-34b770bca7c1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxjb2NvbnV0fGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "coconut"
+    },
+    {
+      "id": "prod-lemons",
+      "imageUrl": "https://images.unsplash.com/photo-1687272901949-2a518b04417a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxsZW1vbnN8ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "lemons"
+    },
+    {
+      "id": "prod-rice-raw-boiled-basmati-brown-etc",
+      "imageUrl": "https://images.unsplash.com/photo-1723475158232-819e29803f4d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxyaWNlfGVufDB8fHx8MTc2MTMxNDYyNXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "rice"
+    },
+    {
+      "id": "prod-wheat",
+      "imageUrl": "https://images.unsplash.com/photo-1501430654243-c934cec2e1c0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHx3aGVhdHxlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "wheat"
+    },
+    {
+      "id": "prod-maida-refined-flour",
+      "imageUrl": "https://images.unsplash.com/photo-1565607052745-35f8c6ba59b1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxyZWZpbmVkJTIwZmxvdXJ8ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "refined flour"
+    },
+    {
+      "id": "prod-suji-rava-semolina",
+      "imageUrl": "https://images.unsplash.com/photo-1683553942811-bb8c39424fa2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxzZW1vbGluYXxlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "semolina"
+    },
+    {
+      "id": "prod-poha-flattened-rice",
+      "imageUrl": "https://images.unsplash.com/photo-1505216980056-a7b7b1c6e000?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxmbGF0dGVuZWQlMjByaWNlfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "flattened rice"
+    },
+    {
+      "id": "prod-oats",
+      "imageUrl": "https://images.unsplash.com/photo-1501432781167-c0ccfd492297?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxvYXRzfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "oats"
+    },
+    {
+      "id": "prod-cornflakes",
+      "imageUrl": "https://images.unsplash.com/photo-1714686650962-c5c4d33213b8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxjb3JuZmxha2VzfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "cornflakes"
+    },
+    {
+      "id": "prod-millets-jowar-bajra-ragi-foxtail-etc",
+      "imageUrl": "https://images.unsplash.com/photo-1739395788205-704c225178f9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8bWlsbGV0c3xlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "millets"
+    },
+    {
+      "id": "prod-broken-wheat-dalia",
+      "imageUrl": "https://images.unsplash.com/photo-1620046732598-b5ff29bc4270?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8YnJva2VuJTIwd2hlYXR8ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "broken wheat"
+    },
+    {
+      "id": "prod-toor-dal-arhar-dal",
+      "imageUrl": "https://images.unsplash.com/photo-1702041357314-db5826c96f04?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHx0b29yJTIwZGFsfGVufDB8fHx8MTc2MTI5ODAxOHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "toor dal"
+    },
+    {
+      "id": "prod-moong-dal-yellow-split",
+      "imageUrl": "https://images.unsplash.com/photo-1653279403693-4ad51964210d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxtb29uZyUyMGRhbHxlbnwwfHx8fDE3NjEzMTkyNDJ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "moong dal"
+    },
+    {
+      "id": "prod-masoor-dal-red-lentil",
+      "imageUrl": "https://images.unsplash.com/photo-1626933176453-85751fb4a825?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxtYXNvb3IlMjBkYWx8ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "masoor dal"
+    },
+    {
+      "id": "prod-chana-dal",
+      "imageUrl": "https://images.unsplash.com/photo-1583590019912-19cdc55ec80e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxjaGFuYSUyMGRhbHxlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "chana dal"
+    },
+    {
+      "id": "prod-urad-dal",
+      "imageUrl": "https://images.unsplash.com/photo-1759521296144-fe6f2d2dc769?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHx1cmFkJTIwZGFsfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "urad dal"
+    },
+    {
+      "id": "prod-rajma-kidney-beans",
+      "imageUrl": "https://images.unsplash.com/photo-1579705745811-a32bef7856a3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxraWRuZXklMjBiZWFuc3xlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "kidney beans"
+    },
+    {
+      "id": "prod-kabuli-chana-white-chickpeas",
+      "imageUrl": "https://images.unsplash.com/photo-1644432757699-bb5a01e8fb0e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxjaGlja3BlYXN8ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "chickpeas"
+    },
+    {
+      "id": "prod-kala-chana-black-chickpeas",
+      "imageUrl": "https://images.unsplash.com/photo-1628445550863-18735b48d1eb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxibGFjayUyMGNoaWNrcGVhc3xlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "black chickpeas"
+    },
+    {
+      "id": "prod-green-gram",
+      "imageUrl": "https://images.unsplash.com/photo-1651678938439-fc3f8f03eda5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxncmVlbiUyMGdyYW18ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "green gram"
+    },
+    {
+      "id": "prod-lobia-black-eyed-peas",
+      "imageUrl": "https://images.unsplash.com/photo-1515347272087-685ce5a1fc8b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxibGFjay1leWVkJTIwcGVhc3xlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "black-eyed peas"
+    },
+    {
+      "id": "prod-soya-chunks",
+      "imageUrl": "https://picsum.photos/seed/soya-chunks/300/300",
+      "imageHint": "soya chunks"
+    },
+    {
+      "id": "prod-horse-gram",
+      "imageUrl": "https://images.unsplash.com/photo-1559208944-1cf07933f7b5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxob3JzZSUyMGdyYW18ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "horse gram"
+    },
+    {
+      "id": "prod-salt",
+      "imageUrl": "https://images.unsplash.com/photo-1614759258004-39da973d3268?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxzYWx0fGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "salt"
+    },
+    {
+      "id": "prod-turmeric-powder",
+      "imageUrl": "https://images.unsplash.com/photo-1667889244329-7d34a4641a72?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHx0dXJtZXJpYyUyMHBvd2RlcnxlbnwwfHx8fDE3NjEzMDc1MDB8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "turmeric powder"
+    },
+    {
+      "id": "prod-red-chili-powder",
+      "imageUrl": "https://images.unsplash.com/photo-1547332226-395d746d139a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxjaGlsaSUyMHBvd2RlcnxlbnwwfHx8fDE3NjEzMDc1MDB8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "chili powder"
+    },
+    {
+      "id": "prod-coriander-powder",
+      "imageUrl": "https://images.unsplash.com/photo-1751717391622-34d83e295beb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8Y29yaWFuZGVyJTIwcG93ZGVyfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "coriander powder"
+    },
+    {
+      "id": "prod-cumin-seeds",
+      "imageUrl": "https://images.unsplash.com/photo-1731970820339-e725b78f55e4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxjdW1pbiUyMHNlZWRzfGVufDB8fHx8MTc2MTMwMjM0NHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "cumin seeds"
+    },
+    {
+      "id": "prod-mustard-seeds",
+      "imageUrl": "https://images.unsplash.com/photo-1573804439989-5e69c2bdc6ac?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxtdXN0YXJkJTIwc2VlZHN8ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "mustard seeds"
+    },
+    {
+      "id": "prod-fenugreek-seeds",
+      "imageUrl": "https://images.unsplash.com/photo-1732343975383-f73f6d39cd08?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxmZW51Z3JlZWslMjBzZWVkc3xlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "fenugreek seeds"
+    },
+    {
+      "id": "prod-garam-masala",
+      "imageUrl": "https://images.unsplash.com/photo-1641385739374-ff132668908f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxnYXJhbSUyMG1hc2FsYXxlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "garam masala"
+    },
+    {
+      "id": "prod-black-pepper",
+      "imageUrl": "https://images.unsplash.com/photo-1574685379681-1aacfc4f22d8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxibGFjayUyMHBlcHBlcnxlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "black pepper"
+    },
+    {
+      "id": "prod-cloves",
+      "imageUrl": "https://images.unsplash.com/photo-1701191307664-1cec970d7595?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxjbG92ZXN8ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "cloves"
+    },
+    {
+      "id": "prod-cardamom",
+      "imageUrl": "https://images.unsplash.com/photo-1701190588800-67a7007492ad?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxjYXJkYW1vbXxlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "cardamom"
+    },
+    {
+      "id": "prod-cinnamon",
+      "imageUrl": "https://images.unsplash.com/photo-1550807014-1236e91b92d4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxjaW5uYW1vbnxlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "cinnamon"
+    },
+    {
+      "id": "prod-bay-leaf",
+      "imageUrl": "https://images.unsplash.com/photo-1526130963484-68fa9ba0717a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxiYXklMjBsZWFmfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "bay leaf"
+    },
+    {
+      "id": "prod-fennel-seeds-saunf",
+      "imageUrl": "https://images.unsplash.com/photo-1755441223328-d4a57d3163ba?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxmZW5uZWwlMjBzZWVkc3xlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "fennel seeds"
+    },
+    {
+      "id": "prod-curry-leaves",
+      "imageUrl": "https://images.unsplash.com/photo-1662097735076-1eeb3aafa3ab?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxjdXJyeSUyMGxlYXZlc3xlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "curry leaves"
+    },
+    {
+      "id": "prod-hing-asafoetida",
+      "imageUrl": "https://picsum.photos/seed/asafoetida/300/300",
+      "imageHint": "asafoetida"
+    },
+    {
+      "id": "prod-kasuri-methi-dried-fenugreek",
+      "imageUrl": "https://images.unsplash.com/photo-1551848739-00f229d30d81?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxkcmllZCUyMGZlbnVncmVla3xlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "dried fenugreek"
+    },
+    {
+      "id": "prod-tamarind",
+      "imageUrl": "https://images.unsplash.com/photo-1613518398765-0b04e1969a77?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8dGFtYXJpbmR8ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "tamarind"
+    },
+    {
+      "id": "prod-dry-red-chilies",
+      "imageUrl": "https://images.unsplash.com/photo-1604922324393-d257daac06d9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxkcnklMjBjaGlsaWVzfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "dry chilies"
+    },
+    {
+      "id": "prod-sunflower-oil",
+      "imageUrl": "https://images.unsplash.com/photo-1717056577965-194f5228a09d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxzdW5mbG93ZXIlMjBvaWx8ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "sunflower oil"
+    },
+    {
+      "id": "prod-groundnut-oil",
+      "imageUrl": "https://images.unsplash.com/photo-1640958905323-45e9891309fc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxncm91bmRudXQlMjBvaWx8ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "groundnut oil"
+    },
+    {
+      "id": "prod-mustard-oil",
+      "imageUrl": "https://images.unsplash.com/photo-1647977021236-9957bd2633bb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxtdXN0YXJkJTIwb2lsfGVufDB8fHx8MTc2MTMyNzg4OXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "mustard oil"
+    },
+    {
+      "id": "prod-coconut-oil",
+      "imageUrl": "https://images.unsplash.com/photo-1627245784359-d8264960b62a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxjb2NvbnV0JTIwb2lsfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "coconut oil"
+    },
+    {
+      "id": "prod-palm-oil",
+      "imageUrl": "https://images.unsplash.com/photo-1620509400948-f9c2c0a61e37?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxwYWxtJTIwb2lsfGVufDB8fHx8MTc2MTM3MDExNXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "palm oil"
+    },
+    {
+      "id": "prod-olive-oil",
+      "imageUrl": "https://images.unsplash.com/photo-1610547939489-73202bc6afda?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxvbGl2ZSUyMG9pbHxlbnwwfHx8fDE3NjEzMTgyNTR8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "olive oil"
+    },
+    {
+      "id": "prod-rice-bran-oil",
+      "imageUrl": "https://images.unsplash.com/photo-1654245495489-6616a6ca252e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxyaWNlJTIwYnJhbiUyMG9pbHxlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "rice bran oil"
+    },
+    {
+      "id": "prod-ghee-clarified-butter",
+      "imageUrl": "https://images.unsplash.com/photo-1707425197455-bd0639a0efd4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxnaGVlfGVufDB8fHx8MTc2MTMzNDUzNXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "ghee"
+    },
+    {
+      "id": "prod-butter",
+      "imageUrl": "https://images.unsplash.com/photo-1573812461383-e5f8b759d12e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxidXR0ZXJ8ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "butter"
+    },
+    {
+      "id": "prod-tomato-ketchup",
+      "imageUrl": "https://images.unsplash.com/photo-1611100369029-c0d5ddb80a51?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHx0b21hdG8lMjBrZXRjaHVwfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "tomato ketchup"
+    },
+    {
+      "id": "prod-soy-sauce",
+      "imageUrl": "https://images.unsplash.com/photo-1582581720432-de83a98176ab?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxzb3klMjBzYXVjZXxlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "soy sauce"
+    },
+    {
+      "id": "prod-vinegar",
+      "imageUrl": "https://images.unsplash.com/photo-1649533689664-55c670b25124?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8dmluZWdhcnxlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "vinegar"
+    },
+    {
+      "id": "prod-green-chili-sauce",
+      "imageUrl": "https://images.unsplash.com/photo-1613360734521-adef8a377347?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxjaGlsaSUyMHNhdWNlfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "chili sauce"
+    },
+    {
+      "id": "prod-red-chili-sauce",
+      "imageUrl": "https://images.unsplash.com/photo-1690944082468-b370cdac9dcd?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxyZWQlMjBzYXVjZXxlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "red sauce"
+    },
+    {
+      "id": "prod-mustard-sauce",
+      "imageUrl": "https://images.unsplash.com/photo-1654747780222-f5ce1c0dd567?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxtdXN0YXJkJTIwc2F1Y2V8ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "mustard sauce"
+    },
+    {
+      "id": "prod-mayonnaise",
+      "imageUrl": "https://images.unsplash.com/photo-1678104996863-86ef97e10876?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxtYXlvbm5haXNlfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "mayonnaise"
+    },
+    {
+      "id": "prod-pickles-mango-lime-mixed-etc",
+      "imageUrl": "https://images.unsplash.com/photo-1576020301507-5d5a00982053?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxwaWNrbGVzfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "pickles"
+    },
+    {
+      "id": "prod-chutneys-coconut-mint-tamarind",
+      "imageUrl": "https://images.unsplash.com/photo-1591465619339-60fce055bc82?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxjaHV0bmV5c3xlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "chutneys"
+    },
+    {
+      "id": "prod-milk",
+      "imageUrl": "https://images.unsplash.com/photo-1563636619-e9143da7973b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxtaWxrfGVufDB8fHx8MTc2MTM3MDExNXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "milk"
+    },
+    {
+      "id": "prod-curd-yogurt",
       "imageUrl": "https://images.unsplash.com/photo-1564149503905-7fef56abc1f2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHx5b2d1cnR8ZW58MHx8fHwxNzYxMzcwMTE1fDA&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "yogurt"
     },
     {
-      "id": "prod-12",
-      "imageUrl": "https://images.unsplash.com/photo-1551892374-ecf8754cf8b0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxwYXN0YXxlbnwwfHx8fDE3NjEyODU1ODl8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "id": "prod-paneer-cottage-cheese",
+      "imageUrl": "https://images.unsplash.com/photo-1588612218075-96c1d8617de7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxjb3R0YWdlJTIwY2hlZXNlfGVufDB8fHx8MTc2MTM3MDM5N3ww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "cottage cheese"
+    },
+    {
+      "id": "prod-cheese",
+      "imageUrl": "https://images.unsplash.com/photo-1452195100486-9cc805987862?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxjaGVlc2V8ZW58MHx8fHwxNzYxMjYzMjk3fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "cheese"
+    },
+    {
+      "id": "prod-fresh-cream",
+      "imageUrl": "https://images.unsplash.com/photo-1593250078127-b24780fa0d6b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxmcmVzaCUyMGNyZWFtfGVufDB8fHx8MTc2MTM3MDM5N3ww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "fresh cream"
+    },
+    {
+      "id": "prod-bread-white-brown-multigrain",
+      "imageUrl": "https://images.unsplash.com/photo-1486887396153-fa416526c108?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxicmVhZHxlbnwwfHx8fDE3NjEyODc4ODl8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "bread"
+    },
+    {
+      "id": "prod-buns",
+      "imageUrl": "https://images.unsplash.com/photo-1632552544552-3ca612a328ac?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxidW5zfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "buns"
+    },
+    {
+      "id": "prod-pav",
+      "imageUrl": "https://images.unsplash.com/photo-1605189361149-8db06ad7baf6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxwYXYlMjBicmVhZHxlbnwwfHx8fDE3NjEzNzAzOTd8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "pav bread"
+    },
+    {
+      "id": "prod-biscuits",
+      "imageUrl": "https://images.unsplash.com/photo-1598839950984-034f6dc7b495?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxiaXNjdWl0c3xlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "biscuits"
+    },
+    {
+      "id": "prod-rusks",
+      "imageUrl": "https://images.unsplash.com/photo-1690642108924-4e8201022cc0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxydXNrc3xlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "rusks"
+    },
+    {
+      "id": "prod-cakes",
+      "imageUrl": "https://images.unsplash.com/photo-1562440499-64c9a111f713?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxjYWtlc3xlbnwwfHx8fDE3NjEzNzAzOTd8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "cakes"
+    },
+    {
+      "id": "prod-muffins",
+      "imageUrl": "https://images.unsplash.com/photo-1634513760358-849d427caaad?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxtdWZmaW5zfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "muffins"
+    },
+    {
+      "id": "prod-pancake-mix",
+      "imageUrl": "https://images.unsplash.com/photo-1707222636984-e31164031ffa?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxwYW5jYWtlJTIwbWl4fGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "pancake mix"
+    },
+    {
+      "id": "prod-wafers",
+      "imageUrl": "https://images.unsplash.com/photo-1684675137226-8d7f5b5efca3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHx3YWZlcnN8ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "wafers"
+    },
+    {
+      "id": "prod-breakfast-cereals",
+      "imageUrl": "https://images.unsplash.com/photo-1657809029568-17a94d053091?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxicmVha2Zhc3QlMjBjZXJlYWxzfGVufDB8fHx8MTc2MTM3MDM5N3ww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "breakfast cereals"
+    },
+    {
+      "id": "prod-tea-powder",
+      "imageUrl": "https://images.unsplash.com/photo-1631149206144-4549c0468787?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHx0ZWElMjBwb3dkZXJ8ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "tea powder"
+    },
+    {
+      "id": "prod-coffee-powder",
+      "imageUrl": "https://images.unsplash.com/photo-1509785307050-d4066910ec1e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxjb2ZmZWUlMjBwb3dkZXJ8ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "coffee powder"
+    },
+    {
+      "id": "prod-green-tea",
+      "imageUrl": "https://images.unsplash.com/photo-1622480916113-9000ac49b79d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxncmVlbiUyMHRlYXxlbnwwfHx8fDE3NjEzMjA3ODl8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "green tea"
+    },
+    {
+      "id": "prod-milk-powder",
+      "imageUrl": "https://images.unsplash.com/photo-1712056407271-e51fdc896637?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxtaWxrJTIwcG93ZGVyfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "milk powder"
+    },
+    {
+      "id": "prod-soft-drinks",
+      "imageUrl": "https://images.unsplash.com/photo-1533007716222-4b465613a984?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxzb2Z0JTIwZHJpbmtzfGVufDB8fHx8MTc2MTMyNTUzMXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "soft drinks"
+    },
+    {
+      "id": "prod-juices",
+      "imageUrl": "https://images.unsplash.com/photo-1551198297-094dd136d3e9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxqdWljZXN8ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "juices"
+    },
+    {
+      "id": "prod-coconut-water",
+      "imageUrl": "https://images.unsplash.com/photo-1535922964111-cf1f1e862dcc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxjb2NvbnV0JTIwd2F0ZXJ8ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "coconut water"
+    },
+    {
+      "id": "prod-energy-drinks",
+      "imageUrl": "https://images.unsplash.com/photo-1622543925917-763c34d1a86e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxlbmVyZ3klMjBkcmlua3N8ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "energy drinks"
+    },
+    {
+      "id": "prod-chicken",
+      "imageUrl": "https://images.unsplash.com/photo-1548550023-2bdb3c5beed7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxjaGlja2VufGVufDB8fHx8MTc2MTMyMDIwM3ww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "chicken"
+    },
+    {
+      "id": "prod-mutton",
+      "imageUrl": "https://images.unsplash.com/photo-1701579231349-d7459c40919d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxtdXR0b258ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "mutton"
+    },
+    {
+      "id": "prod-fish",
+      "imageUrl": "https://images.unsplash.com/photo-1524704654690-b56c05c78a00?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxmaXNofGVufDB8fHx8MTc2MTM3MDM5N3ww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "fish"
+    },
+    {
+      "id": "prod-eggs",
+      "imageUrl": "https://images.unsplash.com/photo-1506976785307-8732e854ad03?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxlZ2dzfGVufDB8fHx8MTc2MTI4ODQ5MXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "eggs"
+    },
+    {
+      "id": "prod-prawns",
+      "imageUrl": "https://images.unsplash.com/photo-1504309250229-4f08315f3b5c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxwcmF3bnN8ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "prawns"
+    },
+    {
+      "id": "prod-frozen-parathas",
+      "imageUrl": "https://images.unsplash.com/photo-1702028351803-eb75f7f4f21b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxmcm96ZW4lMjBwYXJhdGhhc3xlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "frozen parathas"
+    },
+    {
+      "id": "prod-frozen-vegetables",
+      "imageUrl": "https://images.unsplash.com/photo-1621800971860-72ffb1a83f6b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxmcm96ZW4lMjB2ZWdldGFibGVzfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "frozen vegetables"
+    },
+    {
+      "id": "prod-nuggets-cutlets",
+      "imageUrl": "https://images.unsplash.com/photo-1569691899455-88464f6d3ab1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxudWdnZXRzfGVufDB8fHx8MTc2MTI4OTU2Mnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "nuggets"
+    },
+    {
+      "id": "prod-sausages",
+      "imageUrl": "https://images.unsplash.com/photo-1624772398061-bbfa87ec6b5a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxzYXVzYWdlc3xlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "sausages"
+    },
+    {
+      "id": "prod-maggi-noodles",
+      "imageUrl": "https://images.unsplash.com/photo-1612929633738-8fe44f7ec841?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxub29kbGVzfGVufDB8fHx8MTc2MTI4OTU2Mnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "noodles"
+    },
+    {
+      "id": "prod-pasta",
+      "imageUrl": "https://images.unsplash.com/photo-1611270629569-8b357cb88da9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxwYXN0YXxlbnwwfHx8fDE3NjEzMDEwNjB8MA&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "pasta"
     },
     {
-      "id": "prod-13",
-      "imageUrl": "https://images.unsplash.com/photo-1635562985686-4f8bb9c0d3bf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxyaWNlfGVufDB8fHx8MTc2MTMxNDYyNXww&ixlib=rb-4.1.0&q=80&w=1080",
-      "imageHint": "rice"
+      "id": "prod-vermicelli",
+      "imageUrl": "https://images.unsplash.com/photo-1757845301698-da07924946a0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHx2ZXJtaWNlbGxpfGVufDB8fHx8MTc2MTM3MDM5N3ww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "vermicelli"
     },
     {
-      "id": "prod-14",
-      "imageUrl": "https://images.unsplash.com/photo-1582401656496-9d75f95f9018?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxjZXJlYWx8ZW58MHx8fHwxNzYxMzcwMTE1fDA&ixlib=rb-4.1.0&q=80&w=1080",
-      "imageHint": "cereal"
+      "id": "prod-soup-packets",
+      "imageUrl": "https://images.unsplash.com/photo-1732638345992-5011e43adbf8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxzb3VwJTIwcGFja2V0c3xlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "soup packets"
     },
     {
-      "id": "prod-15",
-      "imageUrl": "https://images.unsplash.com/photo-1599360889420-da1afaba9edc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8b3JhbmdlJTIwanVpY2V8ZW58MHx8fHwxNzYxMjY2NDM5fDA&ixlib=rb-4.1.0&q=80&w=1080",
-      "imageHint": "orange juice"
+      "id": "prod-instant-upma-poha-mix",
+      "imageUrl": "https://picsum.photos/seed/instant-mix/300/300",
+      "imageHint": "instant mix"
+    },
+    {
+      "id": "prod-instant-rice",
+      "imageUrl": "https://images.unsplash.com/photo-1757845301698-da07924946a0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxpbnN0YW50JTIwcmljZXxlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "instant rice"
+    },
+    {
+      "id": "prod-frozen-pizzas",
+      "imageUrl": "https://images.unsplash.com/photo-1623398969394-2c02e167498e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxmcm96ZW4lMjBwaXp6YXN8ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "frozen pizzas"
+    },
+    {
+      "id": "prod-ready-curries-gravies",
+      "imageUrl": "https://images.unsplash.com/photo-1637194502510-09d5a08e7535?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxyZWFkeSUyMGN1cnJpZXN8ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "ready curries"
+    },
+    {
+      "id": "prod-dishwashing-liquid",
+      "imageUrl": "https://images.unsplash.com/photo-1623008548370-90e908279959?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxkaXNod2FzaGluZyUyMGxpcXVpZHxlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "dishwashing liquid"
+    },
+    {
+      "id": "prod-detergent-powder",
+      "imageUrl": "https://images.unsplash.com/photo-1612690118600-d337bc605841?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxkZXRlcmdlbnQlMjBwb3dkZXJ8ZW58MHx8fHwxNzYxMjk4MDE4fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "detergent powder"
+    },
+    {
+      "id": "prod-floor-cleaner",
+      "imageUrl": "https://images.unsplash.com/photo-1758272421516-9593de0fb5bf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxmbG9vciUyMGNsZWFuZXJ8ZW58MHx8fHwxNzYxMzE1MTc2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "floor cleaner"
+    },
+    {
+      "id": "prod-toilet-cleaner",
+      "imageUrl": "https://images.unsplash.com/photo-1622080511983-e3966935f47e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHx0b2lsZXQlMjBjbGVhbmVyfGVufDB8fHx8MTc2MTMxNTE3Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "toilet cleaner"
+    },
+    {
+      "id": "prod-scrub-pads",
+      "imageUrl": "https://images.unsplash.com/photo-1740324974111-462f7611f599?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8c2NydWIlMjBwYWRzfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "scrub pads"
+    },
+    {
+      "id": "prod-mop",
+      "imageUrl": "https://images.unsplash.com/photo-1664008760004-182420e58e7c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxtb3B8ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "mop"
+    },
+    {
+      "id": "prod-broom",
+      "imageUrl": "https://images.unsplash.com/photo-1627211064753-a449b5dd0e45?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxicm9vbXxlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "broom"
+    },
+    {
+      "id": "prod-garbage-bags",
+      "imageUrl": "https://images.unsplash.com/photo-1606037150583-fb842a55bae7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxnYXJiYWdlJTIwYmFnc3xlbnwwfHx8fDE3NjEzMDg0NzR8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "garbage bags"
+    },
+    {
+      "id": "prod-room-freshener",
+      "imageUrl": "https://images.unsplash.com/photo-1743689374210-2e355b54cf16?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxyb29tJTIwZnJlc2hlbmVyfGVufDB8fHx8MTc2MTM3MDM5N3ww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "room freshener"
+    },
+    {
+      "id": "prod-soap",
+      "imageUrl": "https://images.unsplash.com/photo-1584305574647-0cc949a2bb9f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxzb2FwfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "soap"
+    },
+    {
+      "id": "prod-shampoo",
+      "imageUrl": "https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxzaGFtcG9vfGVufDB8fHx8MTc2MTM3MDM5N3ww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "shampoo"
+    },
+    {
+      "id": "prod-toothpaste",
+      "imageUrl": "https://images.unsplash.com/photo-1550985543-f1ea83691cd8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHx0b290aHBhc3RlfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "toothpaste"
+    },
+    {
+      "id": "prod-toothbrush",
+      "imageUrl": "https://images.unsplash.com/photo-1607613009820-a29f7bb81c04?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHx0b290aGJydXNofGVufDB8fHx8MTc2MTM0MDg5N3ww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "toothbrush"
+    },
+    {
+      "id": "prod-hair-oil",
+      "imageUrl": "https://images.unsplash.com/photo-1699373381578-2663708d7f02?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxoYWlyJTIwb2lsfGVufDB8fHx8MTc2MTI4ODc2NXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "hair oil"
+    },
+    {
+      "id": "prod-face-wash",
+      "imageUrl": "https://images.unsplash.com/photo-1509384473936-2d36ab6e198d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8ZmFjZSUyMHdhc2h8ZW58MHx8fHwxNzYxMjgzODg3fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "face wash"
+    },
+    {
+      "id": "prod-moisturizer",
+      "imageUrl": "https://images.unsplash.com/photo-1629732097571-b042b35aa3ed?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxtb2lzdHVyaXplcnxlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "moisturizer"
+    },
+    {
+      "id": "prod-shaving-cream-razor",
+      "imageUrl": "https://images.unsplash.com/photo-1510711070725-068a3a878a99?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxzaGF2aW5nJTIwY3JlYW18ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "shaving cream"
+    },
+    {
+      "id": "prod-sanitary-pads",
+      "imageUrl": "https://images.unsplash.com/photo-1705957946296-d5739f903fba?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxzYW5pdGFyeSUyMHBhZHN8ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "sanitary pads"
+    },
+    {
+      "id": "prod-hand-wash",
+      "imageUrl": "https://images.unsplash.com/photo-1584744638065-c6bb272cd741?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxoYW5kJTIwd2FzaHxlbnwwfHx8fDE3NjEyOTcxOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "hand wash"
+    },
+    {
+      "id": "prod-agarbatti-incense-sticks",
+      "imageUrl": "https://images.unsplash.com/photo-1599030032319-d78295597e0d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxpbmNlbnNlJTIwc3RpY2tzfGVufDB8fHx8MTc2MTI0Nzc0MXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "incense sticks"
+    },
+    {
+      "id": "prod-camphor",
+      "imageUrl": "https://images.unsplash.com/photo-1712134889858-9004516c4861?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxjYW1waG9yfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "camphor"
+    },
+    {
+      "id": "prod-cotton-wicks",
+      "imageUrl": "https://images.unsplash.com/photo-1604666047136-2594c3a47713?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxjb3R0b24lMjB3aWNrc3xlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "cotton wicks"
+    },
+    {
+      "id": "prod-kumkum",
+      "imageUrl": "https://images.unsplash.com/photo-1692902288473-08b02773fe6c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxrdW1rdW18ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "kumkum"
+    },
+    {
+      "id": "prod-matchbox-candle",
+      "imageUrl": "https://images.unsplash.com/photo-1611176682835-871a38ddc9d3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxtYXRjaGJveHxlbnwwfHx8fDE3NjEzMTQwMTd8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "matchbox"
+    },
+    {
+      "id": "prod-dog-food-cat-food",
+      "imageUrl": "https://images.unsplash.com/photo-1598134493179-51332e56807f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxwZXQlMjBmb29kfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "pet food"
+    },
+    {
+      "id": "prod-pet-shampoo",
+      "imageUrl": "https://images.unsplash.com/photo-1629030502047-b6ac6d4a78b6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxwZXQlMjBzaGFtcG9vfGVufDB8fHx8MTc2MTM3MDM5N3ww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "pet shampoo"
+    },
+    {
+      "id": "prod-feeding-bowl",
+      "imageUrl": "https://images.unsplash.com/photo-1683445895338-8fbf3120f3c7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxmZWVkaW5nJTIwYm93bHxlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "feeding bowl"
+    },
+    {
+      "id": "prod-aluminium-foil",
+      "imageUrl": "https://images.unsplash.com/photo-1618615580649-1a4bc3bea1e5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8YWx1bWluaXVtJTIwZm9pbHxlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "aluminium foil"
+    },
+    {
+      "id": "prod-tissue-paper",
+      "imageUrl": "https://images.unsplash.com/photo-1609840112990-4265448268d1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHx0aXNzdWUlMjBwYXBlcnxlbnwwfHx8fDE3NjEzNzAzOTZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "tissue paper"
+    },
+    {
+      "id": "prod-plastic-covers",
+      "imageUrl": "https://images.unsplash.com/photo-1694610882150-4de206edf95a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxwbGFzdGljJTIwY292ZXJzfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "plastic covers"
+    },
+    {
+      "id": "prod-ziplock-bags",
+      "imageUrl": "https://images.unsplash.com/photo-1703564202854-7edbe5582bd2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8emlwbG9jayUyMGJhZ3N8ZW58MHx8fHwxNzYxMzcwMzk3fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "ziplock bags"
+    },
+    {
+      "id": "prod-batteries",
+      "imageUrl": "https://images.unsplash.com/photo-1619641805634-b867f535071c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxiYXR0ZXJpZXN8ZW58MHx8fHwxNzYxMzcwMzk2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "batteries"
+    },
+    {
+      "id": "prod-lighter",
+      "imageUrl": "https://images.unsplash.com/photo-1576969500732-12cc9992a5f4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxsaWdodGVyfGVufDB8fHx8MTc2MTM3MDM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "lighter"
     }
   ]
 }

@@ -598,7 +598,7 @@ function CreateStoreForm({ user }) {
         const storeData = {
             ...data,
             ownerId: user.uid,
-            imageId: `store-${Math.floor(Math.random() * 10)}`,
+            imageId: `store-${Math.floor(Math.random() * 3) + 1}`,
         };
         const storesCol = collection(firestore, 'stores');
         
