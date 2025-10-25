@@ -26,8 +26,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { revalidateStorePaths, revalidateProductPaths } from '@/app/actions';
 import type { Store, Product } from '@/lib/types';
-import { useFirebase, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, query, where, addDoc, writeBatch, doc, updateDoc } from 'firebase/firestore';
+import { useFirebase, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, deleteDocumentNonBlocking } from '@/firebase';
+import { collection, query, where, addDoc, writeBatch, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import {
   Table,
@@ -41,7 +41,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Checkbox } from '@/components/ui/checkbox';
 import groceryData from '@/lib/grocery-data.json';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Share2, MapPin } from 'lucide-react';
+import { Share2, MapPin, Trash2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const storeSchema = z.object({
@@ -472,6 +472,9 @@ function UpdateLocationForm({ store, onUpdate }: { store: Store, onUpdate: () =>
 
 function ManageStoreView({ store }: { store: Store }) {
     const { firestore } = useFirebase();
+    const { toast } = useToast();
+    const [isDeleting, startDeleteTransition] = useTransition();
+
 
     const productsQuery = useMemoFirebase(() => {
         if (!firestore) return null;
@@ -481,6 +484,31 @@ function ManageStoreView({ store }: { store: Store }) {
     const { data: products, isLoading } = useCollection<Product>(productsQuery);
     
     const needsLocationUpdate = !store.latitude || !store.longitude;
+
+    const handleDeleteProduct = (productId: string, productName: string) => {
+        if (!firestore) return;
+        
+        startDeleteTransition(async () => {
+            const productRef = doc(firestore, 'stores', store.id, 'products', productId);
+            try {
+                // Using non-blocking delete for better UI experience
+                deleteDocumentNonBlocking(productRef);
+                
+                toast({
+                    title: "Product Deleted",
+                    description: `${productName} has been removed from your inventory.`,
+                });
+                // The useCollection hook will automatically update the UI
+            } catch (error) {
+                 toast({
+                    variant: 'destructive',
+                    title: "Deletion Failed",
+                    description: `Could not delete ${productName}.`,
+                });
+            }
+        });
+    };
+
 
     return (
       <div className="space-y-8">
@@ -511,6 +539,7 @@ function ManageStoreView({ store }: { store: Store }) {
                                 <TableHead>Name</TableHead>
                                 <TableHead>Price</TableHead>
                                 <TableHead>Category</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -519,6 +548,17 @@ function ManageStoreView({ store }: { store: Store }) {
                                     <TableCell>{product.name}</TableCell>
                                     <TableCell>${product.price.toFixed(2)}</TableCell>
                                     <TableCell>{product.category}</TableCell>
+                                    <TableCell className="text-right">
+                                        <Button 
+                                            variant="ghost" 
+                                            size="icon" 
+                                            onClick={() => handleDeleteProduct(product.id, product.name)}
+                                            disabled={isDeleting}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                            <span className="sr-only">Delete {product.name}</span>
+                                        </Button>
+                                    </TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
