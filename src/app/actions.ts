@@ -96,7 +96,7 @@ export async function getUniqueProductNames(): Promise<Record<string, number>> {
 
         const priceMap = productsSnapshot.docs.reduce((acc, doc) => {
             const product = doc.data() as Product;
-            if (!acc[product.name]) {
+            if (product.name && !acc[product.name]) {
                 acc[product.name] = product.price;
             }
             return acc;
