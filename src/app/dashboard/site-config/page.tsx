@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useTransition } from 'react';
@@ -27,7 +26,10 @@ import { useFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import placeholderImagesData from '@/lib/placeholder-images.json';
 import { updateImages } from '@/app/actions';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Sparkles, Loader2 } from 'lucide-react';
+import { generateAllImages } from '@/ai/flows/image-generator-flow';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+
 
 const ADMIN_EMAIL = 'admin@gmail.com';
 
@@ -48,6 +50,7 @@ export default function SiteConfigPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
+  const [isGenerating, startGenerationTransition] = useTransition();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -56,7 +59,7 @@ export default function SiteConfigPage() {
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, replace } = useFieldArray({
     control: form.control,
     name: 'images',
   });
@@ -87,6 +90,35 @@ export default function SiteConfigPage() {
       }
     });
   };
+
+  const handleAiGenerate = () => {
+    startGenerationTransition(async () => {
+        try {
+            toast({
+                title: 'Starting AI Image Generation...',
+                description: 'This may take several minutes. Please do not navigate away from this page.',
+            });
+            const newImages = await generateAllImages();
+            
+            // The AI flow returns data that matches our schema.
+            // We can directly replace the form's field array state.
+            replace(newImages);
+
+            toast({
+                title: 'AI Generation Complete!',
+                description: 'All product images have been generated. Review and save your changes.',
+            });
+
+        } catch (error) {
+            console.error("AI Image Generation Failed:", error);
+            toast({
+                variant: 'destructive',
+                title: 'AI Generation Failed',
+                description: 'An error occurred while generating images. Please check the console and try again.',
+            });
+        }
+    });
+  };
   
   if (isUserLoading || !user) {
     return <div className="container mx-auto py-12">Loading admin dashboard...</div>
@@ -102,12 +134,36 @@ export default function SiteConfigPage() {
         <CardHeader>
           <CardTitle>Image Catalog Management</CardTitle>
           <CardDescription>
-            Update the URLs and hints for all placeholder images used across the site. The Image ID is read-only.
+            Update the URLs and hints for all placeholder images used across the site. You can also use AI to generate all product images at once.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+               <Alert>
+                  <Sparkles className="h-4 w-4" />
+                  <AlertTitle>One-Click Image Generation</AlertTitle>
+                  <AlertDescription className="flex justify-between items-center">
+                    <p>
+                      Use AI to generate and populate all product images automatically. 
+                      This is a one-time operation and may take a few minutes.
+                    </p>
+                    <Button type="button" onClick={handleAiGenerate} disabled={isGenerating}>
+                        {isGenerating ? (
+                            <>
+                               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                               Generating...
+                            </>
+                        ) : (
+                           <>
+                             <Sparkles className="mr-2 h-4 w-4" />
+                             Generate All Images with AI
+                           </>
+                        )}
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+
               <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-4">
                 {fields.map((field, index) => (
                   <Card key={field.id} className="p-4">
@@ -174,7 +230,7 @@ export default function SiteConfigPage() {
                  >
                     Add New Image
                 </Button>
-                <Button type="submit" disabled={isPending}>
+                <Button type="submit" disabled={isPending || isGenerating}>
                     {isPending ? 'Saving...' : 'Save All Changes'}
                 </Button>
               </div>
