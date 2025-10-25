@@ -1,7 +1,7 @@
 
 'use server';
 /**
- * @fileOverview A flow to batch-generate images for all products in the catalog.
+ * @fileOverview A flow to generate images for products within a specific category.
  */
 
 import { ai } from '@/ai/genkit';
@@ -19,6 +19,11 @@ const ImageListSchema = z.array(ImageInfoSchema);
 
 export type ImageInfo = z.infer<typeof ImageInfoSchema>;
 
+const ImageGeneratorInputSchema = z.object({
+    category: z.string().describe("The product category to generate images for."),
+});
+
+
 // Helper to create a URL-friendly slug from a string
 const createSlug = (text: string) => {
   return text
@@ -30,29 +35,35 @@ const createSlug = (text: string) => {
     .replace(/-+$/, ''); // Trim - from end of text
 };
 
-export async function generateAllImages(): Promise<ImageInfo[]> {
-    return await imageGeneratorFlow();
+export async function generateImagesForCategory(category: string): Promise<ImageInfo[]> {
+    return await imageGeneratorFlow({ category });
 }
 
 const imageGeneratorFlow = ai.defineFlow(
   {
     name: 'imageGeneratorFlow',
+    inputSchema: ImageGeneratorInputSchema,
     outputSchema: ImageListSchema,
   },
-  async () => {
-    // 1. Get all unique product names from our grocery data
-    const allProducts = groceryData.categories.flatMap(category => category.items || []);
-    const uniqueProductNames = Array.from(new Set(allProducts));
+  async ({ category }) => {
     
+    const categoryData = groceryData.categories.find(c => c.categoryName === category);
+
+    if (!categoryData || !categoryData.items) {
+        console.warn(`Category "${category}" not found or has no items.`);
+        return [];
+    }
+
+    const productsToGenerate = categoryData.items;
     const generatedImages: ImageInfo[] = [];
 
-    // 2. Process products sequentially to avoid timeouts and rate limits
-    for (const productName of uniqueProductNames) {
+    // Process products sequentially to avoid timeouts and rate limits
+    for (const productName of productsToGenerate) {
         try {
-            console.log(`Generating image for: ${productName}`);
+            console.log(`Generating image for: ${productName} in category: ${category}`);
             const { media } = await ai.generate({
                 model: googleAI.model('imagen-4.0-fast-generate-001'),
-                prompt: `A high-quality, professional photograph of "${productName}", on a clean, plain white background. The item should be centered and well-lit. Studio quality.`,
+                prompt: `A high-quality, professional photograph of "${productName}", on a clean, plain white background. Studio quality.`,
             });
             
             if (!media || !media.url) {
@@ -74,10 +85,6 @@ const imageGeneratorFlow = ai.defineFlow(
         }
     }
 
-    // 3. Also include the store images, which we don't need to regenerate
-    const storeImages = (groceryData as any).placeholderImages?.filter((img: any) => img.id.startsWith('store-')) || [];
-
-    // 4. Return the combined list of store images and newly generated product images
-    return [...storeImages, ...generatedImages];
+    return generatedImages;
   }
 );
