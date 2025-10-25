@@ -25,7 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import placeholderImagesData from '@/lib/placeholder-images.json';
-import { updateImages } from '@/ai/flows/update-images-flow';
+import { updateImages } from '@/app/actions';
 import { Trash2 } from 'lucide-react';
 import { ADMIN_USER_ID } from '@/lib/config';
 
@@ -70,18 +70,17 @@ export default function SiteConfigPage() {
 
   const onSubmit = (data: FormValues) => {
     startTransition(async () => {
-      try {
-        await updateImages(data.images);
+      const result = await updateImages(data.images);
+      if (result.success) {
         toast({
           title: 'Images Updated!',
           description: 'The placeholder image catalog has been saved successfully.',
         });
-      } catch (error) {
-        console.error('Failed to update images:', error);
+      } else {
         toast({
           variant: 'destructive',
           title: 'Update Failed',
-          description: 'Could not save the image catalog. Please try again.',
+          description: result.error || 'Could not save the image catalog. Please try again.',
         });
       }
     });
