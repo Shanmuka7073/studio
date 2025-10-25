@@ -14,13 +14,8 @@ interface StoreCardProps {
   store: Store;
 }
 
-interface ImageInfo {
-    imageUrl: string;
-    imageHint: string;
-}
-
 export default function StoreCard({ store }: StoreCardProps) {
-    const [image, setImage] = useState<ImageInfo>({ imageUrl: 'https://placehold.co/400x300/E2E8F0/64748B?text=Loading...', imageHint: 'loading' });
+    const [image, setImage] = useState({ imageUrl: 'https://placehold.co/400x300/E2E8F0/64748B?text=Loading...', imageHint: 'loading' });
 
     useEffect(() => {
         const fetchImage = async () => {

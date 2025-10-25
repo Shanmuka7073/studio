@@ -1,6 +1,6 @@
 
 'use client';
-import { getStore, getStoreImage } from '@/lib/data';
+import { getStore, getStoreImage, getProductImage } from '@/lib/data';
 import Image from 'next/image';
 import ProductCard from '@/components/product-card';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
@@ -86,6 +86,7 @@ export default function StoreDetailPage() {
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<{ categories: string[], searchTerm: string }>({ categories: [], searchTerm: '' });
   const [storeImage, setStoreImage] = useState({ imageUrl: 'https://placehold.co/250x250/E2E8F0/64748B?text=Loading...', imageHint: 'loading' });
+  const [productImages, setProductImages] = useState({});
   
   const productsQuery = useMemoFirebase(() => {
     if (!firestore || !id) return null;
@@ -111,6 +112,20 @@ export default function StoreDetailPage() {
       fetchStoreData();
     }
   }, [firestore, id]);
+
+  useEffect(() => {
+    const fetchProductImages = async () => {
+        if (!products) return;
+        const imagePromises = products.map(p => getProductImage(p.imageId));
+        const resolvedImages = await Promise.all(imagePromises);
+        const imageMap = products.reduce((acc, product, index) => {
+            acc[product.id] = resolvedImages[index];
+            return acc;
+        }, {});
+        setProductImages(imageMap);
+    };
+    fetchProductImages();
+  }, [products]);
   
   const handleFilterChange = (newFilters: { categories: string[], searchTerm: string }) => {
     setFilters(newFilters);
@@ -196,9 +211,10 @@ export default function StoreDetailPage() {
 
           <h2 className="text-3xl font-bold font-headline mb-8">Products ({filteredProducts.length})</h2>
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {filteredProducts && filteredProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
+            {filteredProducts && filteredProducts.map((product) => {
+              const image = productImages[product.id] || { imageUrl: 'https://placehold.co/300x300/E2E8F0/64748B?text=...', imageHint: 'loading' };
+              return <ProductCard key={product.id} product={product} image={image} />
+            })}
           </div>
           {filteredProducts.length === 0 && !productsLoading && (
             <p className="text-muted-foreground">No products found matching your criteria.</p>

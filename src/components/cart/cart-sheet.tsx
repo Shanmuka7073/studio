@@ -12,19 +12,10 @@ import { getProductImage } from '@/lib/data';
 import { Input } from '../ui/input';
 import { useEffect, useState } from 'react';
 
-// A component to render each item, handling the async image fetching
-function CartSheetItem({ item }) {
+// A component to render each item, now receiving image data directly
+function CartSheetItem({ item, image }) {
     const { removeItem, updateQuantity } = useCart();
     const { product, quantity } = item;
-    const [image, setImage] = useState({ imageUrl: 'https://placehold.co/64x64/E2E8F0/64748B?text=...', imageHint: 'loading' });
-
-    useEffect(() => {
-        const fetchImage = async () => {
-            const fetchedImage = await getProductImage(product.imageId);
-            setImage(fetchedImage);
-        };
-        fetchImage();
-    }, [product.imageId]);
 
     return (
         <div className="flex items-center gap-4 w-full">
@@ -60,6 +51,22 @@ function CartSheetItem({ item }) {
 
 export function CartSheetContent() {
   const { cartItems, cartTotal, cartCount } = useCart();
+  const [images, setImages] = useState({});
+
+  useEffect(() => {
+    const fetchImages = async () => {
+        if (cartItems.length === 0) return;
+        const imagePromises = cartItems.map(item => getProductImage(item.product.imageId));
+        const resolvedImages = await Promise.all(imagePromises);
+        const imageMap = cartItems.reduce((acc, item, index) => {
+            acc[item.product.id] = resolvedImages[index];
+            return acc;
+        }, {});
+        setImages(imageMap);
+    };
+
+    fetchImages();
+  }, [cartItems]);
 
   return (
     <>
@@ -74,9 +81,10 @@ export function CartSheetContent() {
         {cartItems.length > 0 ? (
         <ScrollArea className="flex-1 pr-1">
             <div className="flex flex-col gap-4 py-4">
-              {cartItems.map((item) => (
-                <CartSheetItem key={item.product.id} item={item} />
-              ))}
+              {cartItems.map((item) => {
+                const image = images[item.product.id] || { imageUrl: 'https://placehold.co/64x64/E2E8F0/64748B?text=...', imageHint: 'loading' };
+                return <CartSheetItem key={item.product.id} item={item} image={image} />
+              })}
             </div>
         </ScrollArea>
         ) : (

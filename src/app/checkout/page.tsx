@@ -37,18 +37,9 @@ const checkoutSchema = z.object({
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
 
-// A component to render each summary item, handling the async image fetching
-function OrderSummaryItem({ item }) {
+// A component to render each summary item, now receiving image data directly
+function OrderSummaryItem({ item, image }) {
     const { product, quantity } = item;
-    const [image, setImage] = useState({ imageUrl: 'https://placehold.co/48x48/E2E8F0/64748B?text=...', imageHint: 'loading' });
-
-    useEffect(() => {
-        const fetchImage = async () => {
-            const fetchedImage = await getProductImage(product.imageId);
-            setImage(fetchedImage);
-        };
-        fetchImage();
-    }, [product.imageId]);
 
     return (
         <div className="flex justify-between items-center">
@@ -81,6 +72,23 @@ export default function CheckoutPage() {
   const [isTranslating, startTranslationTransition] = useTransition();
   const [translatedList, setTranslatedList] = useState<string | null>(null);
   const [deliveryCoords, setDeliveryCoords] = useState<{lat: number, lng: number} | null>(null);
+  const [images, setImages] = useState({});
+
+  useEffect(() => {
+    const fetchImages = async () => {
+        const imagePromises = cartItems.map(item => getProductImage(item.product.imageId));
+        const resolvedImages = await Promise.all(imagePromises);
+        const imageMap = cartItems.reduce((acc, item, index) => {
+            acc[item.product.id] = resolvedImages[index];
+            return acc;
+        }, {});
+        setImages(imageMap);
+    };
+
+    if (cartItems.length > 0) {
+        fetchImages();
+    }
+  }, [cartItems]);
 
   const processTranscript = useCallback((transcript: string) => {
     startTranslationTransition(() => {
@@ -396,9 +404,10 @@ export default function CheckoutPage() {
                         </CardContent>
                     </Card>
                 )}
-                {cartItems.map((item) => (
-                    <OrderSummaryItem key={item.product.id} item={item} />
-                ))}
+                {cartItems.map((item) => {
+                    const image = images[item.product.id] || { imageUrl: 'https://placehold.co/48x48/E2E8F0/64748B?text=...', imageHint: 'loading' };
+                    return <OrderSummaryItem key={item.product.id} item={item} image={image} />
+                })}
                  {cartItems.length === 0 && audioDataUri && (
                     <p className="text-muted-foreground text-sm text-center py-4">Your order will be fulfilled based on your voice memo. The final price will be confirmed by the shopkeeper.</p>
                 )}
