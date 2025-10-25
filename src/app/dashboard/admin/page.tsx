@@ -4,7 +4,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Settings, ArrowRight, Tag } from 'lucide-react';
 import Link from 'next/link';
-import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import placeholderImagesData from '@/lib/placeholder-images.json';
 import groceryData from '@/lib/grocery-data.json';
@@ -13,8 +13,7 @@ import { Button } from '@/components/ui/button';
 import { useTransition, useState, useEffect, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
-import { updatePriceForProductByName } from '@/app/actions';
-import { collectionGroup, query } from 'firebase/firestore';
+import { updatePriceForProductByName, getUniqueProductNames } from '@/app/actions';
 import type { Product } from '@/lib/types';
 
 
@@ -29,13 +28,28 @@ const adminCards = [
     },
 ];
 
+const createSlug = (text: string) => {
+  return text
+    .toLowerCase()
+    .replace(/\s+/g, '-') // Replace spaces with -
+    .replace(/[^\w-]+/g, '') // Remove all non-word chars
+    .replace(/--+/g, '-') // Replace multiple - with single -
+    .replace(/^-+/, '') // Trim - from start of text
+    .replace(/-+$/, ''); // Trim - from end of text
+};
+
+const allMasterProductNames = groceryData.categories.flatMap(category => Array.isArray(category.items) ? category.items : []);
+const uniqueMasterProductNames = [...new Set(allMasterProductNames)];
+const imageMap = new Map(placeholderImagesData.placeholderImages.map(img => [img.id, img]));
+
+
 function AdminProductCard({ productName, initialPrice, onUpdatePrice }: { productName: string, initialPrice: number, onUpdatePrice: (name: string, price: number) => void }) {
     const [isUpdating, startUpdateTransition] = useTransition();
     const [price, setPrice] = useState(initialPrice.toString());
     const { toast } = useToast();
 
     const imageId = `prod-${createSlug(productName)}`;
-    const image = imageMap.get(imageId) || { imageUrl: 'https://placehold.co/300x300/E2E8F0/64748B?text=No+Image', imageHint: 'none' };
+    const image = imageMap.get(imageId) || { imageUrl: 'https://placehold.co/200x200/E2E8F0/64748B?text=No+Image', imageHint: 'none' };
     
     const handleUpdatePrice = () => {
         const newPrice = parseFloat(price);
@@ -98,45 +112,22 @@ function AdminProductCard({ productName, initialPrice, onUpdatePrice }: { produc
 }
 
 
-const createSlug = (text: string) => {
-  return text
-    .toLowerCase()
-    .replace(/\s+/g, '-') // Replace spaces with -
-    .replace(/[^\w-]+/g, '') // Remove all non-word chars
-    .replace(/--+/g, '-') // Replace multiple - with single -
-    .replace(/^-+/, '') // Trim - from start of text
-    .replace(/-+$/, ''); // Trim - from end of text
-};
-
-const allProductNames = groceryData.categories.flatMap(category => Array.isArray(category.items) ? category.items : []);
-const uniqueProductNames = [...new Set(allProductNames)];
-const imageMap = new Map(placeholderImagesData.placeholderImages.map(img => [img.id, img]));
-
-
 export default function AdminDashboardPage() {
-    const { user, isUserLoading, firestore } = useFirebase();
+    const { user, isUserLoading } = useFirebase();
     const router = useRouter();
 
-    const allProductsQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return query(collectionGroup(firestore, 'products'));
-    }, [firestore]);
-
-    const { data: allProducts, isLoading: productsLoading } = useCollection<Product>(allProductsQuery);
-
     const [productPrices, setProductPrices] = useState<Record<string, number>>({});
+    const [productsLoading, setProductsLoading] = useState(true);
 
     useEffect(() => {
-        if (allProducts) {
-            const priceMap = allProducts.reduce((acc, product) => {
-                if (!acc[product.name]) {
-                    acc[product.name] = product.price;
-                }
-                return acc;
-            }, {});
+        async function fetchProducts() {
+            setProductsLoading(true);
+            const priceMap = await getUniqueProductNames();
             setProductPrices(priceMap);
+            setProductsLoading(false);
         }
-    }, [allProducts]);
+        fetchProducts();
+    }, []);
 
     const handlePriceUpdate = (productName: string, newPrice: number) => {
         setProductPrices(prev => ({ ...prev, [productName]: newPrice }));
@@ -185,8 +176,8 @@ export default function AdminDashboardPage() {
                 </CardHeader>
                 <CardContent>
                      {isLoading ? <p>Loading products...</p> : (
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                            {uniqueProductNames.map(productName => {
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                            {uniqueMasterProductNames.map(productName => {
                                 const initialPrice = productPrices[productName] || 0;
                                 return (
                                     <AdminProductCard 

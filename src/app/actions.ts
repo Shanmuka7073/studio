@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { initServerApp } from '@/firebase/server-init';
-import { collectionGroup, getDocs, writeBatch, query, where } from 'firebase-admin/firestore';
+import { collectionGroup, getDocs, writeBatch } from 'firebase-admin/firestore';
 
 export async function revalidateStorePaths() {
   revalidatePath('/');
@@ -34,7 +34,6 @@ export async function updateImages(images: ImageData[]): Promise<{ success: bool
       const filePath = path.join(process.cwd(), 'src', 'lib', 'placeholder-images.json');
       await fs.writeFile(filePath, JSON.stringify(newContent, null, 2), 'utf-8');
       
-      // Revalidate paths where images are used, if necessary
       revalidatePath('/dashboard/site-config');
       revalidatePath('/');
       revalidatePath('/stores');
@@ -53,10 +52,7 @@ export async function updatePriceForProductByName(productName: string, newPrice:
 
     try {
         const { firestore } = await initServerApp();
-        const productsQuery = query(
-            collectionGroup(firestore, 'products'),
-            where('name', '==', productName)
-        );
+        const productsQuery = firestore.collectionGroup('products').where('name', '==', productName);
         const productsSnapshot = await getDocs(productsQuery);
 
         if (productsSnapshot.empty) {
@@ -78,5 +74,32 @@ export async function updatePriceForProductByName(productName: string, newPrice:
     } catch (error) {
         console.error(`Failed to update price for ${productName}:`, error);
         return { success: false, updatedCount: 0, error: 'A server error occurred during the price update.' };
+    }
+}
+
+export async function getUniqueProductNames(): Promise<Record<string, number>> {
+    try {
+        const { firestore } = await initServerApp();
+        const productsQuery = firestore.collectionGroup('products');
+        const productsSnapshot = await getDocs(productsQuery);
+
+        if (productsSnapshot.empty) {
+            return {};
+        }
+
+        const priceMap = productsSnapshot.docs.reduce((acc, doc) => {
+            const product = doc.data() as Product;
+            if (!acc[product.name]) {
+                acc[product.name] = product.price;
+            }
+            return acc;
+        }, {} as Record<string, number>);
+
+        return priceMap;
+
+    } catch (error) {
+        console.error(`Failed to fetch unique product names:`, error);
+        // In case of error, return an empty object to prevent the client from crashing.
+        return {};
     }
 }
