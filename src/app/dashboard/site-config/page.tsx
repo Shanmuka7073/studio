@@ -102,7 +102,7 @@ export default function SiteConfigPage() {
         <CardHeader>
           <CardTitle>Image Catalog Management</CardTitle>
           <CardDescription>
-            Update the URLs and hints for all placeholder images used across the site.
+            Update the URLs and hints for all placeholder images used across the site. The Image ID is read-only.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -119,7 +119,7 @@ export default function SiteConfigPage() {
                             <FormItem>
                               <FormLabel>Image ID</FormLabel>
                               <FormControl>
-                                <Input {...field} />
+                                <Input {...field} readOnly className="bg-muted/50" />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
