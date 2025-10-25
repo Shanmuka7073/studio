@@ -4,16 +4,19 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Settings, ArrowRight, Tag } from 'lucide-react';
 import Link from 'next/link';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import placeholderImagesData from '@/lib/placeholder-images.json';
 import groceryData from '@/lib/grocery-data.json';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { useTransition, useState } from 'react';
+import { useTransition, useState, useEffect, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
-import { updateAllProductPrices } from '@/app/actions';
+import { updatePriceForProductByName } from '@/app/actions';
+import { collectionGroup, query } from 'firebase/firestore';
+import type { Product } from '@/lib/types';
+
 
 const ADMIN_EMAIL = 'admin@gmail.com';
 
@@ -26,65 +29,72 @@ const adminCards = [
     },
 ];
 
-function BulkPriceUpdater() {
+function AdminProductCard({ productName, initialPrice, onUpdatePrice }: { productName: string, initialPrice: number, onUpdatePrice: (name: string, price: number) => void }) {
     const [isUpdating, startUpdateTransition] = useTransition();
-    const [price, setPrice] = useState('');
+    const [price, setPrice] = useState(initialPrice.toString());
     const { toast } = useToast();
 
-    const handleUpdatePrices = () => {
+    const imageId = `prod-${createSlug(productName)}`;
+    const image = imageMap.get(imageId) || { imageUrl: 'https://placehold.co/300x300/E2E8F0/64748B?text=No+Image', imageHint: 'none' };
+    
+    const handleUpdatePrice = () => {
         const newPrice = parseFloat(price);
-        if (isNaN(newPrice) || newPrice <= 0) {
+        if (isNaN(newPrice) || newPrice < 0) {
             toast({
                 variant: 'destructive',
                 title: 'Invalid Price',
-                description: 'Please enter a valid, positive number for the price.',
+                description: 'Please enter a valid, non-negative number.',
             });
             return;
         }
 
         startUpdateTransition(async () => {
-            const result = await updateAllProductPrices(newPrice);
+            const result = await updatePriceForProductByName(productName, newPrice);
             if (result.success) {
                 toast({
-                    title: 'Prices Updated!',
-                    description: `Successfully updated ${result.updatedCount} products to ₹${newPrice.toFixed(2)}.`,
+                    title: 'Price Updated!',
+                    description: `Price for ${productName} set to ₹${newPrice.toFixed(2)} across ${result.updatedCount} store(s).`,
                 });
-                setPrice('');
+                onUpdatePrice(productName, newPrice);
             } else {
-                toast({
+                 toast({
                     variant: 'destructive',
                     title: 'Update Failed',
                     description: result.error || 'An unexpected error occurred.',
                 });
             }
         });
-    };
+    }
 
     return (
-        <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-2xl font-bold font-headline">Bulk Price Update</CardTitle>
-                <Tag className="h-8 w-8 text-primary" />
-            </CardHeader>
-            <CardContent>
-                <CardDescription className="mb-4">
-                    Set a new price for every single product across all stores. This action cannot be undone.
-                </CardDescription>
-                <div className="flex gap-2">
+        <Card className="overflow-hidden">
+            <Image
+                src={image.imageUrl}
+                alt={productName}
+                width={200}
+                height={200}
+                className="w-full h-32 object-cover"
+                data-ai-hint={image.imageHint}
+            />
+            <CardContent className="p-2 space-y-2">
+                <p className="text-sm font-medium truncate text-center">{productName}</p>
+                <div className="flex gap-2 items-center">
+                     <span className="font-bold">₹</span>
                     <Input
                         type="number"
-                        placeholder="Enter new price (e.g., 99.99)"
+                        placeholder="Price"
                         value={price}
                         onChange={(e) => setPrice(e.target.value)}
                         disabled={isUpdating}
+                        className="h-8"
                     />
-                    <Button onClick={handleUpdatePrices} disabled={isUpdating}>
-                        {isUpdating ? 'Updating...' : 'Update All Prices'}
-                    </Button>
                 </div>
+                 <Button onClick={handleUpdatePrice} disabled={isUpdating} size="sm" className="w-full">
+                    {isUpdating ? 'Updating...' : 'Update Price'}
+                </Button>
             </CardContent>
         </Card>
-    )
+    );
 }
 
 
@@ -99,20 +109,47 @@ const createSlug = (text: string) => {
 };
 
 const allProductNames = groceryData.categories.flatMap(category => Array.isArray(category.items) ? category.items : []);
-const uniqueProductNames = [...new Set(allProductNames)]; // Ensure uniqueness
+const uniqueProductNames = [...new Set(allProductNames)];
 const imageMap = new Map(placeholderImagesData.placeholderImages.map(img => [img.id, img]));
 
 
 export default function AdminDashboardPage() {
-    const { user, isUserLoading } = useFirebase();
+    const { user, isUserLoading, firestore } = useFirebase();
     const router = useRouter();
+
+    const allProductsQuery = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return query(collectionGroup(firestore, 'products'));
+    }, [firestore]);
+
+    const { data: allProducts, isLoading: productsLoading } = useCollection<Product>(allProductsQuery);
+
+    const [productPrices, setProductPrices] = useState<Record<string, number>>({});
+
+    useEffect(() => {
+        if (allProducts) {
+            const priceMap = allProducts.reduce((acc, product) => {
+                if (!acc[product.name]) {
+                    acc[product.name] = product.price;
+                }
+                return acc;
+            }, {});
+            setProductPrices(priceMap);
+        }
+    }, [allProducts]);
+
+    const handlePriceUpdate = (productName: string, newPrice: number) => {
+        setProductPrices(prev => ({ ...prev, [productName]: newPrice }));
+    };
 
     if (!isUserLoading && (!user || user.email !== ADMIN_EMAIL)) {
         router.replace('/dashboard');
         return <p>Access Denied. Redirecting...</p>;
     }
     
-    if (isUserLoading || !user) {
+    const isLoading = isUserLoading || productsLoading;
+
+    if (isLoading || !user) {
         return <p>Loading admin dashboard...</p>
     }
 
@@ -120,7 +157,7 @@ export default function AdminDashboardPage() {
         <div className="container mx-auto py-12 px-4 md:px-6">
             <div className="text-center mb-12">
                 <h1 className="text-4xl font-bold font-headline">Admin Dashboard</h1>
-                <p className="text-lg text-muted-foreground mt-2">Manage your application's settings and view all products.</p>
+                <p className="text-lg text-muted-foreground mt-2">Manage your application's settings and products.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto mb-12">
                 {adminCards.map((card) => (
@@ -140,35 +177,28 @@ export default function AdminDashboardPage() {
                         </Card>
                     </Link>
                 ))}
-                <BulkPriceUpdater />
             </div>
             <Card>
                 <CardHeader>
                     <CardTitle>All Available Products</CardTitle>
-                    <CardDescription>A complete catalog of all products in the system and their current images.</CardDescription>
+                    <CardDescription>A complete catalog of all products in the system. Updating a price here will change it across all stores.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4">
-                        {uniqueProductNames.map(productName => {
-                            const imageId = `prod-${createSlug(productName)}`;
-                            const image = imageMap.get(imageId) || { imageUrl: 'https://placehold.co/300x300/E2E8F0/64748B?text=No+Image', imageHint: 'none' };
-                            return (
-                                <Card key={productName} className="overflow-hidden">
-                                    <Image
-                                        src={image.imageUrl}
-                                        alt={productName}
-                                        width={200}
-                                        height={200}
-                                        className="w-full h-32 object-cover"
-                                        data-ai-hint={image.imageHint}
+                     {isLoading ? <p>Loading products...</p> : (
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            {uniqueProductNames.map(productName => {
+                                const initialPrice = productPrices[productName] || 0;
+                                return (
+                                    <AdminProductCard 
+                                        key={productName}
+                                        productName={productName}
+                                        initialPrice={initialPrice}
+                                        onUpdatePrice={handlePriceUpdate}
                                     />
-                                    <CardContent className="p-2">
-                                        <p className="text-sm font-medium truncate">{productName}</p>
-                                    </CardContent>
-                                </Card>
-                            )
-                        })}
-                    </div>
+                                )
+                            })}
+                        </div>
+                     )}
                 </CardContent>
             </Card>
         </div>

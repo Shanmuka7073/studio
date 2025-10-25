@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { initServerApp } from '@/firebase/server-init';
-import { collectionGroup, getDocs, writeBatch } from 'firebase-admin/firestore';
+import { collectionGroup, getDocs, writeBatch, query, where } from 'firebase-admin/firestore';
 
 export async function revalidateStorePaths() {
   revalidatePath('/');
@@ -46,17 +46,21 @@ export async function updateImages(images: ImageData[]): Promise<{ success: bool
     }
 }
 
-export async function updateAllProductPrices(newPrice: number): Promise<{ success: boolean, updatedCount: number, error?: string }> {
-    if (typeof newPrice !== 'number' || newPrice <= 0) {
+export async function updatePriceForProductByName(productName: string, newPrice: number): Promise<{ success: boolean; updatedCount: number; error?: string }> {
+    if (typeof newPrice !== 'number' || newPrice < 0) {
         return { success: false, updatedCount: 0, error: 'Invalid price provided.' };
     }
 
     try {
         const { firestore } = await initServerApp();
-        const productsSnapshot = await firestore.collectionGroup('products').get();
+        const productsQuery = query(
+            collectionGroup(firestore, 'products'),
+            where('name', '==', productName)
+        );
+        const productsSnapshot = await getDocs(productsQuery);
 
         if (productsSnapshot.empty) {
-            return { success: false, updatedCount: 0, error: 'No products found to update.' };
+            return { success: false, updatedCount: 0, error: `No products named "${productName}" found to update.` };
         }
 
         const batch = firestore.batch();
@@ -72,7 +76,7 @@ export async function updateAllProductPrices(newPrice: number): Promise<{ succes
         return { success: true, updatedCount: productsSnapshot.size };
 
     } catch (error) {
-        console.error('Failed to update all product prices:', error);
+        console.error(`Failed to update price for ${productName}:`, error);
         return { success: false, updatedCount: 0, error: 'A server error occurred during the price update.' };
     }
 }
