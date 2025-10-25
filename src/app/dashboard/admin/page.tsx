@@ -12,8 +12,7 @@ import { Button } from '@/components/ui/button';
 import { useTransition, useState, useEffect, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
-import { updatePriceForProductByName, getUniqueProductNames } from '@/app/actions';
-import type { Product } from '@/lib/types';
+import { getUniqueProductNames, updatePriceForProductByName } from './actions';
 
 
 const ADMIN_EMAIL = 'admin@gmail.com';
@@ -194,4 +193,3 @@ export default function AdminDashboardPage() {
         </div>
     );
 }
-    

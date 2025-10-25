@@ -24,7 +24,6 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { revalidateStorePaths, revalidateProductPaths } from '@/app/actions';
 import type { Store, Product } from '@/lib/types';
 import { useFirebase, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, query, where, addDoc, writeBatch, doc, updateDoc, deleteDoc } from 'firebase/firestore';
@@ -43,6 +42,7 @@ import groceryData from '@/lib/grocery-data.json';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Share2, MapPin, Trash2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { getUniqueProductNames } from '@/app/dashboard/admin/actions';
 
 const storeSchema = z.object({
   name: z.string().min(3, 'Store name must be at least 3 characters'),
@@ -81,7 +81,7 @@ const createSlug = (text: string) => {
       .replace(/-+$/, ''); // Trim - from end of text
   };
 
-function ProductChecklist({ storeId, onProductsAdded }: { storeId: string; onProductsAdded: () => void }) {
+function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPrices: Record<string, number> }) {
   const { toast } = useToast();
   const [isAdding, startTransition] = useTransition();
   const { firestore } = useFirebase();
@@ -111,9 +111,10 @@ function ProductChecklist({ storeId, onProductsAdded }: { storeId: string; onPro
           const newProductRef = doc(collection(firestore, 'stores', storeId, 'products'));
           const category = groceryData.categories.find(c => Array.isArray(c.items) && c.items.includes(name))?.categoryName || 'Miscellaneous';
           const imageId = `prod-${createSlug(name)}`;
+          const price = adminPrices[name] !== undefined ? adminPrices[name] : 0.99; // Use admin price if available
           batch.set(newProductRef, {
             name,
-            price: 0.99, // Default price
+            price,
             description: '',
             storeId: storeId,
             imageId: imageId,
@@ -128,7 +129,6 @@ function ProductChecklist({ storeId, onProductsAdded }: { storeId: string; onPro
             description: 'The selected products have been added to your inventory.',
           });
           setSelectedProducts({});
-          onProductsAdded(); // Revalidate paths
         }).catch((serverError) => {
           console.error("Failed to add products:", serverError);
           const permissionError = new FirestorePermissionError({
@@ -190,7 +190,7 @@ function ProductChecklist({ storeId, onProductsAdded }: { storeId: string; onPro
 }
 
 
-function AddProductForm({ storeId }: { storeId: string }) {
+function AddProductForm({ storeId, adminPrices }: { storeId: string; adminPrices: Record<string, number> }) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const { firestore } = useFirebase();
@@ -205,8 +205,17 @@ function AddProductForm({ storeId }: { storeId: string }) {
 
     startTransition(() => {
         const imageId = `prod-${createSlug(data.name)}`;
+        const price = adminPrices[data.name] !== undefined ? adminPrices[data.name] : data.price;
+        if (price !== data.price) {
+            toast({
+                title: 'Admin Price Applied',
+                description: `The price for ${data.name} is managed by the admin and has been set to ₹${price.toFixed(2)}.`,
+            });
+        }
+        
         const productData = {
             ...data,
+            price,
             storeId,
             imageId: imageId,
             quantity: 1, // Default quantity
@@ -215,7 +224,6 @@ function AddProductForm({ storeId }: { storeId: string }) {
         const productsCol = collection(firestore, 'stores', storeId, 'products');
         
         addDoc(productsCol, productData).then(() => {
-            revalidateProductPaths(storeId);
             toast({
                 title: 'Product Added!',
                 description: `${data.name} has been added to your store.`,
@@ -260,8 +268,16 @@ function AddProductForm({ storeId }: { storeId: string }) {
                 <FormItem>
                   <FormLabel>Price (₹)</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.01" {...field} />
+                    <Input
+                      type="number"
+                      step="0.01"
+                      {...field}
+                      disabled={adminPrices[form.getValues('name')] !== undefined}
+                    />
                   </FormControl>
+                  {adminPrices[form.getValues('name')] !== undefined && (
+                    <p className="text-xs text-muted-foreground">Price is managed by admin.</p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
@@ -470,7 +486,7 @@ function UpdateLocationForm({ store, onUpdate }: { store: Store, onUpdate: () =>
 }
 
 
-function ManageStoreView({ store }: { store: Store }) {
+function ManageStoreView({ store, adminPrices }: { store: Store; adminPrices: Record<string, number> }) {
     const { firestore } = useFirebase();
     const { toast } = useToast();
     const [isDeleting, startDeleteTransition] = useTransition();
@@ -512,7 +528,7 @@ function ManageStoreView({ store }: { store: Store }) {
 
     return (
       <div className="space-y-8">
-        {needsLocationUpdate && <UpdateLocationForm store={store} onUpdate={revalidateStorePaths} />}
+        {needsLocationUpdate && <UpdateLocationForm store={store} onUpdate={() => {}} />}
         <div className="grid md:grid-cols-2 gap-8">
             <Card>
                 <CardHeader>
@@ -522,7 +538,7 @@ function ManageStoreView({ store }: { store: Store }) {
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                   <AddProductForm storeId={store.id} />
+                   <AddProductForm storeId={store.id} adminPrices={adminPrices} />
                 </CardContent>
             </Card>
              <Card>
@@ -570,14 +586,14 @@ function ManageStoreView({ store }: { store: Store }) {
             </Card>
         </div>
          <div className="grid md:grid-cols-2 gap-8">
-            <ProductChecklist storeId={store.id} onProductsAdded={() => revalidateProductPaths(store.id)} />
+            <ProductChecklist storeId={store.id} adminPrices={adminPrices} />
             <PromoteStore store={store} />
         </div>
       </div>
     )
 }
 
-function CreateStoreForm({ user }) {
+function CreateStoreForm({ user, adminPrices }: { user: any; adminPrices: Record<string, number> }) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const { firestore } = useFirebase();
@@ -644,7 +660,6 @@ function CreateStoreForm({ user }) {
         
         try {
             const storeRef = await addDoc(storesCol, storeData);
-            await revalidateStorePaths();
 
             const productNames = Object.keys(selectedProducts).filter(key => selectedProducts[key]);
             
@@ -654,14 +669,15 @@ function CreateStoreForm({ user }) {
                     const newProductRef = doc(collection(firestore, 'stores', storeRef.id, 'products'));
                     const category = groceryData.categories.find(c => Array.isArray(c.items) && c.items.includes(name))?.categoryName || 'Miscellaneous';
                     const imageId = `prod-${createSlug(name)}`;
+                    const price = adminPrices[name] !== undefined ? adminPrices[name] : 0.99; // Use admin price if available
                     batch.set(newProductRef, {
-                    name,
-                    price: 0.99,
-                    description: '',
-                    storeId: storeRef.id,
-                    imageId: imageId,
-                    quantity: 100,
-                    category: category,
+                        name,
+                        price,
+                        description: '',
+                        storeId: storeRef.id,
+                        imageId: imageId,
+                        quantity: 100,
+                        category: category,
                     });
                 });
                 await batch.commit();
@@ -836,10 +852,22 @@ export default function MyStorePage() {
   }, [firestore, user]);
 
   const { data: stores, isLoading: isStoreLoading } = useCollection<Store>(storeQuery);
-
   const myStore = stores?.[0];
 
-  if (isUserLoading || isStoreLoading) {
+  const [adminPrices, setAdminPrices] = useState<Record<string, number>>({});
+  const [pricesLoading, setPricesLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchAdminPrices() {
+      setPricesLoading(true);
+      const priceMap = await getUniqueProductNames();
+      setAdminPrices(priceMap);
+      setPricesLoading(false);
+    }
+    fetchAdminPrices();
+  }, []);
+
+  if (isUserLoading || isStoreLoading || pricesLoading) {
     return <div className="container mx-auto py-12 px-4 md:px-6">Loading your store...</div>
   }
   
@@ -850,9 +878,9 @@ export default function MyStorePage() {
       </h1>
 
       {myStore ? (
-        <ManageStoreView store={myStore} />
+        <ManageStoreView store={myStore} adminPrices={adminPrices} />
       ) : (
-        <CreateStoreForm user={user} />
+        <CreateStoreForm user={user} adminPrices={adminPrices} />
       )}
     </div>
   );
