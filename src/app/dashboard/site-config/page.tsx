@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useTransition } from 'react';
@@ -27,7 +28,8 @@ import { useRouter } from 'next/navigation';
 import placeholderImagesData from '@/lib/placeholder-images.json';
 import { updateImages } from '@/app/actions';
 import { Trash2 } from 'lucide-react';
-import { ADMIN_USER_ID } from '@/lib/config';
+
+const ADMIN_EMAIL = 'admin@gmail.com';
 
 const imageSchema = z.object({
   id: z.string().min(1, 'ID is required'),
@@ -59,7 +61,7 @@ export default function SiteConfigPage() {
     name: 'images',
   });
 
-  if (!isUserLoading && (!user || user.uid !== ADMIN_USER_ID)) {
+  if (!isUserLoading && (!user || user.email !== ADMIN_EMAIL)) {
     router.replace('/');
     return (
         <div className="container mx-auto py-12">

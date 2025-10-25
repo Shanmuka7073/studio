@@ -26,8 +26,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { getAuth, signOut } from 'firebase/auth';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ADMIN_USER_ID } from '@/lib/config';
 import { useEffect } from 'react';
+
+const ADMIN_EMAIL = 'admin@gmail.com';
 
 const navLinks = [
   { href: '/', label: 'Home' },
@@ -60,14 +61,7 @@ function AssistantToggle() {
 
 function UserMenu() {
   const { user, isUserLoading } = useFirebase();
-  const isAdmin = user && user.uid === ADMIN_USER_ID;
-
-  useEffect(() => {
-    if (user) {
-      console.log('Your User Info (for Admin Setup):', user);
-      console.log('Your Admin UID is:', user.uid);
-    }
-  }, [user]);
+  const isAdmin = user && user.email === ADMIN_EMAIL;
 
   const handleLogout = async () => {
     const auth = getAuth();
@@ -136,7 +130,7 @@ function UserMenu() {
 export function Header() {
   const pathname = usePathname();
   const { user } = useFirebase();
-  const isAdmin = user && user.uid === ADMIN_USER_ID;
+  const isAdmin = user && user.email === ADMIN_EMAIL;
 
   return (
     <header className="sticky top-0 z-50 flex h-16 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:px-6">
