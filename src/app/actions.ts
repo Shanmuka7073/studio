@@ -1,11 +1,23 @@
 
 'use server';
 
-import type { Order, Product } from '@/lib/types';
+import type { Product } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { initServerApp } from '@/firebase/server-init';
+// Remove initServerApp and import admin functions directly
+import { getApps, initializeApp, getApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+
+// Helper function for robust server-side Firebase admin initialization
+function getAdminFirestore() {
+    if (getApps().length === 0) {
+        // Automatically uses GOOGLE_APPLICATION_CREDENTIALS in a server environment
+        initializeApp();
+    }
+    return getFirestore(getApp());
+}
+
 
 export async function revalidateStorePaths() {
   revalidatePath('/');
@@ -50,7 +62,7 @@ export async function updatePriceForProductByName(productName: string, newPrice:
     }
 
     try {
-        const { firestore } = await initServerApp();
+        const firestore = getAdminFirestore();
         const productsQuery = firestore.collectionGroup('products').where('name', '==', productName);
         const productsSnapshot = await productsQuery.get();
 
@@ -65,16 +77,13 @@ export async function updatePriceForProductByName(productName: string, newPrice:
 
         await batch.commit();
         
-        // Revalidate paths to show changes
         try {
             revalidatePath('/stores');
             revalidatePath('/cart');
             revalidatePath('/dashboard/admin');
         } catch (revalError) {
             console.error('Failed to revalidate paths:', revalError);
-            // Don't fail the whole operation if revalidation fails
         }
-
 
         return { success: true, updatedCount: productsSnapshot.size };
 
@@ -86,9 +95,8 @@ export async function updatePriceForProductByName(productName: string, newPrice:
 
 export async function getUniqueProductNames(): Promise<Record<string, number>> {
     try {
-        const { firestore } = await initServerApp();
-        const productsQuery = firestore.collectionGroup('products');
-        const productsSnapshot = await productsQuery.get();
+        const firestore = getAdminFirestore();
+        const productsSnapshot = await firestore.collectionGroup('products').get();
 
         if (productsSnapshot.empty) {
             return {};
@@ -106,9 +114,6 @@ export async function getUniqueProductNames(): Promise<Record<string, number>> {
 
     } catch (error) {
         console.error(`Failed to fetch unique product names:`, error);
-        // In case of error, return an empty object to prevent the client from crashing.
         return {};
     }
 }
-
-    
