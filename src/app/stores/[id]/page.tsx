@@ -210,7 +210,7 @@ export default function StoreDetailPage() {
           </div>
 
           <h2 className="text-3xl font-bold font-headline mb-8">Products ({filteredProducts.length})</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
             {filteredProducts && filteredProducts.map((product) => {
               const image = productImages[product.id] || { imageUrl: 'https://placehold.co/300x300/E2E8F0/64748B?text=...', imageHint: 'loading' };
               return <ProductCard key={product.id} product={product} image={image} />
