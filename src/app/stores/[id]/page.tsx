@@ -8,92 +8,158 @@ import { Store, Product } from '@/lib/types';
 import { useEffect, useState, useMemo } from 'react';
 import { notFound, useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from '@/components/ui/sheet';
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import groceryData from '@/lib/grocery-data.json';
-import { PanelLeft } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { collection } from 'firebase/firestore';
+import { cn } from '@/lib/utils';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+
+// Helper to create a URL-friendly slug from a string
+const createSlug = (text: string) => {
+    return text
+      .toLowerCase()
+      .replace(/\s+/g, '-') // Replace spaces with -
+      .replace(/[^\w-]+/g, '') // Remove all non-word chars
+      .replace(/--+/g, '-') // Replace multiple - with single -
+      .replace(/^-+/, '') // Trim - from start of text
+      .replace(/-+$/, ''); // Trim - from end of text
+};
 
 
-function ProductFilterSidebar({ onFilterChange }: { onFilterChange: (filters: { categories: string[], searchTerm: string }) => void }) {
-  const [selectedCategories, setSelectedCategories] = useState<Record<string, boolean>>({});
-  const [searchTerm, setSearchTerm] = useState('');
+function CategorySidebar({ categories, selectedCategory, onSelectCategory }) {
+  const [images, setImages] = useState({});
 
-  const handleCategorySelection = (categoryName: string, isChecked: boolean) => {
-    const newSelection = { ...selectedCategories, [categoryName]: isChecked };
-    setSelectedCategories(newSelection);
-    const activeCategories = Object.keys(newSelection).filter(key => newSelection[key]);
-    onFilterChange({ categories: activeCategories, searchTerm });
-  };
-
-  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const newSearchTerm = event.target.value;
-    setSearchTerm(newSearchTerm);
-    const activeCategories = Object.keys(selectedCategories).filter(key => selectedCategories[key]);
-    onFilterChange({ categories: activeCategories, searchTerm: newSearchTerm });
-  };
+    useEffect(() => {
+        const fetchCategoryImages = async () => {
+            const imageMap = {};
+            for (const category of categories) {
+                // Find first item in category to use for image
+                const firstItem = Array.isArray(category.items) ? category.items[0] : null;
+                if (firstItem) {
+                    const imageId = `prod-${createSlug(firstItem)}`;
+                    try {
+                        imageMap[category.categoryName] = await getProductImage(imageId);
+                    } catch (e) {
+                         imageMap[category.categoryName] = { imageUrl: 'https://placehold.co/64x64/E2E8F0/64748B?text=Img', imageHint: 'placeholder' };
+                    }
+                } else {
+                    imageMap[category.categoryName] = { imageUrl: 'https://placehold.co/64x64/E2E8F0/64748B?text=Img', imageHint: 'placeholder' };
+                }
+            }
+            setImages(imageMap);
+        };
+        fetchCategoryImages();
+    }, [categories]);
 
   return (
-    <div className="h-full flex flex-col">
-      <CardHeader>
-        <CardTitle>Filter Products</CardTitle>
-        <CardDescription>Filter by category or search for a specific product.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4 flex-1 overflow-y-auto">
-        <div className="px-1">
-          <Input 
-            placeholder="Search products..."
-            value={searchTerm}
-            onChange={handleSearchChange}
-          />
-        </div>
-        <Accordion type="multiple" className="w-full">
-          {groceryData.categories.map((category) => (
-             <AccordionItem value={category.categoryName} key={category.categoryName}>
-                <div className="flex items-center gap-2 py-4">
-                    <Checkbox
-                        id={`filter-${category.categoryName}`}
-                        onCheckedChange={(checked) => handleCategorySelection(category.categoryName, !!checked)}
-                        checked={selectedCategories[category.categoryName] || false}
-                    />
-                    <label htmlFor={`filter-${category.categoryName}`} className="flex-1">
-                      <AccordionTrigger className="p-0 flex-1 hover:no-underline">
-                          {category.categoryName}
-                      </AccordionTrigger>
-                    </label>
-                </div>
-              <AccordionContent>
-                <div className="grid grid-cols-1 gap-2 p-2">
-                   {Array.isArray(category.items) && category.items.map(item => <p key={item} className="text-sm text-muted-foreground ml-4">{item}</p>)}
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
-      </CardContent>
+    <>
+    {/* Desktop Sidebar */}
+    <nav className="hidden md:block w-32 flex-shrink-0 border-r">
+        <ScrollArea className="h-full py-4">
+            <div className="space-y-4 px-2">
+                {categories.map((category) => {
+                    const isSelected = category.categoryName === selectedCategory;
+                    const image = images[category.categoryName] || { imageUrl: 'https://placehold.co/64x64/E2E8F0/64748B?text=...', imageHint: 'loading' };
+                    return (
+                    <button
+                        key={category.categoryName}
+                        onClick={() => onSelectCategory(category.categoryName)}
+                        className={cn(
+                        'flex flex-col items-center gap-2 p-2 rounded-lg w-full text-center transition-colors',
+                        isSelected
+                            ? 'bg-primary/10 text-primary'
+                            : 'hover:bg-muted/50'
+                        )}
+                    >
+                         <div className={cn("relative rounded-full p-1", isSelected && "ring-2 ring-primary")}>
+                            <Image
+                                src={image.imageUrl}
+                                alt={category.categoryName}
+                                width={56}
+                                height={56}
+                                className="rounded-full object-cover w-14 h-14"
+                            />
+                         </div>
+
+                        <span className="text-xs font-medium">{category.categoryName}</span>
+                    </button>
+                    );
+                })}
+            </div>
+        </ScrollArea>
+    </nav>
+    {/* Mobile Horizontal Scroll */}
+     <div className="md:hidden border-b">
+        <ScrollArea className="w-full whitespace-nowrap">
+            <div className="flex w-max space-x-2 p-4">
+                {categories.map((category) => {
+                     const isSelected = category.categoryName === selectedCategory;
+                     const image = images[category.categoryName] || { imageUrl: 'https://placehold.co/48x48/E2E8F0/64748B?text=...', imageHint: 'loading' };
+                    return (
+                         <button
+                            key={category.categoryName}
+                            onClick={() => onSelectCategory(category.categoryName)}
+                            className={cn(
+                            'flex flex-col items-center justify-start gap-2 rounded-lg w-20 text-center transition-colors flex-shrink-0',
+                             isSelected ? 'text-primary' : 'hover:bg-muted/50'
+                            )}
+                        >
+                            <div className={cn("relative rounded-full p-0.5", isSelected && "ring-2 ring-primary")}>
+                                <Image
+                                    src={image.imageUrl}
+                                    alt={category.categoryName}
+                                    width={48}
+                                    height={48}
+                                    className="rounded-full object-cover w-12 h-12"
+                                />
+                            </div>
+                            <span className="text-[10px] font-medium leading-tight line-clamp-2">{category.categoryName}</span>
+                        </button>
+                    )
+                })}
+            </div>
+            <ScrollBar orientation="horizontal" />
+        </ScrollArea>
     </div>
+    </>
   );
 }
+
 
 export default function StoreDetailPage() {
   const params = useParams();
   const id = params.id as string;
-  const { firestore, user } = useFirebase();
+  const { firestore } = useFirebase();
   const [store, setStore] = useState<Store | null>(null);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState<{ categories: string[], searchTerm: string }>({ categories: [], searchTerm: '' });
   const [storeImage, setStoreImage] = useState({ imageUrl: 'https://placehold.co/250x250/E2E8F0/64748B?text=Loading...', imageHint: 'loading' });
   const [productImages, setProductImages] = useState({});
-  
+  const [searchTerm, setSearchTerm] = useState('');
+
   const productsQuery = useMemoFirebase(() => {
     if (!firestore || !id) return null;
     return collection(firestore, 'stores', id, 'products');
   }, [firestore, id]);
 
   const { data: products, isLoading: productsLoading } = useCollection<Product>(productsQuery);
+
+  // Memoize categories to prevent re-renders
+  const storeCategories = useMemo(() => {
+    if (!products) return [];
+    const uniqueCategories = [...new Set(products.map(p => p.category || 'Miscellaneous'))];
+    // Find the original category objects from groceryData to preserve order and structure
+    return groceryData.categories.filter(gc => uniqueCategories.includes(gc.categoryName));
+  }, [products]);
+
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  // Set default category once products load
+  useEffect(() => {
+    if (storeCategories.length > 0 && !selectedCategory) {
+      setSelectedCategory(storeCategories[0].categoryName);
+    }
+  }, [storeCategories, selectedCategory]);
 
   useEffect(() => {
     if (firestore && id) {
@@ -117,45 +183,41 @@ export default function StoreDetailPage() {
     const fetchProductImages = async () => {
         if (!products) return;
         const imagePromises = products.map(p => getProductImage(p.imageId));
-        const resolvedImages = await Promise.all(imagePromises);
-        const imageMap = products.reduce((acc, product, index) => {
-            acc[product.id] = resolvedImages[index];
-            return acc;
-        }, {});
-        setProductImages(imageMap);
+        try {
+            const resolvedImages = await Promise.all(imagePromises);
+            const imageMap = products.reduce((acc, product, index) => {
+                acc[product.id] = resolvedImages[index];
+                return acc;
+            }, {});
+            setProductImages(imageMap);
+        } catch(e) {
+            console.error("Failed to fetch one or more product images", e);
+        }
     };
     fetchProductImages();
   }, [products]);
   
-  const handleFilterChange = (newFilters: { categories: string[], searchTerm: string }) => {
-    setFilters(newFilters);
-  };
-
   const filteredProducts = useMemo(() => {
     if (!products) return [];
     let tempProducts = [...products];
 
-    // Filter by search term
-    if (filters.searchTerm) {
-      tempProducts = tempProducts.filter(product =>
-        product.name.toLowerCase().includes(filters.searchTerm.toLowerCase())
-      );
+    // Filter by selected category
+    if (selectedCategory) {
+        tempProducts = tempProducts.filter(product => product.category === selectedCategory);
     }
 
-    // Filter by category
-    if (filters.categories.length > 0) {
+    // Filter by search term
+    if (searchTerm) {
       tempProducts = tempProducts.filter(product =>
-        filters.categories.includes(product.category || 'Miscellaneous')
+        product.name.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
     return tempProducts;
-  }, [products, filters]);
+  }, [products, selectedCategory, searchTerm]);
 
 
-  const isStoreOwner = user && store && user.uid === store.ownerId;
-
-  if (loading || productsLoading) {
+  if (loading) {
     return <div className="container mx-auto py-12 px-4 md:px-6">Loading...</div>;
   }
 
@@ -163,63 +225,55 @@ export default function StoreDetailPage() {
     return notFound();
   }
   
-  const sidebarContent = <ProductFilterSidebar onFilterChange={handleFilterChange} />;
-
   return (
-    <div className="flex">
-        <div className="hidden lg:block w-96 border-r h-[calc(100vh-4rem)] sticky top-16">
-             {sidebarContent}
-        </div>
-        <div className="container mx-auto py-12 px-4 md:px-6 flex-1">
-          <div className="flex flex-col md:flex-row gap-8 mb-12">
-            <Image
-              src={storeImage.imageUrl}
-              alt={store.name}
-              data-ai-hint={storeImage.imageHint}
-              width={250}
-              height={250}
-              className="rounded-lg object-cover"
-            />
-            <div className="flex-1">
-              <div className="flex items-center gap-4">
-                <h1 className="text-4xl font-bold font-headline mb-2">{store.name}</h1>
-                <Sheet>
-                    <SheetTrigger asChild>
-                        <Button variant="outline" className="lg:hidden">
-                            <PanelLeft className="mr-2 h-4 w-4" />
-                            Filter Products
-                        </Button>
-                    </SheetTrigger>
-                    <SheetContent side="left" className="p-0 w-full max-w-md flex flex-col">
-                       <SheetHeader className="p-6 pb-0">
-                          <SheetTitle>Filter Products</SheetTitle>
-                          <SheetDescription>
-                            Find exactly what you're looking for.
-                          </SheetDescription>
-                        </SheetHeader>
-                        {/* The content itself has its own padding and scrolling */}
-                        <div className="flex-1 overflow-y-auto">
-                            {sidebarContent}
-                        </div>
-                    </SheetContent>
-                </Sheet>
+    <div className="flex flex-col md:flex-row min-h-screen">
+      <CategorySidebar categories={storeCategories} selectedCategory={selectedCategory} onSelectCategory={setSelectedCategory} />
+        
+        <div className="flex-1">
+          <header className="p-4 md:p-6 border-b">
+              <div className="flex flex-col md:flex-row gap-6">
+                <Image
+                src={storeImage.imageUrl}
+                alt={store.name}
+                data-ai-hint={storeImage.imageHint}
+                width={150}
+                height={150}
+                className="rounded-lg object-cover w-full h-40 md:w-[150px] md:h-[150px]"
+                />
+                <div className="flex-1">
+                    <h1 className="text-3xl font-bold font-headline mb-2">{store.name}</h1>
+                    <p className="text-md text-muted-foreground mb-2">{store.address}</p>
+                    <p className="text-md">{store.description}</p>
+                </div>
               </div>
-              <p className="text-lg text-muted-foreground mb-2">{store.address}</p>
-              <p className="text-lg">{store.description}</p>
+          </header>
+          <main className="p-4 md:p-6">
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold font-headline">{selectedCategory} ({filteredProducts.length})</h2>
+                <div className="w-full max-w-sm">
+                    <Input 
+                        placeholder="Search in this category..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                </div>
             </div>
-          </div>
 
-          <h2 className="text-3xl font-bold font-headline mb-8">Products ({filteredProducts.length})</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
-            {filteredProducts && filteredProducts.map((product) => {
-              const image = productImages[product.id] || { imageUrl: 'https://placehold.co/300x300/E2E8F0/64748B?text=...', imageHint: 'loading' };
-              return <ProductCard key={product.id} product={product} image={image} />
-            })}
-          </div>
-          {filteredProducts.length === 0 && !productsLoading && (
-            <p className="text-muted-foreground">No products found matching your criteria.</p>
-          )}
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                {productsLoading ? (
+                    <p>Loading products...</p>
+                ) : filteredProducts && filteredProducts.length > 0 ? (
+                    filteredProducts.map((product) => {
+                    const image = productImages[product.id] || { imageUrl: 'https://placehold.co/300x300/E2E8F0/64748B?text=...', imageHint: 'loading' };
+                    return <ProductCard key={product.id} product={product} image={image} />
+                    })
+                ) : (
+                    <p className="text-muted-foreground col-span-full">No products found matching your criteria.</p>
+                )}
+            </div>
+          </main>
         </div>
     </div>
   );
 }
+
