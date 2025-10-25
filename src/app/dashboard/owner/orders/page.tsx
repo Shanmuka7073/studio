@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useFirebase, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase } from '@/firebase';
@@ -212,37 +211,31 @@ export default function OrdersDashboardPage() {
   }, [regularOrders, pendingVoiceOrders, assignedVoiceOrders]);
 
 
-  const handleStatusChange = async (orderId: string, collectionName: 'orders' | 'voice-orders', newStatus: Order['status']) => {
+  const handleStatusChange = (orderId: string, collectionName: 'orders' | 'voice-orders', newStatus: Order['status']) => {
     if (!firestore) return;
     
     const orderDocRef = doc(firestore, collectionName, orderId);
     
-    try {
-        const updatePayload: { status: Order['status'], storeId?: string } = { status: newStatus };
-        if (collectionName === 'voice-orders' && newStatus !== 'Pending' && myStore) {
-            updatePayload.storeId = myStore.id;
-        }
-
-        await updateDoc(orderDocRef, updatePayload);
-
-        toast({
-            title: "Status Updated",
-            description: `Order ${orderId.substring(0,7)} marked as ${newStatus}.`,
-        });
-    } catch (error: any) {
-        console.error("Failed to update status:", error);
-         const permissionError = new FirestorePermissionError({
-            path: orderDocRef.path,
-            operation: 'update',
-            requestResourceData: { status: newStatus },
-        });
-        errorEmitter.emit('permission-error', permissionError);
-        toast({
-            variant: "destructive",
-            title: "Update Failed",
-            description: "Could not update the order status. Check permissions.",
-        });
+    const updatePayload: { status: Order['status'], storeId?: string } = { status: newStatus };
+    if (collectionName === 'voice-orders' && newStatus !== 'Pending' && myStore) {
+        updatePayload.storeId = myStore.id;
     }
+
+    updateDoc(orderDocRef, updatePayload)
+        .then(() => {
+            toast({
+                title: "Status Updated",
+                description: `Order ${orderId.substring(0,7)} marked as ${newStatus}.`,
+            });
+        })
+        .catch(async (serverError) => {
+            const permissionError = new FirestorePermissionError({
+                path: orderDocRef.path,
+                operation: 'update',
+                requestResourceData: updatePayload,
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        });
   };
 
   const formatDate = (date: any) => {
