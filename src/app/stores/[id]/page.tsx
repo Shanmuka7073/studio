@@ -3,9 +3,9 @@
 import { getStore, getStoreImage } from '@/lib/data';
 import Image from 'next/image';
 import ProductCard from '@/components/product-card';
-import { useFirebase, useCollection, useMemoFirebase, errorEmitter } from '@/firebase';
+import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { Store, Product } from '@/lib/types';
-import { useEffect, useState, useMemo, useTransition } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { notFound, useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -13,123 +13,10 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from '@/components/ui/sheet';
 import groceryData from '@/lib/grocery-data.json';
-import { useToast } from '@/hooks/use-toast';
-import { writeBatch, collection, doc } from 'firebase/firestore';
-import { FirestorePermissionError } from '@/firebase/errors';
-import { revalidateProductPaths } from '@/app/actions';
 import { PanelLeft } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { collection } from 'firebase/firestore';
 
-function InventoryManager({ storeId, existingProducts, onProductsAdded }: { storeId: string; existingProducts: Product[], onProductsAdded: () => void }) {
-  const { toast } = useToast();
-  const [isAdding, startTransition] = useTransition();
-  const { firestore } = useFirebase();
-  const [selectedProducts, setSelectedProducts] = useState<Record<string, boolean>>({});
-
-  useEffect(() => {
-    const initialSelection: Record<string, boolean> = {};
-    existingProducts.forEach(p => {
-      if (p.name) initialSelection[p.name] = true;
-    });
-    setSelectedProducts(initialSelection);
-  }, [existingProducts]);
-
-  const handleProductSelection = (productName: string, isChecked: boolean) => {
-    setSelectedProducts(prev => ({ ...prev, [productName]: isChecked }));
-  };
-  
-  const handleUpdateInventory = () => {
-    if (!firestore || !storeId) return;
-
-    const productsToAdd = Object.keys(selectedProducts).filter(key => selectedProducts[key] && !existingProducts.some(p => p.name === key));
-    
-    if (productsToAdd.length === 0) {
-      toast({
-        title: 'No new products selected',
-        description: 'You did not select any new products to add.',
-      });
-      return;
-    }
-    
-    startTransition(() => {
-       const batch = writeBatch(firestore);
-       productsToAdd.forEach(name => {
-         const newProductRef = doc(collection(firestore, 'stores', storeId, 'products'));
-         batch.set(newProductRef, {
-           name,
-           price: 0.99,
-           description: '',
-           storeId: storeId,
-           imageId: `prod-${Math.floor(Math.random() * 15) + 1}`,
-           quantity: 100,
-           category: groceryData.categories.find(c => c.items.includes(name))?.categoryName || 'Miscellaneous'
-         });
-       });
-       
-       batch.commit().then(() => {
-         toast({
-           title: `${productsToAdd.length} Products Added!`,
-           description: 'The selected products have been added to your inventory.',
-         });
-         onProductsAdded();
-       }).catch((serverError) => {
-         console.error("Failed to add products:", serverError);
-         const permissionError = new FirestorePermissionError({
-           path: `stores/${storeId}/products`,
-           operation: 'create',
-           requestResourceData: { names: productsToAdd },
-         });
-         errorEmitter.emit('permission-error', permissionError);
-         return Promise.reject(serverError);
-       });
-    });
-  };
-
-  const selectedCount = Object.keys(selectedProducts).filter(key => selectedProducts[key]).length;
-  const newProductsCount = Object.keys(selectedProducts).filter(key => selectedProducts[key] && !existingProducts.some(p => p.name === key)).length;
-
-  return (
-    <div className="h-full flex flex-col">
-      <CardHeader>
-        <CardTitle>Manage Inventory</CardTitle>
-        <CardDescription>Select items to add to your store. Currently showing {selectedCount} items.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4 flex-1 overflow-y-auto">
-        <Accordion type="multiple" className="w-full">
-          {groceryData.categories.map((category) => (
-            <AccordionItem value={category.categoryName} key={category.categoryName}>
-              <AccordionTrigger>{category.categoryName} ({category.items.filter(item => selectedProducts[item]).length}/{category.items.length})</AccordionTrigger>
-              <AccordionContent>
-                <div className="grid grid-cols-2 gap-4 p-4">
-                  {category.items.map((item) => (
-                    <div key={item} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`owner-${category.categoryName}-${item}`}
-                        onCheckedChange={(checked) => handleProductSelection(item, !!checked)}
-                        checked={selectedProducts[item] || false}
-                      />
-                      <label
-                        htmlFor={`owner-${category.categoryName}-${item}`}
-                        className="text-sm font-medium leading-none"
-                      >
-                        {item}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
-      </CardContent>
-      <div className="p-6 border-t">
-        <Button onClick={handleUpdateInventory} disabled={isAdding || newProductsCount === 0} className="w-full">
-            {isAdding ? 'Adding...' : `Add ${newProductsCount} New Products`}
-        </Button>
-      </div>
-    </div>
-  );
-}
 
 function ProductFilterSidebar({ onFilterChange }: { onFilterChange: (filters: { categories: string[], searchTerm: string }) => void }) {
   const [selectedCategories, setSelectedCategories] = useState<Record<string, boolean>>({});
@@ -180,7 +67,7 @@ function ProductFilterSidebar({ onFilterChange }: { onFilterChange: (filters: { 
                 </div>
               <AccordionContent>
                 <div className="grid grid-cols-1 gap-2 p-2">
-                   {category.items.map(item => <p key={item} className="text-sm text-muted-foreground ml-4">{item}</p>)}
+                   {Array.isArray(category.items) && category.items.map(item => <p key={item} className="text-sm text-muted-foreground ml-4">{item}</p>)}
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -260,9 +147,7 @@ export default function StoreDetailPage() {
 
   const image = getStoreImage(store.imageId);
   
-  const sidebarContent = isStoreOwner 
-    ? <InventoryManager storeId={store.id} existingProducts={products || []} onProductsAdded={() => revalidateProductPaths(store.id)} />
-    : <ProductFilterSidebar onFilterChange={handleFilterChange} />;
+  const sidebarContent = <ProductFilterSidebar onFilterChange={handleFilterChange} />;
 
   return (
     <div className="flex">
@@ -286,14 +171,14 @@ export default function StoreDetailPage() {
                     <SheetTrigger asChild>
                         <Button variant="outline" className="lg:hidden">
                             <PanelLeft className="mr-2 h-4 w-4" />
-                            {isStoreOwner ? 'Manage Inventory' : 'Filter Products'}
+                            Filter Products
                         </Button>
                     </SheetTrigger>
                     <SheetContent side="left" className="p-0 w-full max-w-md flex flex-col">
                        <SheetHeader className="p-6 pb-0">
-                          <SheetTitle>{isStoreOwner ? 'Manage Inventory' : 'Filter Products'}</SheetTitle>
+                          <SheetTitle>Filter Products</SheetTitle>
                           <SheetDescription>
-                            {isStoreOwner ? 'Add or remove products from your store.' : 'Find exactly what you\'re looking for.'}
+                            Find exactly what you're looking for.
                           </SheetDescription>
                         </SheetHeader>
                         {/* The content itself has its own padding and scrolling */}
