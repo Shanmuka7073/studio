@@ -2,7 +2,7 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Settings, ArrowRight,Languages, Pricetag, PriceTag } from 'lucide-react';
+import { Settings, ArrowRight, Tag } from 'lucide-react';
 import Link from 'next/link';
 import { useFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
@@ -64,7 +64,7 @@ function BulkPriceUpdater() {
         <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-2xl font-bold font-headline">Bulk Price Update</CardTitle>
-                <PriceTag className="h-8 w-8 text-primary" />
+                <Tag className="h-8 w-8 text-primary" />
             </CardHeader>
             <CardContent>
                 <CardDescription className="mb-4">
