@@ -2,13 +2,17 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Settings, ArrowRight } from 'lucide-react';
+import { Settings, ArrowRight,Languages } from 'lucide-react';
 import Link from 'next/link';
 import { useFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import placeholderImagesData from '@/lib/placeholder-images.json';
 import groceryData from '@/lib/grocery-data.json';
 import Image from 'next/image';
+import { Button } from '@/components/ui/button';
+import { useTransition } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import { translateAndSaveAllProductNames } from '@/app/actions';
 
 const ADMIN_EMAIL = 'admin@gmail.com';
 
@@ -34,6 +38,48 @@ const createSlug = (text: string) => {
 const allProductNames = groceryData.categories.flatMap(category => Array.isArray(category.items) ? category.items : []);
 const uniqueProductNames = [...new Set(allProductNames)]; // Ensure uniqueness
 const imageMap = new Map(placeholderImagesData.placeholderImages.map(img => [img.id, img]));
+
+function TranslationCard() {
+    const [isTranslating, startTranslation] = useTransition();
+    const { toast } = useToast();
+
+    const handleTranslate = () => {
+        startTranslation(async () => {
+            try {
+                const result = await translateAndSaveAllProductNames();
+                if (result.success) {
+                    toast({
+                        title: 'Translation Complete!',
+                        description: `${result.count} product names were translated and saved.`,
+                    });
+                } else {
+                    throw new Error(result.error || 'Unknown error');
+                }
+            } catch (error: any) {
+                 toast({
+                    variant: 'destructive',
+                    title: 'Translation Failed',
+                    description: error.message || 'An unexpected error occurred.',
+                });
+            }
+        });
+    }
+    
+    return (
+        <Card className="h-full flex flex-col">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-2xl font-bold font-headline">Product Localization</CardTitle>
+                <Languages className="h-8 w-8 text-primary" />
+            </CardHeader>
+            <CardContent className="flex-1 flex flex-col justify-between">
+                <CardDescription>Use AI to translate all product names into Telugu and save them permanently to the database for all users.</CardDescription>
+                <Button onClick={handleTranslate} disabled={isTranslating} className="mt-4">
+                    {isTranslating ? 'Translating...' : 'Translate Product Names'}
+                </Button>
+            </CardContent>
+        </Card>
+    );
+}
 
 
 export default function AdminDashboardPage() {
@@ -73,6 +119,9 @@ export default function AdminDashboardPage() {
                         </Card>
                     </Link>
                 ))}
+                 <div className="md:col-span-1">
+                    <TranslationCard />
+                </div>
             </div>
             <Card>
                 <CardHeader>
