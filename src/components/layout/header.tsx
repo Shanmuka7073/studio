@@ -62,6 +62,7 @@ function AssistantToggle() {
 function UserMenu() {
   const { user, isUserLoading } = useFirebase();
   const isAdmin = user && user.email === ADMIN_EMAIL;
+  const dashboardHref = isAdmin ? '/dashboard/admin' : '/dashboard';
 
   const handleLogout = async () => {
     const auth = getAuth();
@@ -92,22 +93,26 @@ function UserMenu() {
         <DropdownMenuLabel>My Account</DropdownMenuLabel>
         <DropdownMenuItem disabled>{user.email}</DropdownMenuItem>
         <DropdownMenuSeparator />
-        <Link href="/dashboard" passHref>
+        <Link href={dashboardHref} passHref>
           <DropdownMenuItem>
               <LayoutDashboard className="mr-2 h-4 w-4" />
               <span>Dashboard</span>
           </DropdownMenuItem>
         </Link>
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel>Roles</DropdownMenuLabel>
-        {dashboardLinks.map(({ href, label, icon: Icon }) => (
-             <Link key={href} href={href} passHref>
-                <DropdownMenuItem>
-                    <Icon className="mr-2 h-4 w-4" />
-                    <span>{label}</span>
-                </DropdownMenuItem>
-             </Link>
-        ))}
+        {!isAdmin && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Roles</DropdownMenuLabel>
+            {dashboardLinks.map(({ href, label, icon: Icon }) => (
+                <Link key={href} href={href} passHref>
+                    <DropdownMenuItem>
+                        <Icon className="mr-2 h-4 w-4" />
+                        <span>{label}</span>
+                    </DropdownMenuItem>
+                </Link>
+            ))}
+          </>
+        )}
         {isAdmin && (
             <>
                 <DropdownMenuSeparator />
@@ -131,6 +136,7 @@ export function Header() {
   const pathname = usePathname();
   const { user } = useFirebase();
   const isAdmin = user && user.email === ADMIN_EMAIL;
+  const dashboardHref = isAdmin ? '/dashboard/admin' : '/dashboard';
 
   return (
     <header className="sticky top-0 z-50 flex h-16 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:px-6">
@@ -154,6 +160,15 @@ export function Header() {
             {label}
           </Link>
         ))}
+         <Link
+            href={dashboardHref}
+            className={cn(
+              'transition-colors hover:text-foreground',
+              pathname.startsWith('/dashboard') ? 'text-foreground' : 'text-muted-foreground'
+            )}
+          >
+            Dashboard
+          </Link>
       </nav>
       <Sheet>
         <SheetTrigger asChild>
@@ -193,7 +208,16 @@ export function Header() {
             <div className="border-t pt-4">
                 <p className="px-3 text-sm font-medium text-muted-foreground mb-2">Dashboard</p>
                 <div className="grid gap-2">
-                    {dashboardLinks.map(({ href, label, icon: Icon }) => (
+                    <SheetClose asChild>
+                        <Link
+                            href={dashboardHref}
+                            className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+                        >
+                            <LayoutDashboard className="h-4 w-4" />
+                            Dashboard
+                        </Link>
+                    </SheetClose>
+                    {!isAdmin && dashboardLinks.map(({ href, label, icon: Icon }) => (
                     <SheetClose asChild key={href}>
                         <Link
                             href={href}

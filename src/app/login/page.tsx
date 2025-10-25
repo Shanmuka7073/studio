@@ -22,6 +22,8 @@ import { useFirebase, useAuth } from '@/firebase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 
+const ADMIN_EMAIL = 'admin@gmail.com';
+
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6, 'Password must be at least 6 characters'),
@@ -44,7 +46,11 @@ export default function LoginPage() {
   useEffect(() => {
     // If user is already logged in, redirect them away from the login page.
     if (!isUserLoading && user) {
-      router.push(redirectTo);
+       if (user.email === ADMIN_EMAIL) {
+        router.push('/dashboard/admin');
+      } else {
+        router.push(redirectTo);
+      }
     }
   }, [user, isUserLoading, router, redirectTo]);
 
