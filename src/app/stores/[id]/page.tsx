@@ -230,23 +230,6 @@ export default function StoreDetailPage() {
       <CategorySidebar categories={storeCategories} selectedCategory={selectedCategory} onSelectCategory={setSelectedCategory} />
         
         <div className="flex-1">
-          <header className="p-4 md:p-6 border-b">
-              <div className="flex flex-col md:flex-row gap-6">
-                <Image
-                src={storeImage.imageUrl}
-                alt={store.name}
-                data-ai-hint={storeImage.imageHint}
-                width={150}
-                height={150}
-                className="rounded-lg object-cover w-full h-40 md:w-[150px] md:h-[150px]"
-                />
-                <div className="flex-1">
-                    <h1 className="text-3xl font-bold font-headline mb-2">{store.name}</h1>
-                    <p className="text-md text-muted-foreground mb-2">{store.address}</p>
-                    <p className="text-md">{store.description}</p>
-                </div>
-              </div>
-          </header>
           <main className="p-4 md:p-6">
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold font-headline">{selectedCategory} ({filteredProducts.length})</h2>
@@ -276,4 +259,3 @@ export default function StoreDetailPage() {
     </div>
   );
 }
-
