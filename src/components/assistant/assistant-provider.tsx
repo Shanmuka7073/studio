@@ -213,7 +213,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
 
           if (foundProduct) {
             setPendingAction({ intent: 'addProductToCart', product: foundProduct });
-            await speak(`I found ${foundProduct.name} for $${foundProduct.price.toFixed(2)}. Should I add it to your cart?`);
+            await speak(`I found ${foundProduct.name} for ₹${foundProduct.price.toFixed(2)}. Should I add it to your cart?`);
           } else {
             await speak(`I couldn't find ${productName} in this store.`);
           }

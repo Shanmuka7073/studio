@@ -258,7 +258,7 @@ function AddProductForm({ storeId }: { storeId: string }) {
               name="price"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Price ($)</FormLabel>
+                  <FormLabel>Price (₹)</FormLabel>
                   <FormControl>
                     <Input type="number" step="0.01" {...field} />
                   </FormControl>
@@ -546,7 +546,7 @@ function ManageStoreView({ store }: { store: Store }) {
                             {products.map(product => (
                                 <TableRow key={product.id}>
                                     <TableCell>{product.name}</TableCell>
-                                    <TableCell>${product.price.toFixed(2)}</TableCell>
+                                    <TableCell>₹{product.price.toFixed(2)}</TableCell>
                                     <TableCell>{product.category}</TableCell>
                                     <TableCell className="text-right">
                                         <Button 

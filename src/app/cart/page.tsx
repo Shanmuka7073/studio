@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useCart } from '@/lib/cart';
@@ -31,7 +32,7 @@ function CartRow({ item, image }) {
                     <span className="font-medium">{product.name}</span>
                 </div>
             </TableCell>
-            <TableCell>${product.price.toFixed(2)}</TableCell>
+            <TableCell>₹{product.price.toFixed(2)}</TableCell>
             <TableCell>
                 <Input
                     type="number"
@@ -42,7 +43,7 @@ function CartRow({ item, image }) {
                     aria-label={`Quantity for ${product.name}`}
                 />
             </TableCell>
-            <TableCell className="text-right">${(product.price * quantity).toFixed(2)}</TableCell>
+            <TableCell className="text-right">₹{(product.price * quantity).toFixed(2)}</TableCell>
             <TableCell>
                 <Button variant="ghost" size="icon" onClick={() => removeItem(product.id)}>
                     <Trash2 className="h-4 w-4" />
@@ -129,7 +130,7 @@ export default function CartPage() {
                 <CardContent className="space-y-4">
                     <div className="flex justify-between">
                         <span>Subtotal</span>
-                        <span>${cartTotal.toFixed(2)}</span>
+                        <span>₹{cartTotal.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between">
                         <span>Shipping</span>
@@ -137,7 +138,7 @@ export default function CartPage() {
                     </div>
                      <div className="flex justify-between font-bold text-lg">
                         <span>Total</span>
-                        <span>${cartTotal.toFixed(2)}</span>
+                        <span>₹{cartTotal.toFixed(2)}</span>
                     </div>
                     <Button asChild className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
                         <Link href="/checkout">Proceed to Checkout</Link>

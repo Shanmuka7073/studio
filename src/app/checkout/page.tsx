@@ -50,7 +50,7 @@ function OrderSummaryItem({ item, image }) {
                     <p className="text-sm text-muted-foreground">Qty: {quantity}</p>
                 </div>
             </div>
-            <p>${(product.price * quantity).toFixed(2)}</p>
+            <p>₹{(product.price * quantity).toFixed(2)}</p>
         </div>
     );
 }
@@ -414,7 +414,7 @@ export default function CheckoutPage() {
             </CardContent>
             <CardFooter className="flex justify-between font-bold text-lg">
                 <span>Total</span>
-                <span>${cartTotal.toFixed(2)}</span>
+                <span>₹{cartTotal.toFixed(2)}</span>
             </CardFooter>
           </Card>
            <Card className="mt-8">

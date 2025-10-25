@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useCart } from '@/lib/cart';
@@ -38,7 +39,7 @@ function CartSheetItem({ item, image }) {
                         className="w-16 h-8 text-center"
                         aria-label={`Quantity for ${product.name}`}
                     />
-                    <p className="text-sm font-semibold">${(product.price * quantity).toFixed(2)}</p>
+                    <p className="text-sm font-semibold">₹{(product.price * quantity).toFixed(2)}</p>
                 </div>
             </div>
             <Button variant="ghost" size="icon" onClick={() => removeItem(product.id)}>
@@ -98,7 +99,7 @@ export function CartSheetContent() {
               <Separator />
               <div className="flex justify-between font-bold text-lg">
                 <span>Total</span>
-                <span>${cartTotal.toFixed(2)}</span>
+                <span>₹{cartTotal.toFixed(2)}</span>
               </div>
               <SheetClose asChild>
                   <Button asChild className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">

@@ -128,7 +128,7 @@ export default function MyOrdersPage() {
                             <Badge variant={getStatusVariant(order.status)}>{order.status}</Badge>
                         </div>
                         <div className="flex-1 text-right">
-                             <p className="font-medium">${order.totalAmount.toFixed(2)}</p>
+                             <p className="font-medium">₹{order.totalAmount.toFixed(2)}</p>
                         </div>
                     </div>
                   </AccordionTrigger>
@@ -150,7 +150,7 @@ export default function MyOrdersPage() {
                                             <TableRow key={index}>
                                                 <TableCell>{item.name}</TableCell>
                                                 <TableCell>{item.quantity}</TableCell>
-                                                <TableCell className="text-right">${item.price.toFixed(2)}</TableCell>
+                                                <TableCell className="text-right">₹{item.price.toFixed(2)}</TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>

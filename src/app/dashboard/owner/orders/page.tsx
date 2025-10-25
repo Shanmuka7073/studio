@@ -87,7 +87,7 @@ function OrderDetailsDialog({ order, isOpen, onClose }: { order: Order | null; i
                                             <TableRow key={index}>
                                                 <TableCell>{item.name}</TableCell>
                                                 <TableCell>{item.quantity}</TableCell>
-                                                <TableCell className="text-right">${item.price.toFixed(2)}</TableCell>
+                                                <TableCell className="text-right">₹{item.price.toFixed(2)}</TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
@@ -317,7 +317,7 @@ export default function OrdersDashboardPage() {
                     <TableCell>
                       <StatusManager order={order} onStatusChange={handleStatusChange} />
                     </TableCell>
-                    <TableCell className="text-right">${order.totalAmount.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">₹{order.totalAmount.toFixed(2)}</TableCell>
                     <TableCell className="text-right">
                         <Button variant="outline" size="sm" onClick={() => setSelectedOrder(order)}>
                             View Details
