@@ -621,7 +621,7 @@ function ManageStoreView({ store, adminPrices }: { store: Store; adminPrices: Re
         <div className="grid md:grid-cols-2 gap-8">
             <Card>
                 <CardHeader>
-                    <CardTitle>Manage {store.name}</CardTitle>
+                    <CardTitle>Manage ${store.name}</CardTitle>
                     <CardDescription>
                         View your existing inventory below and add new products.
                     </CardDescription>
@@ -661,7 +661,7 @@ function ManageStoreView({ store, adminPrices }: { store: Store; adminPrices: Re
                                             disabled={isDeleting}
                                         >
                                             <Trash2 className="h-4 w-4" />
-                                            <span className="sr-only">Delete {product.name}</span>
+                                            <span className="sr-only">Delete ${product.name}</span>
                                         </Button>
                                     </TableCell>
                                 </TableRow>
@@ -878,8 +878,10 @@ function CreateStoreForm({ user, adminPrices }: { user: any; adminPrices: Record
 
               <div className="space-y-4">
                   <h3 className="text-lg font-medium">Select Your Initial Inventory</h3>
-                  <Accordion type="multiple" className="w-full">
-                    {groceryData.categories.map((category) => {
+                  <Accordion type="single" collapsible className="w-full" defaultValue='Non-Veg & Frozen Items'>
+                    {groceryData.categories
+                      .filter(category => category.categoryName === 'Non-Veg & Frozen Items')
+                      .map((category) => {
                        const categoryItems = category.items && Array.isArray(category.items) ? category.items : [];
                        const selectedInCategory = categoryItems.filter(item => selectedProducts[item]).length;
 
@@ -976,3 +978,5 @@ export default function MyStorePage() {
     </div>
   );
 }
+
+    
