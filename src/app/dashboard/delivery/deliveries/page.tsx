@@ -70,24 +70,21 @@ export default function DeliveriesPage() {
     if (!firestore) return null;
     return query(
         collection(firestore, 'orders'),
-        where('status', '==', 'Out for Delivery')
+        where('status', '==', 'Processing') // Changed from "Out for Delivery"
     );
   }, [firestore]);
   
   const { data: deliveries, isLoading: deliveriesLoading } = useCollection<Order>(deliveriesQuery);
 
   const completedDeliveriesQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayTimestamp = Timestamp.fromDate(today);
-
+    if (!firestore || !user) return null;
+    // Secure query: Only fetch deliveries completed by the current user.
     return query(
       collection(firestore, 'orders'),
-      where('status', '==', 'Delivered')
+      where('status', '==', 'Delivered'),
+      where('deliveryPartnerId', '==', user.uid)
     );
-  }, [firestore]);
+  }, [firestore, user]);
 
   const { data: completedDeliveries, isLoading: completedDeliveriesLoading } = useCollection<Order>(completedDeliveriesQuery);
 
@@ -115,7 +112,29 @@ export default function DeliveriesPage() {
   }, [deliveries, stores]);
 
   const handleConfirmPickup = (orderId: string) => {
-    setPickedUpOrders(prev => ({ ...prev, [orderId]: true }));
+    if (!firestore || !user) return;
+     startUpdateTransition(async () => {
+        const orderRef = doc(firestore, 'orders', orderId);
+        try {
+            await updateDoc(orderRef, {
+                status: 'Out for Delivery',
+                deliveryPartnerId: user.uid,
+            });
+            setPickedUpOrders(prev => ({ ...prev, [orderId]: true }));
+             toast({
+                title: "Pickup Confirmed!",
+                description: `You are now assigned to deliver order #${orderId.substring(0, 7)}.`
+            });
+        } catch (error) {
+             console.error("Failed to confirm pickup:", error);
+            const permissionError = new FirestorePermissionError({
+                path: orderRef.path,
+                operation: 'update',
+                requestResourceData: { status: 'Out for Delivery', deliveryPartnerId: user.uid },
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        }
+     });
   };
 
   const handleMarkAsDelivered = (orderId: string) => {
@@ -226,22 +245,32 @@ export default function DeliveriesPage() {
 
   const totalEarnings = (completedDeliveries?.length || 0) * DELIVERY_FEE;
 
+  // Filter for orders that the current partner has picked up.
+  const myActiveDeliveries = useMemo(() => {
+    return deliveriesWithStores.filter(order => order.deliveryPartnerId === user?.uid && order.status === 'Out for Delivery');
+  }, [deliveriesWithStores, user]);
+
+  const availableDeliveries = useMemo(() => {
+    return deliveriesWithStores.filter(order => order.status === 'Processing');
+  }, [deliveriesWithStores]);
+
+
   return (
     <div className="container mx-auto py-12 px-4 md:px-6 space-y-12">
       
       <PayoutCard partnerData={partnerData} isLoading={partnerLoading} onPayout={handlePayoutRequest} />
       
       <div>
-        <h1 className="text-4xl font-bold mb-8 font-headline">Available Deliveries</h1>
+        <h1 className="text-4xl font-bold mb-8 font-headline">My Active Deliveries</h1>
         <Card>
           <CardHeader>
-            <CardTitle>Orders Ready for Pickup</CardTitle>
+            <CardTitle>Orders You Are Delivering</CardTitle>
           </CardHeader>
           <CardContent>
-            {deliveriesLoading ? (
-              <p>Loading deliveries...</p>
-            ) : !deliveriesWithStores || deliveriesWithStores.length === 0 ? (
-              <p className="text-muted-foreground">No orders are currently out for delivery.</p>
+            {isLoading ? (
+              <p>Loading your active deliveries...</p>
+            ) : !myActiveDeliveries || myActiveDeliveries.length === 0 ? (
+              <p className="text-muted-foreground">You have no active deliveries. Pick one from the available list below.</p>
             ) : (
               <Table>
                 <TableHeader>
@@ -252,9 +281,7 @@ export default function DeliveriesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {deliveriesWithStores.map((order) => {
-                    const isPickedUp = pickedUpOrders[order.id];
-                    return (
+                  {myActiveDeliveries.map((order) => (
                     <TableRow key={order.id}>
                       <TableCell>
                         <div className="font-medium">{order.store?.name}</div>
@@ -266,34 +293,22 @@ export default function DeliveriesPage() {
                       </TableCell>
                       <TableCell>
                           <div className="flex items-center gap-2">
-                              {!isPickedUp && (
-                                  <Button
-                                      variant="default"
-                                      size="sm"
-                                      onClick={() => handleConfirmPickup(order.id)}
-                                  >
-                                      Confirm Pickup
-                                  </Button>
-                              )}
-
-                              {order.store && (
+                               {order.store && (
                                   <Button
                                       variant="outline"
                                       size="sm"
                                       onClick={() => openInGoogleMaps(
                                           order.store!.latitude, 
                                           order.store!.longitude,
-                                          isPickedUp ? order.deliveryLat : order.store!.latitude, 
-                                          isPickedUp ? order.deliveryLng : order.store!.longitude,
+                                          order.deliveryLat,
+                                          order.deliveryLng,
                                       )}
                                   >
                                       <MapPin className="mr-2 h-4 w-4" />
-                                      {isPickedUp ? 'Route to Customer' : 'Route to Store'}
+                                      Route to Customer
                                   </Button>
                               )}
-
-                              {isPickedUp && (
-                                  <Button
+                               <Button
                                       variant="secondary"
                                       size="sm"
                                       onClick={() => handleMarkAsDelivered(order.id)}
@@ -302,14 +317,64 @@ export default function DeliveriesPage() {
                                       <Check className="mr-2 h-4 w-4" />
                                       {isUpdating ? 'Updating...' : 'Mark as Delivered'}
                                   </Button>
-                              )}
                           </div>
-                          {isPickedUp && (
-                              <div className="text-sm text-muted-foreground mt-2">{order.deliveryAddress}</div>
-                          )}
+                          <div className="text-sm text-muted-foreground mt-2">{order.deliveryAddress}</div>
                       </TableCell>
                     </TableRow>
-                  )})}
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+
+      <div>
+        <h2 className="text-3xl font-bold mb-8 font-headline">Available Deliveries</h2>
+        <Card>
+          <CardHeader>
+            <CardTitle>Orders Ready for Pickup</CardTitle>
+             <CardDescription>Accept a job to see customer details and delivery route.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {deliveriesLoading ? (
+              <p>Loading deliveries...</p>
+            ) : !availableDeliveries || availableDeliveries.length === 0 ? (
+              <p className="text-muted-foreground">No orders are currently ready for delivery.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Store Pickup</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {availableDeliveries.map((order) => (
+                    <TableRow key={order.id}>
+                      <TableCell>
+                        <div className="font-medium">{order.store?.name}</div>
+                        <div className="text-sm text-muted-foreground">{order.store?.address}</div>
+                      </TableCell>
+                      <TableCell>
+                          <div className="font-medium">{order.customerName}</div>
+                      </TableCell>
+                      <TableCell>
+                          <div className="flex items-center gap-2">
+                              <Button
+                                  variant="default"
+                                  size="sm"
+                                  onClick={() => handleConfirmPickup(order.id)}
+                                  disabled={isUpdating}
+                              >
+                                  Accept Job & Confirm Pickup
+                              </Button>
+                          </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             )}
