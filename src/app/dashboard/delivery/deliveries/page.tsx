@@ -70,7 +70,7 @@ export default function DeliveriesPage() {
     if (!firestore) return null;
     return query(
         collection(firestore, 'orders'),
-        where('status', '==', 'Processing'),
+        where('status', '==', 'Out for Delivery'),
         where('deliveryPartnerId', '==', null)
     );
   }, [firestore]);
@@ -252,7 +252,7 @@ export default function DeliveriesPage() {
   }, [deliveriesWithStores, user]);
 
   const availableDeliveries = useMemo(() => {
-    return deliveriesWithStores.filter(order => order.status === 'Processing');
+    return deliveriesWithStores.filter(order => order.status === 'Out for Delivery');
   }, [deliveriesWithStores]);
 
 
