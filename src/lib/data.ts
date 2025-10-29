@@ -76,7 +76,7 @@ export async function getProduct(
   return undefined;
 }
 
-// --- Keeping placeholder image functions ---
+// --- Placeholder image functions ---
 
 export const getProductImage = async (imageId: string) => await getImage(imageId);
 export const getStoreImage = async (imageId: string) => await getImage(imageId);
