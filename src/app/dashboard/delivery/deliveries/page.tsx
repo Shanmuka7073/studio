@@ -62,24 +62,22 @@ function PayoutCard({ partnerData, isLoading, onPayout }: { partnerData: Deliver
 export default function DeliveriesPage() {
   const { firestore, user } = useFirebase();
   const [stores, setStores] = useState<Store[]>([]);
-  const [pickedUpOrders, setPickedUpOrders] = useState<Record<string, boolean>>({});
   const [isUpdating, startUpdateTransition] = useTransition();
   const { toast } = useToast();
 
+  // Unified query for all relevant orders: either available or picked up by the current user
   const deliveriesQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
+    if (!firestore || !user) return null;
     return query(
         collection(firestore, 'orders'),
-        where('status', '==', 'Out for Delivery'),
-        where('deliveryPartnerId', '==', null)
+        where('status', '==', 'Out for Delivery')
     );
-  }, [firestore]);
+  }, [firestore, user]);
   
-  const { data: deliveries, isLoading: deliveriesLoading } = useCollection<Order>(deliveriesQuery);
+  const { data: allRelevantDeliveries, isLoading: deliveriesLoading } = useCollection<Order>(deliveriesQuery);
 
   const completedDeliveriesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
-    // Secure query: Only fetch deliveries completed by the current user.
     return query(
       collection(firestore, 'orders'),
       where('status', '==', 'Delivered'),
@@ -104,13 +102,16 @@ export default function DeliveriesPage() {
   }, [firestore]);
 
   const deliveriesWithStores = useMemo(() => {
-    if (!deliveries || !stores.length) return [];
+    if (!allRelevantDeliveries || !stores.length) return [];
     
-    return deliveries.map(order => {
+    return allRelevantDeliveries.map(order => {
       const store = stores.find(s => s.id === order.storeId);
       return { ...order, store };
+    }).filter(order => {
+        // Show orders that are either unassigned OR assigned to the current user
+        return order.deliveryPartnerId === null || order.deliveryPartnerId === user?.uid;
     });
-  }, [deliveries, stores]);
+  }, [allRelevantDeliveries, stores, user]);
 
   const handleConfirmPickup = (orderId: string) => {
     if (!firestore || !user) return;
@@ -120,7 +121,6 @@ export default function DeliveriesPage() {
             await updateDoc(orderRef, {
                 deliveryPartnerId: user.uid,
             });
-            setPickedUpOrders(prev => ({ ...prev, [orderId]: true }));
              toast({
                 title: "Pickup Confirmed!",
                 description: `You are now assigned to deliver order #${orderId.substring(0, 7)}.`
@@ -147,10 +147,7 @@ export default function DeliveriesPage() {
         try {
             const batch = writeBatch(firestore);
             
-            // 1. Update the order status
             batch.update(orderRef, { status: 'Delivered' });
-
-            // 2. Increment the partner's earnings
             batch.set(partnerRef, { 
                 totalEarnings: increment(DELIVERY_FEE),
                 userId: user.uid,
@@ -165,8 +162,6 @@ export default function DeliveriesPage() {
             });
         } catch (error) {
             console.error("Failed to mark as delivered:", error);
-            // Since this is a batch, we can't be sure which part failed for a specific error.
-            // A generic error is acceptable here for the UI.
             toast({
                 variant: 'destructive',
                 title: 'Update Failed',
@@ -187,7 +182,6 @@ export default function DeliveriesPage() {
       try {
         const batch = writeBatch(firestore);
         
-        // 1. Create a new payout request document
         const newPayoutRef = doc(collection(firestore, `deliveryPartners/${user.uid}/payouts`));
         batch.set(newPayoutRef, {
             amount: payoutAmount,
@@ -196,7 +190,6 @@ export default function DeliveriesPage() {
             status: 'pending',
         });
 
-        // 2. Reset the partner's earnings balance
         const partnerRef = doc(firestore, 'deliveryPartners', user.uid);
         batch.update(partnerRef, {
             totalEarnings: 0,
@@ -243,16 +236,13 @@ export default function DeliveriesPage() {
     return 'N/A';
   }
 
-  const totalEarnings = (completedDeliveries?.length || 0) * DELIVERY_FEE;
-
-  // Filter for orders that the current partner has picked up.
   const myActiveDeliveries = useMemo(() => {
     if (!user) return [];
-    return deliveriesWithStores.filter(order => order.deliveryPartnerId === user.uid && order.status === 'Out for Delivery');
+    return deliveriesWithStores.filter(order => order.deliveryPartnerId === user.uid);
   }, [deliveriesWithStores, user]);
 
   const availableDeliveries = useMemo(() => {
-    return deliveriesWithStores.filter(order => order.status === 'Out for Delivery');
+    return deliveriesWithStores.filter(order => order.deliveryPartnerId === null);
   }, [deliveriesWithStores]);
 
 
@@ -270,7 +260,7 @@ export default function DeliveriesPage() {
           <CardContent>
             {isLoading ? (
               <p>Loading your active deliveries...</p>
-            ) : !myActiveDeliveries || myActiveDeliveries.length === 0 ? (
+            ) : myActiveDeliveries.length === 0 ? (
               <p className="text-muted-foreground">You have no active deliveries. Pick one from the available list below.</p>
             ) : (
               <Table>
@@ -341,7 +331,7 @@ export default function DeliveriesPage() {
           <CardContent>
             {deliveriesLoading ? (
               <p>Loading deliveries...</p>
-            ) : !availableDeliveries || availableDeliveries.length === 0 ? (
+            ) : availableDeliveries.length === 0 ? (
               <p className="text-muted-foreground">No orders are currently ready for delivery.</p>
             ) : (
               <Table>
@@ -431,5 +421,4 @@ export default function DeliveriesPage() {
 
     </div>
   );
-
-    
+}
