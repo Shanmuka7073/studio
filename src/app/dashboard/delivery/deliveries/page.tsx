@@ -65,17 +65,27 @@ export default function DeliveriesPage() {
   const [isUpdating, startUpdateTransition] = useTransition();
   const { toast } = useToast();
 
-  // Unified query for all relevant orders: either available or picked up by the current user
-  const deliveriesQuery = useMemoFirebase(() => {
+  // Query 1: Get orders assigned to the current delivery partner.
+  const myActiveDeliveriesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
         collection(firestore, 'orders'),
-        where('status', '==', 'Out for Delivery')
+        where('status', '==', 'Out for Delivery'),
+        where('deliveryPartnerId', '==', user.uid)
     );
   }, [firestore, user]);
   
-  const { data: allRelevantDeliveries, isLoading: deliveriesLoading } = useCollection<Order>(deliveriesQuery);
+  // Query 2: Get orders that are ready for pickup and have no partner assigned.
+  const availableDeliveriesQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(
+        collection(firestore, 'orders'),
+        where('status', '==', 'Out for Delivery'),
+        where('deliveryPartnerId', '==', null)
+    );
+  }, [firestore]);
 
+  // Query 3: Get completed orders for the earnings history.
   const completedDeliveriesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
@@ -85,15 +95,16 @@ export default function DeliveriesPage() {
     );
   }, [firestore, user]);
 
+  // Hooks for each query
+  const { data: myActiveDeliveries, isLoading: activeDeliveriesLoading } = useCollection<Order>(myActiveDeliveriesQuery);
+  const { data: availableDeliveries, isLoading: availableDeliveriesLoading } = useCollection<Order>(availableDeliveriesQuery);
   const { data: completedDeliveries, isLoading: completedDeliveriesLoading } = useCollection<Order>(completedDeliveriesQuery);
 
   const partnerDocRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return doc(firestore, 'deliveryPartners', user.uid);
   }, [firestore, user]);
-
   const { data: partnerData, isLoading: partnerLoading } = useDoc<DeliveryPartner>(partnerDocRef);
-
 
   useEffect(() => {
     if (firestore) {
@@ -101,17 +112,18 @@ export default function DeliveriesPage() {
     }
   }, [firestore]);
 
-  const deliveriesWithStores = useMemo(() => {
-    if (!allRelevantDeliveries || !stores.length) return [];
-    
-    return allRelevantDeliveries.map(order => {
+  // Memoize to join store data with orders
+  const joinStoresToOrders = (orders: Order[] | null) => {
+    if (!orders || !stores.length) return [];
+    return orders.map(order => {
       const store = stores.find(s => s.id === order.storeId);
       return { ...order, store };
-    }).filter(order => {
-        // Show orders that are either unassigned OR assigned to the current user
-        return order.deliveryPartnerId === null || order.deliveryPartnerId === user?.uid;
     });
-  }, [allRelevantDeliveries, stores, user]);
+  };
+
+  const myActiveDeliveriesWithStores = useMemo(() => joinStoresToOrders(myActiveDeliveries), [myActiveDeliveries, stores]);
+  const availableDeliveriesWithStores = useMemo(() => joinStoresToOrders(availableDeliveries), [availableDeliveries, stores]);
+
 
   const handleConfirmPickup = (orderId: string) => {
     if (!firestore || !user) return;
@@ -218,7 +230,7 @@ export default function DeliveriesPage() {
     window.open(url, '_blank');
   };
   
-  const isLoading = deliveriesLoading || completedDeliveriesLoading || stores.length === 0;
+  const isLoading = activeDeliveriesLoading || availableDeliveriesLoading || completedDeliveriesLoading || stores.length === 0;
 
   const formatDate = (date: any) => {
     if (!date) return 'N/A';
@@ -236,16 +248,6 @@ export default function DeliveriesPage() {
     return 'N/A';
   }
 
-  const myActiveDeliveries = useMemo(() => {
-    if (!user) return [];
-    return deliveriesWithStores.filter(order => order.deliveryPartnerId === user.uid);
-  }, [deliveriesWithStores, user]);
-
-  const availableDeliveries = useMemo(() => {
-    return deliveriesWithStores.filter(order => order.deliveryPartnerId === null);
-  }, [deliveriesWithStores]);
-
-
   return (
     <div className="container mx-auto py-12 px-4 md:px-6 space-y-12">
       
@@ -258,9 +260,9 @@ export default function DeliveriesPage() {
             <CardTitle>Orders You Are Delivering</CardTitle>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
+            {activeDeliveriesLoading ? (
               <p>Loading your active deliveries...</p>
-            ) : myActiveDeliveries.length === 0 ? (
+            ) : myActiveDeliveriesWithStores.length === 0 ? (
               <p className="text-muted-foreground">You have no active deliveries. Pick one from the available list below.</p>
             ) : (
               <Table>
@@ -272,7 +274,7 @@ export default function DeliveriesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {myActiveDeliveries.map((order) => (
+                  {myActiveDeliveriesWithStores.map((order) => (
                     <TableRow key={order.id}>
                       <TableCell>
                         <div className="font-medium">{order.store?.name}</div>
@@ -329,9 +331,9 @@ export default function DeliveriesPage() {
              <CardDescription>Accept a job to see customer details and delivery route.</CardDescription>
           </CardHeader>
           <CardContent>
-            {deliveriesLoading ? (
+            {availableDeliveriesLoading ? (
               <p>Loading deliveries...</p>
-            ) : availableDeliveries.length === 0 ? (
+            ) : availableDeliveriesWithStores.length === 0 ? (
               <p className="text-muted-foreground">No orders are currently ready for delivery.</p>
             ) : (
               <Table>
@@ -343,7 +345,7 @@ export default function DeliveriesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {availableDeliveries.map((order) => (
+                  {availableDeliveriesWithStores.map((order) => (
                     <TableRow key={order.id}>
                       <TableCell>
                         <div className="font-medium">{order.store?.name}</div>
