@@ -21,6 +21,7 @@ export type Store = {
   latitude: number;
   longitude: number;
   distance?: number;
+  isClosed?: boolean;
 };
 
 export type CartItem = {

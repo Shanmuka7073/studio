@@ -38,6 +38,10 @@
         "longitude": {
           "type": "number",
           "description": "The longitude of the store's location."
+        },
+        "isClosed": {
+            "type": "boolean",
+            "description": "A flag to indicate if the store is permanently closed."
         }
       },
       "required": [
@@ -575,5 +579,3 @@
     ]
   }
 }
-
-    

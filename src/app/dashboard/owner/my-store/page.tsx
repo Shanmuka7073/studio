@@ -36,11 +36,22 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Checkbox } from '@/components/ui/checkbox';
 import groceryData from '@/lib/grocery-data.json';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Share2, MapPin, Trash2 } from 'lucide-react';
+import { Share2, MapPin, Trash2, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getUniqueProductNames } from '@/app/dashboard/admin/actions';
 
@@ -485,6 +496,72 @@ function UpdateLocationForm({ store, onUpdate }: { store: Store, onUpdate: () =>
     );
 }
 
+function DangerZone({ store }: { store: Store }) {
+    const { firestore } = useFirebase();
+    const [isClosing, startCloseTransition] = useTransition();
+    const { toast } = useToast();
+
+    const handleCloseStore = () => {
+        if (!firestore) return;
+
+        startCloseTransition(async () => {
+            const storeRef = doc(firestore, 'stores', store.id);
+            try {
+                await updateDoc(storeRef, { isClosed: true });
+                toast({
+                    title: "Store Closed",
+                    description: `${store.name} has been permanently closed and will no longer be visible to customers.`,
+                });
+            } catch (error) {
+                console.error("Failed to close store:", error);
+                const permissionError = new FirestorePermissionError({
+                    path: storeRef.path,
+                    operation: 'update',
+                    requestResourceData: { isClosed: true },
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            }
+        });
+    };
+
+    return (
+        <Card className="border-destructive">
+            <CardHeader>
+                <CardTitle className="text-destructive">Danger Zone</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <div className="flex justify-between items-center">
+                    <div>
+                        <p className="font-medium">Permanently Close Store</p>
+                        <p className="text-sm text-muted-foreground">
+                            This action cannot be undone. Your store will be removed from all public listings.
+                        </p>
+                    </div>
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="destructive">Close Store</Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    This action is permanent. Your store and all its products will no longer be visible to any users. You will not be able to accept any new orders.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleCloseStore} disabled={isClosing}>
+                                    {isClosing ? "Closing..." : "Yes, Close My Store"}
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
 
 function ManageStoreView({ store, adminPrices }: { store: Store; adminPrices: Record<string, number> }) {
     const { firestore } = useFirebase();
@@ -500,6 +577,18 @@ function ManageStoreView({ store, adminPrices }: { store: Store; adminPrices: Re
     const { data: products, isLoading } = useCollection<Product>(productsQuery);
     
     const needsLocationUpdate = !store.latitude || !store.longitude;
+
+    if (store.isClosed) {
+        return (
+            <Alert variant="destructive">
+                 <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Store Permanently Closed</AlertTitle>
+                <AlertDescription>
+                    This store is closed and is no longer visible to customers. To re-open, please contact support.
+                </AlertDescription>
+            </Alert>
+        )
+    }
 
     const handleDeleteProduct = (productId: string, productName: string) => {
         if (!firestore) return;
@@ -589,6 +678,7 @@ function ManageStoreView({ store, adminPrices }: { store: Store; adminPrices: Re
             <ProductChecklist storeId={store.id} adminPrices={adminPrices} />
             <PromoteStore store={store} />
         </div>
+        <DangerZone store={store} />
       </div>
     )
 }
@@ -655,6 +745,7 @@ function CreateStoreForm({ user, adminPrices }: { user: any; adminPrices: Record
             ...data,
             ownerId: user.uid,
             imageId: `store-${Math.floor(Math.random() * 3) + 1}`,
+            isClosed: false,
         };
         const storesCol = collection(firestore, 'stores');
         

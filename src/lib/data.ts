@@ -6,6 +6,7 @@ import {
   getDoc,
   getDocs,
   query,
+  where,
   Firestore,
 } from 'firebase/firestore';
 
@@ -30,7 +31,8 @@ const getImage = async (id: string) => {
 
 export async function getStores(db: Firestore): Promise<Store[]> {
   const storesCol = collection(db, 'stores');
-  const storeSnapshot = await getDocs(storesCol);
+  const q = query(storesCol, where('isClosed', '!=', true));
+  const storeSnapshot = await getDocs(q);
   const storeList = storeSnapshot.docs.map((doc) => ({
     id: doc.id,
     ...doc.data(),
@@ -45,7 +47,11 @@ export async function getStore(
   const storeDocRef = doc(db, 'stores', id);
   const storeSnap = await getDoc(storeDocRef);
   if (storeSnap.exists()) {
-    return { id: storeSnap.id, ...storeSnap.data() } as Store;
+    const storeData = { id: storeSnap.id, ...storeSnap.data() } as Store;
+    if (storeData.isClosed) {
+        return undefined; // Treat closed stores as not found for public viewing
+    }
+    return storeData;
   }
   return undefined;
 }
