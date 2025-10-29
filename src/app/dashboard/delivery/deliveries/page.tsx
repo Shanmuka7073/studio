@@ -70,7 +70,8 @@ export default function DeliveriesPage() {
     if (!firestore) return null;
     return query(
         collection(firestore, 'orders'),
-        where('status', '==', 'Processing') // Changed from "Out for Delivery"
+        where('status', '==', 'Processing'),
+        where('deliveryPartnerId', '==', null)
     );
   }, [firestore]);
   
