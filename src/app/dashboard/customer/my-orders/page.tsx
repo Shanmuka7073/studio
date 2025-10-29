@@ -14,6 +14,7 @@ import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { useState, useEffect, useMemo } from 'react';
 import { FirestorePermissionError } from '@/firebase/errors';
 
+const DELIVERY_FEE = 30;
 
 export default function MyOrdersPage() {
   const { user, isUserLoading, firestore } = useFirebase();
@@ -155,6 +156,22 @@ export default function MyOrdersPage() {
                                         ))}
                                     </TableBody>
                                 </Table>
+                                <div className="flex justify-end mt-4 text-sm">
+                                    <div className="w-full max-w-xs space-y-2">
+                                        <div className="flex justify-between">
+                                            <span>Subtotal</span>
+                                            <span>₹{(order.totalAmount - DELIVERY_FEE).toFixed(2)}</span>
+                                        </div>
+                                         <div className="flex justify-between">
+                                            <span>Delivery Fee</span>
+                                            <span>₹{DELIVERY_FEE.toFixed(2)}</span>
+                                        </div>
+                                         <div className="flex justify-between font-bold">
+                                            <span>Total</span>
+                                            <span>₹{order.totalAmount.toFixed(2)}</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </>
                         ) : order.voiceMemoUrl ? (
                              <div className="space-y-4">
@@ -166,6 +183,9 @@ export default function MyOrdersPage() {
                                         <p className="text-sm text-muted-foreground whitespace-pre-wrap">{order.translatedList}</p>
                                     </div>
                                 )}
+                                <div className="flex justify-end font-bold">
+                                  <span>Total (incl. delivery): ₹{order.totalAmount.toFixed(2)}</span>
+                                </div>
                             </div>
                         ) : (
                             <p>This order has no items listed.</p>

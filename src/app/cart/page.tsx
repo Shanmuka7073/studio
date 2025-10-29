@@ -12,6 +12,8 @@ import { getProductImage } from '@/lib/data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useEffect, useState } from 'react';
 
+const DELIVERY_FEE = 30;
+
 // A component to render each row, which now receives the image data directly
 function CartRow({ item, image }) {
     const { removeItem, updateQuantity } = useCart();
@@ -133,12 +135,12 @@ export default function CartPage() {
                         <span>₹{cartTotal.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between">
-                        <span>Shipping</span>
-                        <span>Free</span>
+                        <span>Delivery Fee</span>
+                        <span>₹{DELIVERY_FEE.toFixed(2)}</span>
                     </div>
                      <div className="flex justify-between font-bold text-lg">
                         <span>Total</span>
-                        <span>₹{cartTotal.toFixed(2)}</span>
+                        <span>₹{(cartTotal + DELIVERY_FEE).toFixed(2)}</span>
                     </div>
                     <Button asChild className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
                         <Link href="/checkout">Proceed to Checkout</Link>

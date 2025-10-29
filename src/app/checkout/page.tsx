@@ -37,6 +37,8 @@ const checkoutSchema = z.object({
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
 
+const DELIVERY_FEE = 30;
+
 // A component to render each summary item, now receiving image data directly
 function OrderSummaryItem({ item, image }) {
     const { product, quantity } = item;
@@ -209,6 +211,8 @@ export default function CheckoutPage() {
     }
 
     startPlaceOrderTransition(async () => {
+        const totalAmount = isVoiceOrder ? DELIVERY_FEE : cartTotal + DELIVERY_FEE;
+        
         const orderPayload = {
             userId: user.uid,
             customerName: data.name,
@@ -218,7 +222,7 @@ export default function CheckoutPage() {
             phone: data.phone,
             email: user.email,
             orderDate: serverTimestamp(),
-            totalAmount: cartTotal,
+            totalAmount: totalAmount,
             status: 'Pending' as 'Pending',
         };
 
@@ -238,7 +242,7 @@ export default function CheckoutPage() {
             collectionName = 'voice-orders';
             orderData = {
                 ...orderPayload,
-                totalAmount: 0, // Price to be confirmed by shopkeeper
+                totalAmount: DELIVERY_FEE, // Price to be confirmed by shopkeeper, but delivery fee is fixed
                 voiceMemoUrl: audioDataUri,
                 translatedList: translatedList,
             };
@@ -307,6 +311,8 @@ export default function CheckoutPage() {
         </div>
     )
   }
+
+  const finalTotal = cartItems.length > 0 ? cartTotal + DELIVERY_FEE : DELIVERY_FEE;
 
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
@@ -408,13 +414,31 @@ export default function CheckoutPage() {
                     const image = images[item.product.id] || { imageUrl: 'https://placehold.co/48x48/E2E8F0/64748B?text=...', imageHint: 'loading' };
                     return <OrderSummaryItem key={item.product.id} item={item} image={image} />
                 })}
+                 {cartItems.length > 0 && (
+                    <>
+                        <div className="flex justify-between items-center border-t pt-4">
+                            <p className="font-medium">Subtotal</p>
+                            <p>₹{cartTotal.toFixed(2)}</p>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <p className="font-medium">Delivery Fee</p>
+                            <p>₹{DELIVERY_FEE.toFixed(2)}</p>
+                        </div>
+                    </>
+                 )}
                  {cartItems.length === 0 && audioDataUri && (
-                    <p className="text-muted-foreground text-sm text-center py-4">Your order will be fulfilled based on your voice memo. The final price will be confirmed by the shopkeeper.</p>
+                    <div>
+                        <p className="text-muted-foreground text-sm text-center py-4">Your order will be fulfilled based on your voice memo. The final price will be confirmed by the shopkeeper.</p>
+                        <div className="flex justify-between items-center">
+                            <p className="font-medium">Delivery Fee</p>
+                            <p>₹{DELIVERY_FEE.toFixed(2)}</p>
+                        </div>
+                    </div>
                 )}
             </CardContent>
             <CardFooter className="flex justify-between font-bold text-lg">
                 <span>Total</span>
-                <span>₹{cartTotal.toFixed(2)}</span>
+                <span>₹{finalTotal.toFixed(2)}</span>
             </CardFooter>
           </Card>
            <Card className="mt-8">
@@ -440,5 +464,3 @@ export default function CheckoutPage() {
     </div>
   );
 }
-
-    
