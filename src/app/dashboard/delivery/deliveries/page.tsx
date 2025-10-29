@@ -1,13 +1,13 @@
 
 'use client';
 
-import { Order, Store } from '@/lib/types';
+import { Order, Store, DeliveryPartner } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MapPin, Check } from 'lucide-react';
-import { useFirebase, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, query, where, doc, updateDoc, Timestamp } from 'firebase/firestore';
+import { MapPin, Check, Banknote } from 'lucide-react';
+import { useFirebase, useCollection, useDoc, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { collection, query, where, doc, updateDoc, Timestamp, increment, writeBatch } from 'firebase/firestore';
 import { useEffect, useState, useMemo, useTransition } from 'react';
 import { getStores } from '@/lib/data';
 import { useToast } from '@/hooks/use-toast';
@@ -15,8 +15,52 @@ import { format } from 'date-fns';
 
 const DELIVERY_FEE = 30;
 
+function PayoutCard({ partnerData, isLoading, onPayout }: { partnerData: DeliveryPartner | null, isLoading: boolean, onPayout: () => void }) {
+    const [isCashingOut, startCashOutTransition] = useTransition();
+
+    const handlePayout = () => {
+        startCashOutTransition(() => {
+            onPayout();
+        });
+    }
+
+    const totalEarnings = partnerData?.totalEarnings || 0;
+
+    return (
+        <Card className="bg-primary/5">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <Banknote className="h-6 w-6 text-primary" />
+                    <span>Earnings & Payouts</span>
+                </CardTitle>
+                <CardDescription>
+                    Your current withdrawable balance. Payout requests are processed within 24 hours.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="text-center md:text-left">
+                    <p className="text-sm text-muted-foreground">Current Balance</p>
+                    {isLoading ? (
+                        <p className="text-3xl font-bold">Loading...</p>
+                    ) : (
+                        <p className="text-3xl font-bold">₹{totalEarnings.toFixed(2)}</p>
+                    )}
+                </div>
+                <Button 
+                    size="lg" 
+                    onClick={handlePayout}
+                    disabled={isCashingOut || isLoading || totalEarnings <= 0}
+                >
+                    {isCashingOut ? 'Processing...' : 'Request Payout'}
+                </Button>
+            </CardContent>
+        </Card>
+    )
+}
+
+
 export default function DeliveriesPage() {
-  const { firestore } = useFirebase();
+  const { firestore, user } = useFirebase();
   const [stores, setStores] = useState<Store[]>([]);
   const [pickedUpOrders, setPickedUpOrders] = useState<Record<string, boolean>>({});
   const [isUpdating, startUpdateTransition] = useTransition();
@@ -35,7 +79,6 @@ export default function DeliveriesPage() {
   const completedDeliveriesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     
-    // Get today's date at midnight
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayTimestamp = Timestamp.fromDate(today);
@@ -43,12 +86,17 @@ export default function DeliveriesPage() {
     return query(
       collection(firestore, 'orders'),
       where('status', '==', 'Delivered')
-      // To keep this simple and avoid complex indexes, we won't filter by date yet.
-      // We can add `where('orderDate', '>=', todayTimestamp)` later if needed.
     );
   }, [firestore]);
 
   const { data: completedDeliveries, isLoading: completedDeliveriesLoading } = useCollection<Order>(completedDeliveriesQuery);
+
+  const partnerDocRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, 'deliveryPartners', user.uid);
+  }, [firestore, user]);
+
+  const { data: partnerData, isLoading: partnerLoading } = useDoc<DeliveryPartner>(partnerDocRef);
 
 
   useEffect(() => {
@@ -71,26 +119,86 @@ export default function DeliveriesPage() {
   };
 
   const handleMarkAsDelivered = (orderId: string) => {
-    if (!firestore) return;
+    if (!firestore || !user) return;
     
     startUpdateTransition(async () => {
         const orderRef = doc(firestore, 'orders', orderId);
+        const partnerRef = doc(firestore, 'deliveryPartners', user.uid);
+        
         try {
-            await updateDoc(orderRef, { status: 'Delivered' });
+            const batch = writeBatch(firestore);
+            
+            // 1. Update the order status
+            batch.update(orderRef, { status: 'Delivered' });
+
+            // 2. Increment the partner's earnings
+            batch.set(partnerRef, { 
+                totalEarnings: increment(DELIVERY_FEE),
+                userId: user.uid,
+                payoutsEnabled: true,
+             }, { merge: true });
+
+            await batch.commit();
+
             toast({
                 title: "Delivery Complete!",
-                description: `Order #${orderId.substring(0, 7)} has been marked as delivered.`
-            })
+                description: `Order #${orderId.substring(0, 7)} marked as delivered. ₹${DELIVERY_FEE} added to your earnings.`
+            });
         } catch (error) {
             console.error("Failed to mark as delivered:", error);
-            const permissionError = new FirestorePermissionError({
-                path: orderRef.path,
-                operation: 'update',
-                requestResourceData: { status: 'Delivered' },
+            // Since this is a batch, we can't be sure which part failed for a specific error.
+            // A generic error is acceptable here for the UI.
+            toast({
+                variant: 'destructive',
+                title: 'Update Failed',
+                description: 'Could not update the order status and your earnings. Please try again.'
             });
-            errorEmitter.emit('permission-error', permissionError);
         }
     });
+  };
+
+  const handlePayoutRequest = async () => {
+      if (!firestore || !user || !partnerData || partnerData.totalEarnings <= 0) {
+          toast({ variant: 'destructive', title: 'Payout Error', description: 'No balance available to cash out.' });
+          return;
+      }
+
+      const payoutAmount = partnerData.totalEarnings;
+      
+      try {
+        const batch = writeBatch(firestore);
+        
+        // 1. Create a new payout request document
+        const newPayoutRef = doc(collection(firestore, `deliveryPartners/${user.uid}/payouts`));
+        batch.set(newPayoutRef, {
+            amount: payoutAmount,
+            partnerId: user.uid,
+            requestDate: Timestamp.now(),
+            status: 'pending',
+        });
+
+        // 2. Reset the partner's earnings balance
+        const partnerRef = doc(firestore, 'deliveryPartners', user.uid);
+        batch.update(partnerRef, {
+            totalEarnings: 0,
+            lastPayoutDate: Timestamp.now(),
+        });
+        
+        await batch.commit();
+
+        toast({
+            title: 'Payout Requested!',
+            description: `Your request for ₹${payoutAmount.toFixed(2)} has been submitted for processing.`
+        });
+
+      } catch (error) {
+          console.error("Failed to request payout:", error);
+          toast({
+              variant: 'destructive',
+              title: 'Payout Failed',
+              description: 'There was an error submitting your payout request. Please try again.'
+          });
+      }
   };
 
   const openInGoogleMaps = (originLat: number, originLng: number, destLat: number, destLng: number) => {
@@ -120,6 +228,9 @@ export default function DeliveriesPage() {
 
   return (
     <div className="container mx-auto py-12 px-4 md:px-6 space-y-12">
+      
+      <PayoutCard partnerData={partnerData} isLoading={partnerLoading} onPayout={handlePayoutRequest} />
+      
       <div>
         <h1 className="text-4xl font-bold mb-8 font-headline">Available Deliveries</h1>
         <Card>
@@ -242,8 +353,8 @@ export default function DeliveriesPage() {
                         </TableBody>
                         <TableFooter>
                             <TableRow>
-                                <TableCell colSpan={3} className="text-right font-bold text-lg">Total Earnings</TableCell>
-                                <TableCell className="text-right font-bold text-lg">₹{totalEarnings.toFixed(2)}</TableCell>
+                                <TableCell colSpan={3} className="text-right font-bold text-lg">Total Deliveries in this period</TableCell>
+                                <TableCell className="text-right font-bold text-lg">{completedDeliveries.length}</TableCell>
                             </TableRow>
                         </TableFooter>
                     </Table>
