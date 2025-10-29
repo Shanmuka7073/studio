@@ -96,18 +96,33 @@ function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPric
   const { toast } = useToast();
   const [isAdding, startTransition] = useTransition();
   const { firestore } = useFirebase();
-  const [selectedProducts, setSelectedProducts] = useState<Record<string, boolean>>({});
+  const [selectedProducts, setSelectedProducts] = useState<Record<string, {selected: boolean, price: string}>>({});
 
   const handleProductSelection = (productName: string, isChecked: boolean) => {
-    setSelectedProducts(prev => ({ ...prev, [productName]: isChecked }));
+    setSelectedProducts(prev => ({ 
+        ...prev, 
+        [productName]: { 
+            ...prev[productName],
+            selected: isChecked, 
+            price: prev[productName]?.price || (adminPrices[productName] !== undefined ? String(adminPrices[productName]) : '')
+        } 
+    }));
   };
   
+  const handlePriceChange = (productName: string, price: string) => {
+      setSelectedProducts(prev => ({
+          ...prev,
+          [productName]: { ...prev[productName], price }
+      }))
+  }
+
   const handleAddSelectedProducts = () => {
     if (!firestore || !storeId) return;
 
-    const productNames = Object.keys(selectedProducts).filter(key => selectedProducts[key]);
+    const productsToAdd = Object.entries(selectedProducts)
+                                .filter(([_, value]) => value.selected);
     
-    if (productNames.length === 0) {
+    if (productsToAdd.length === 0) {
       toast({
         variant: 'destructive',
         title: 'No products selected',
@@ -116,16 +131,28 @@ function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPric
       return;
     }
     
+    // Validate that all selected products have a price
+    for (const [name, { price }] of productsToAdd) {
+        if (!price || isNaN(parseFloat(price)) || parseFloat(price) < 0) {
+            toast({
+                variant: 'destructive',
+                title: 'Missing or Invalid Price',
+                description: `Please enter a valid price for ${name}.`,
+            });
+            return;
+        }
+    }
+
     startTransition(async () => {
        const batch = writeBatch(firestore);
-        productNames.forEach(name => {
+        productsToAdd.forEach(([name, { price }]) => {
           const newProductRef = doc(collection(firestore, 'stores', storeId, 'products'));
           const category = groceryData.categories.find(c => Array.isArray(c.items) && c.items.includes(name))?.categoryName || 'Miscellaneous';
           const imageId = `prod-${createSlug(name)}`;
-          const price = adminPrices[name] !== undefined ? adminPrices[name] : 0.99; // Use admin price if available
+          
           batch.set(newProductRef, {
             name,
-            price,
+            price: parseFloat(price),
             description: '',
             storeId: storeId,
             imageId: imageId,
@@ -135,7 +162,7 @@ function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPric
         
         batch.commit().then(() => {
           toast({
-            title: `${productNames.length} Products Added!`,
+            title: `${productsToAdd.length} Products Added!`,
             description: 'The selected products have been added to your inventory.',
           });
           setSelectedProducts({});
@@ -144,14 +171,14 @@ function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPric
           const permissionError = new FirestorePermissionError({
             path: `stores/${storeId}/products`,
             operation: 'create',
-            requestResourceData: { names: productNames },
+            requestResourceData: { products: productsToAdd.map(([name, val]) => ({ name, price: val.price })) },
           });
           errorEmitter.emit('permission-error', permissionError);
         });
     });
   };
 
-  const selectedCount = Object.values(selectedProducts).filter(Boolean).length;
+  const selectedCount = Object.values(selectedProducts).filter(val => val && val.selected).length;
 
   return (
     <Card>
@@ -163,26 +190,38 @@ function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPric
         <Accordion type="multiple" className="w-full">
           {groceryData.categories.map((category) => {
              const categoryItems = category.items && Array.isArray(category.items) ? category.items : [];
-            const selectedInCategory = categoryItems.filter(item => selectedProducts[item]).length;
+            const selectedInCategory = categoryItems.filter(item => selectedProducts[item]?.selected).length;
 
             return (
               <AccordionItem value={category.categoryName} key={category.categoryName}>
                 <AccordionTrigger>{category.categoryName} ({selectedInCategory}/{categoryItems.length})</AccordionTrigger>
                 <AccordionContent>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4 p-4">
                     {categoryItems.map((item) => (
                       <div key={item} className="flex items-center space-x-2">
                         <Checkbox
                           id={`${category.categoryName}-${item}`}
                           onCheckedChange={(checked) => handleProductSelection(item, !!checked)}
-                          checked={selectedProducts[item] || false}
+                          checked={selectedProducts[item]?.selected || false}
                         />
                         <label
                           htmlFor={`${category.categoryName}-${item}`}
-                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-1"
                         >
                           {item}
                         </label>
+                         {selectedProducts[item]?.selected && (
+                            <div className="flex items-center gap-1 w-28">
+                               <span>₹</span>
+                                <Input
+                                    type="number"
+                                    placeholder="Price"
+                                    value={selectedProducts[item]?.price || ''}
+                                    onChange={(e) => handlePriceChange(item, e.target.value)}
+                                    className="h-8"
+                                />
+                            </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -200,7 +239,7 @@ function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPric
 }
 
 
-function AddProductForm({ storeId, adminPrices }: { storeId: string; adminPrices: Record<string, number> }) {
+function AddProductForm({ storeId }: { storeId: string }) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const { firestore } = useFirebase();
@@ -215,17 +254,8 @@ function AddProductForm({ storeId, adminPrices }: { storeId: string; adminPrices
 
     startTransition(() => {
         const imageId = `prod-${createSlug(data.name)}`;
-        const price = adminPrices[data.name] !== undefined ? adminPrices[data.name] : data.price;
-        if (price !== data.price) {
-            toast({
-                title: 'Admin Price Applied',
-                description: `The price for ${data.name} is managed by the admin and has been set to ₹${price.toFixed(2)}.`,
-            });
-        }
-        
         const productData = {
             ...data,
-            price,
             storeId,
             imageId: imageId,
         };
@@ -281,12 +311,8 @@ function AddProductForm({ storeId, adminPrices }: { storeId: string; adminPrices
                       type="number"
                       step="0.01"
                       {...field}
-                      disabled={adminPrices[form.getValues('name')] !== undefined}
                     />
                   </FormControl>
-                  {adminPrices[form.getValues('name')] !== undefined && (
-                    <p className="text-xs text-muted-foreground">Price is managed by admin.</p>
-                  )}
                   <FormMessage />
                 </FormItem>
               )}
@@ -619,13 +645,13 @@ function ManageStoreView({ store, adminPrices }: { store: Store; adminPrices: Re
         <div className="grid md:grid-cols-2 gap-8">
             <Card>
                 <CardHeader>
-                    <CardTitle>Manage ${store.name}</CardTitle>
+                    <CardTitle>Manage {store.name}</CardTitle>
                     <CardDescription>
                         View your existing inventory below and add new products.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                   <AddProductForm storeId={store.id} adminPrices={adminPrices} />
+                   <AddProductForm storeId={store.id} />
                 </CardContent>
             </Card>
              <Card>
@@ -659,7 +685,7 @@ function ManageStoreView({ store, adminPrices }: { store: Store; adminPrices: Re
                                             disabled={isDeleting}
                                         >
                                             <Trash2 className="h-4 w-4" />
-                                            <span className="sr-only">Delete ${product.name}</span>
+                                            <span className="sr-only">Delete {product.name}</span>
                                         </Button>
                                     </TableCell>
                                 </TableRow>
