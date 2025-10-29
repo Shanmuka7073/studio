@@ -85,10 +85,6 @@
           "type": "string",
           "description": "Category the product falls under."
         },
-        "quantity": {
-          "type": "number",
-          "description": "Available quantity of the product in the store."
-        },
         "imageId": {
           "type": "string",
           "description": "ID for the product's placeholder image."

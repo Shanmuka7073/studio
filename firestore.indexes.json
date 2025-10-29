@@ -48,21 +48,17 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "storeId",
+          "fieldPath": "status",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "orderDate",
-          "order": "DESCENDING"
         }
       ]
     },
-    {
-      "collectionGroup": "orders",
+     {
+      "collectionGroup": "voice-orders",
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "status",
+          "fieldPath": "storeId",
           "order": "ASCENDING"
         }
       ]

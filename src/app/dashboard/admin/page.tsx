@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -121,7 +122,12 @@ export default function AdminDashboardPage() {
         async function fetchProducts() {
             setProductsLoading(true);
             const priceMap = await getUniqueProductNames();
-            setProductPrices(priceMap);
+            // Also ensure all master products have a default price if not in DB
+            const allPrices = uniqueMasterProductNames.reduce((acc, name) => {
+                acc[name] = priceMap[name] || 0; // Default to 0 if not set
+                return acc;
+            }, {} as Record<string, number>);
+            setProductPrices(allPrices);
             setProductsLoading(false);
         }
         fetchProducts();
@@ -169,8 +175,8 @@ export default function AdminDashboardPage() {
             </div>
             <Card>
                 <CardHeader>
-                    <CardTitle>All Available Products</CardTitle>
-                    <CardDescription>A complete catalog of all products in the system. Updating a price here will change it across all stores.</CardDescription>
+                    <CardTitle>Master Product Pricing</CardTitle>
+                    <CardDescription>A complete catalog of all products in the system. Updating a price here will change it across all stores that stock the item.</CardDescription>
                 </CardHeader>
                 <CardContent>
                      {isLoading ? <p>Loading products...</p> : (

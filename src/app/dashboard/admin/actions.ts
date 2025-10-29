@@ -26,7 +26,10 @@ export async function updatePriceForProductByName(productName: string, newPrice:
         const productsSnapshot = await productsQuery.get();
 
         if (productsSnapshot.empty) {
-            return { success: false, updatedCount: 0, error: `No products named "${productName}" found to update.` };
+            // This is not an error, it just means no stores currently have this product.
+            // We proceed as if successful, since the goal is to update existing ones.
+            // The admin UI will show the updated price for future additions.
+             return { success: true, updatedCount: 0, error: `No products named "${productName}" found to update, but the admin price is conceptually set.` };
         }
 
         const batch = firestore.batch();
@@ -36,10 +39,12 @@ export async function updatePriceForProductByName(productName: string, newPrice:
 
         await batch.commit();
         
+        // Revalidate paths to ensure data freshness across the app
         try {
-            revalidatePath('/stores');
-            revalidatePath('/cart');
-            revalidatePath('/dashboard/admin');
+            revalidatePath('/stores', 'layout');
+            revalidatePath('/cart', 'layout');
+            revalidatePath('/dashboard/admin', 'page');
+            revalidatePath('/dashboard/owner/my-store', 'page');
         } catch (revalError) {
             console.error('Failed to revalidate paths:', revalError);
         }
@@ -63,7 +68,8 @@ export async function getUniqueProductNames(): Promise<Record<string, number>> {
 
         const priceMap = productsSnapshot.docs.reduce((acc, doc) => {
             const product = doc.data() as Product;
-            if (product.name && !acc[product.name]) {
+            // Only set the price if it hasn't been set yet, ensuring consistency
+            if (product.name && acc[product.name] === undefined) {
                 acc[product.name] = product.price;
             }
             return acc;

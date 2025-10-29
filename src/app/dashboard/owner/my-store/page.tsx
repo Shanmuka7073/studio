@@ -129,7 +129,6 @@ function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPric
             description: '',
             storeId: storeId,
             imageId: imageId,
-            quantity: 100, // Default quantity
             category: category,
           });
         });
@@ -229,7 +228,6 @@ function AddProductForm({ storeId, adminPrices }: { storeId: string; adminPrices
             price,
             storeId,
             imageId: imageId,
-            quantity: 1, // Default quantity
         };
         
         const productsCol = collection(firestore, 'stores', storeId, 'products');
@@ -687,8 +685,7 @@ function CreateStoreForm({ user, adminPrices }: { user: any; adminPrices: Record
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const { firestore } = useFirebase();
-  const [selectedProducts, setSelectedProducts] = useState<Record<string, boolean>>({});
-
+  
   const form = useForm<StoreFormValues>({
     resolver: zodResolver(storeSchema),
     defaultValues: {
@@ -699,10 +696,6 @@ function CreateStoreForm({ user, adminPrices }: { user: any; adminPrices: Record
       longitude: 0,
     },
   });
-
-  const handleProductSelection = (productName: string, isChecked: boolean) => {
-    setSelectedProducts(prev => ({...prev, [productName]: isChecked}));
-  }
 
   const handleGetLocation = () => {
     if (navigator.geolocation) {
@@ -750,36 +743,13 @@ function CreateStoreForm({ user, adminPrices }: { user: any; adminPrices: Record
         const storesCol = collection(firestore, 'stores');
         
         try {
-            const storeRef = await addDoc(storesCol, storeData);
-
-            const productNames = Object.keys(selectedProducts).filter(key => selectedProducts[key]);
-            
-            if (productNames.length > 0) {
-                const batch = writeBatch(firestore);
-                productNames.forEach(name => {
-                    const newProductRef = doc(collection(firestore, 'stores', storeRef.id, 'products'));
-                    const category = groceryData.categories.find(c => Array.isArray(c.items) && c.items.includes(name))?.categoryName || 'Miscellaneous';
-                    const imageId = `prod-${createSlug(name)}`;
-                    const price = adminPrices[name] !== undefined ? adminPrices[name] : 0.99; // Use admin price if available
-                    batch.set(newProductRef, {
-                        name,
-                        price,
-                        description: '',
-                        storeId: storeRef.id,
-                        imageId: imageId,
-                        quantity: 100,
-                        category: category,
-                    });
-                });
-                await batch.commit();
-            }
-
+            await addDoc(storesCol, storeData);
             toast({
                 title: 'Store Created!',
-                description: `Your store "${data.name}" has been successfully created.`,
+                description: `Your store "${data.name}" has been successfully created. You can now add products.`,
             });
         } catch (serverError) {
-            console.error("Failed to create store or products:", serverError);
+            console.error("Failed to create store:", serverError);
             const permissionError = new FirestorePermissionError({
                 path: 'stores',
                 operation: 'create',
@@ -797,7 +767,7 @@ function CreateStoreForm({ user, adminPrices }: { user: any; adminPrices: Record
             Create Your Store
           </CardTitle>
           <CardDescription>
-            Fill out the details below to get your shop listed on LocalBasket.
+            Fill out the details below to get your shop listed on LocalBasket. Once created, you can add products to your inventory.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -876,43 +846,6 @@ function CreateStoreForm({ user, adminPrices }: { user: any; adminPrices: Record
                     </div>
                </div>
 
-              <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Select Your Initial Inventory</h3>
-                  <Accordion type="single" collapsible className="w-full" defaultValue='Non-Veg & Frozen Items'>
-                    {groceryData.categories
-                      .filter(category => category.categoryName === 'Non-Veg & Frozen Items')
-                      .map((category) => {
-                       const categoryItems = category.items && Array.isArray(category.items) ? category.items : [];
-                       const selectedInCategory = categoryItems.filter(item => selectedProducts[item]).length;
-
-                      return (
-                        <AccordionItem value={category.categoryName} key={category.categoryName}>
-                          <AccordionTrigger>{category.categoryName} ({selectedInCategory}/{categoryItems.length})</AccordionTrigger>
-                          <AccordionContent>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4">
-                              {categoryItems.map((item) => (
-                                <div key={item} className="flex items-center space-x-2">
-                                  <Checkbox
-                                    id={`create-${category.categoryName}-${item}`}
-                                    onCheckedChange={(checked) => handleProductSelection(item, !!checked)}
-                                    checked={selectedProducts[item] || false}
-                                  />
-                                  <label
-                                    htmlFor={`create-${category.categoryName}-${item}`}
-                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                                  >
-                                    {item}
-                                  </label>
-                                </div>
-                              ))}
-                            </div>
-                          </AccordionContent>
-                        </AccordionItem>
-                      )
-                    })}
-                  </Accordion>
-              </div>
-
               <Button
                 type="submit"
                 className="w-full bg-accent hover:bg-accent/90 text-accent-foreground"
@@ -978,5 +911,3 @@ export default function MyStorePage() {
     </div>
   );
 }
-
-    

@@ -1,3 +1,4 @@
+
 import { Timestamp } from "firebase/firestore";
 
 export type Product = {
@@ -7,7 +8,6 @@ export type Product = {
   price: number;
   imageId: string;
   storeId: string;
-  quantity?: number;
   category?: string;
 };
 
