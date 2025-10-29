@@ -13,6 +13,8 @@ import { getStores } from '@/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
+const DELIVERY_FEE = 30;
+
 export default function DeliveriesPage() {
   const { firestore } = useFirebase();
   const [stores, setStores] = useState<Store[]>([]);
@@ -221,7 +223,7 @@ export default function DeliveriesPage() {
                                 <TableHead>Date</TableHead>
                                 <TableHead>Customer</TableHead>
                                 <TableHead>Delivery Address</TableHead>
-                                <TableHead className="text-right">Total</TableHead>
+                                <TableHead className="text-right">Your Earning</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -230,7 +232,7 @@ export default function DeliveriesPage() {
                                     <TableCell>{formatDate(order.orderDate)}</TableCell>
                                     <TableCell>{order.customerName}</TableCell>
                                     <TableCell>{order.deliveryAddress}</TableCell>
-                                    <TableCell className="text-right">₹{order.totalAmount.toFixed(2)}</TableCell>
+                                    <TableCell className="text-right font-medium">₹{DELIVERY_FEE.toFixed(2)}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
