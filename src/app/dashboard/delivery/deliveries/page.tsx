@@ -2,7 +2,7 @@
 'use client';
 
 import { Order, Store } from '@/lib/types';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { MapPin, Check } from 'lucide-react';
@@ -116,6 +116,8 @@ export default function DeliveriesPage() {
     return 'N/A';
   }
 
+  const totalEarnings = (completedDeliveries?.length || 0) * DELIVERY_FEE;
+
   return (
     <div className="container mx-auto py-12 px-4 md:px-6 space-y-12">
       <div>
@@ -205,17 +207,19 @@ export default function DeliveriesPage() {
       </div>
 
       <div>
-        <h2 className="text-3xl font-bold mb-8 font-headline">Completed Deliveries</h2>
+        <h2 className="text-3xl font-bold mb-8 font-headline">Earnings & Completed Deliveries</h2>
          <Card>
             <CardHeader>
-                <CardTitle>Today's Delivered Orders</CardTitle>
-                <CardDescription>A list of orders you have successfully delivered today.</CardDescription>
+                <CardTitle>This Month's Delivered Orders</CardTitle>
+                <CardDescription>
+                  This is a record of your completed deliveries for the current cycle. Earnings from the 1st to the 30th of the month are paid out on the last day of the month.
+                </CardDescription>
             </CardHeader>
             <CardContent>
                 {completedDeliveriesLoading ? (
                     <p>Loading completed deliveries...</p>
                 ) : !completedDeliveries || completedDeliveries.length === 0 ? (
-                    <p className="text-muted-foreground">You have not completed any deliveries today.</p>
+                    <p className="text-muted-foreground">You have not completed any deliveries yet.</p>
                 ) : (
                     <Table>
                         <TableHeader>
@@ -236,6 +240,12 @@ export default function DeliveriesPage() {
                                 </TableRow>
                             ))}
                         </TableBody>
+                        <TableFooter>
+                            <TableRow>
+                                <TableCell colSpan={3} className="text-right font-bold text-lg">Total Earnings</TableCell>
+                                <TableCell className="text-right font-bold text-lg">₹{totalEarnings.toFixed(2)}</TableCell>
+                            </TableRow>
+                        </TableFooter>
                     </Table>
                 )}
             </CardContent>
