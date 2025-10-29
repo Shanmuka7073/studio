@@ -403,6 +403,68 @@
         }
       },
       "required": ["id", "dishName", "ingredients", "createdAt"]
+    },
+    "DeliveryPartner": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "DeliveryPartner",
+      "type": "object",
+      "description": "Represents a delivery partner, tracking their earnings and payout status.",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The UID of the user who is the delivery partner. This is the document ID."
+        },
+        "totalEarnings": {
+          "type": "number",
+          "description": "The total accumulated earnings since the last payout."
+        },
+        "lastPayoutDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The date of the last successful payout."
+        },
+        "payoutsEnabled": {
+          "type": "boolean",
+          "description": "Whether the partner is eligible for payouts."
+        }
+      },
+      "required": ["userId", "totalEarnings", "payoutsEnabled"]
+    },
+    "Payout": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Payout",
+      "type": "object",
+      "description": "Represents a payout request made by a delivery partner.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the payout transaction."
+        },
+        "partnerId": {
+          "type": "string",
+          "description": "The ID of the delivery partner requesting the payout."
+        },
+        "amount": {
+          "type": "number",
+          "description": "The amount requested for payout."
+        },
+        "requestDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the payout was requested."
+        },
+        "completionDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the payout was completed."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "completed", "failed"],
+          "description": "The status of the payout request."
+        }
+      },
+      "required": ["id", "partnerId", "amount", "requestDate", "status"]
     }
   },
   "auth": {
@@ -571,7 +633,45 @@
             }
           ]
         }
+      },
+      {
+        "path": "/deliveryPartners/{partnerId}",
+        "definition": {
+          "entityName": "DeliveryPartner",
+          "schema": {
+            "$ref": "#/backend/entities/DeliveryPartner"
+          },
+          "description": "Stores earnings and payout information for delivery partners. The document ID is the partner's user ID.",
+          "params": [
+            {
+              "name": "partnerId",
+              "description": "The unique identifier of the delivery partner (same as userId)."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/deliveryPartners/{partnerId}/payouts/{payoutId}",
+        "definition": {
+          "entityName": "Payout",
+          "schema": {
+            "$ref": "#/backend/entities/Payout"
+          },
+          "description": "Stores a record of all payout requests for a delivery partner.",
+          "params": [
+            {
+              "name": "partnerId",
+              "description": "The unique identifier of the delivery partner."
+            },
+            {
+              "name": "payoutId",
+              "description": "The unique identifier of the payout request."
+            }
+          ]
+        }
       }
     ]
   }
 }
+
+    
