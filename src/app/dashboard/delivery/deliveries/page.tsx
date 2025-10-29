@@ -118,7 +118,6 @@ export default function DeliveriesPage() {
         const orderRef = doc(firestore, 'orders', orderId);
         try {
             await updateDoc(orderRef, {
-                status: 'Out for Delivery',
                 deliveryPartnerId: user.uid,
             });
             setPickedUpOrders(prev => ({ ...prev, [orderId]: true }));
@@ -131,7 +130,7 @@ export default function DeliveriesPage() {
             const permissionError = new FirestorePermissionError({
                 path: orderRef.path,
                 operation: 'update',
-                requestResourceData: { status: 'Out for Delivery', deliveryPartnerId: user.uid },
+                requestResourceData: { deliveryPartnerId: user.uid },
             });
             errorEmitter.emit('permission-error', permissionError);
         }
@@ -248,7 +247,8 @@ export default function DeliveriesPage() {
 
   // Filter for orders that the current partner has picked up.
   const myActiveDeliveries = useMemo(() => {
-    return deliveriesWithStores.filter(order => order.deliveryPartnerId === user?.uid && order.status === 'Out for Delivery');
+    if (!user) return [];
+    return deliveriesWithStores.filter(order => order.deliveryPartnerId === user.uid && order.status === 'Out for Delivery');
   }, [deliveriesWithStores, user]);
 
   const availableDeliveries = useMemo(() => {
@@ -431,4 +431,5 @@ export default function DeliveriesPage() {
 
     </div>
   );
-}
+
+    
