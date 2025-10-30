@@ -5,6 +5,8 @@ import type { Product } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
 import { getApps, initializeApp, getApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
+
 
 // Helper function for robust server-side Firebase admin initialization
 function getAdminFirestore() {
@@ -14,6 +16,57 @@ function getAdminFirestore() {
     }
     return getFirestore(getApp());
 }
+
+function getAdminAuth() {
+    if (getApps().length === 0) {
+        initializeApp();
+    }
+    return getAuth(getApp());
+}
+
+export async function getAdminStats(): Promise<{
+    totalUsers: number,
+    totalStores: number,
+    totalDeliveryPartners: number,
+    totalOrdersDelivered: number,
+}> {
+    try {
+        const firestore = getAdminFirestore();
+        const auth = getAdminAuth();
+
+        const usersPromise = auth.listUsers();
+        const storesPromise = firestore.collection('stores').where('isClosed', '!=', true).get();
+        const partnersPromise = firestore.collection('deliveryPartners').get();
+        const ordersPromise = firestore.collection('orders').where('status', '==', 'Delivered').get();
+
+        const [usersResult, storesSnapshot, partnersSnapshot, ordersSnapshot] = await Promise.all([
+            usersPromise,
+            storesPromise,
+            partnersPromise,
+            ordersPromise,
+        ]);
+        
+        // Filter out admin user from total customers
+        const totalUsers = usersResult.users.filter(u => u.email !== 'admin@gmail.com').length;
+
+        return {
+            totalUsers: totalUsers,
+            totalStores: storesSnapshot.size,
+            totalDeliveryPartners: partnersSnapshot.size,
+            totalOrdersDelivered: ordersSnapshot.size,
+        };
+
+    } catch (error) {
+        console.error('Failed to fetch admin stats:', error);
+        return {
+            totalUsers: 0,
+            totalStores: 0,
+            totalDeliveryPartners: 0,
+            totalOrdersDelivered: 0,
+        };
+    }
+}
+
 
 export async function updatePriceForProductByName(productName: string, newPrice: number): Promise<{ success: boolean; updatedCount: number; error?: string }> {
     if (typeof newPrice !== 'number' || newPrice < 0) {

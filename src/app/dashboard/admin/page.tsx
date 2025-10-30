@@ -2,7 +2,7 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Settings, ArrowRight, Tag } from 'lucide-react';
+import { Settings, ArrowRight, Tag, Users, Store, Truck, ShoppingBag } from 'lucide-react';
 import Link from 'next/link';
 import { useFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
@@ -10,10 +10,11 @@ import placeholderImagesData from '@/lib/placeholder-images.json';
 import groceryData from '@/lib/grocery-data.json';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { useTransition, useState, useEffect, useMemo } from 'react';
+import { useTransition, useState, useEffect, useMemo, Suspense } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
-import { getUniqueProductNames, updatePriceForProductByName } from './actions';
+import { getUniqueProductNames, updatePriceForProductByName, getAdminStats } from './actions';
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 const ADMIN_EMAIL = 'admin@gmail.com';
@@ -40,6 +41,38 @@ const createSlug = (text: string) => {
 const allMasterProductNames = groceryData.categories.flatMap(category => Array.isArray(category.items) ? category.items : []);
 const uniqueMasterProductNames = [...new Set(allMasterProductNames)];
 const imageMap = new Map(placeholderImagesData.placeholderImages.map(img => [img.id, img]));
+
+
+function StatCard({ title, value, icon: Icon, loading }: { title: string, value: number, icon: React.ElementType, loading?: boolean }) {
+    return (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">{title}</CardTitle>
+                <Icon className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+                {loading ? <Skeleton className="h-8 w-20" /> : <div className="text-2xl font-bold">{value}</div>}
+            </CardContent>
+        </Card>
+    )
+}
+
+async function StatsCards() {
+    const stats = await getAdminStats();
+    
+    const statItems = [
+        { title: 'Total Customers', value: stats.totalUsers, icon: Users },
+        { title: 'Total Stores', value: stats.totalStores, icon: Store },
+        { title: 'Delivery Partners', value: stats.totalDeliveryPartners, icon: Truck },
+        { title: 'Orders Delivered', value: stats.totalOrdersDelivered, icon: ShoppingBag },
+    ];
+
+    return (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+            {statItems.map(item => <StatCard key={item.title} {...item} />)}
+        </div>
+    )
+}
 
 
 function AdminProductCard({ productName, initialPrice, onUpdatePrice }: { productName: string, initialPrice: number, onUpdatePrice: (name: string, price: number) => void }) {
@@ -154,48 +187,62 @@ export default function AdminDashboardPage() {
                 <h1 className="text-4xl font-bold font-headline">Admin Dashboard</h1>
                 <p className="text-lg text-muted-foreground mt-2">Manage your application's settings and products.</p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto mb-12">
-                {adminCards.map((card) => (
-                     <Link href={card.href} key={card.title} className="block hover:shadow-xl transition-shadow rounded-lg">
-                        <Card className="h-full flex flex-col">
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-2xl font-bold font-headline">{card.title}</CardTitle>
-                                <card.icon className="h-8 w-8 text-primary" />
-                            </CardHeader>
-                            <CardContent className="flex-1 flex flex-col justify-between">
-                                <CardDescription>{card.description}</CardDescription>
-                                <div className="flex items-center text-primary font-semibold mt-4">
-                                    <span>Go to {card.title}</span>
-                                    <ArrowRight className="ml-2 h-4 w-4" />
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </Link>
-                ))}
+            
+            <Suspense fallback={
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+                    <StatCard title="Total Customers" value={0} icon={Users} loading />
+                    <StatCard title="Total Stores" value={0} icon={Store} loading />
+                    <StatCard title="Delivery Partners" value={0} icon={Truck} loading />
+                    <StatCard title="Orders Delivered" value={0} icon={ShoppingBag} loading />
+                </div>
+            }>
+                <StatsCards />
+            </Suspense>
+
+            <div className="space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto mb-12">
+                    {adminCards.map((card) => (
+                        <Link href={card.href} key={card.title} className="block hover:shadow-xl transition-shadow rounded-lg">
+                            <Card className="h-full flex flex-col">
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <CardTitle className="text-2xl font-bold font-headline">{card.title}</CardTitle>
+                                    <card.icon className="h-8 w-8 text-primary" />
+                                </CardHeader>
+                                <CardContent className="flex-1 flex flex-col justify-between">
+                                    <CardDescription>{card.description}</CardDescription>
+                                    <div className="flex items-center text-primary font-semibold mt-4">
+                                        <span>Go to {card.title}</span>
+                                        <ArrowRight className="ml-2 h-4 w-4" />
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </Link>
+                    ))}
+                </div>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Master Product Pricing</CardTitle>
+                        <CardDescription>A complete catalog of all products in the system. Updating a price here will change it across all stores that stock the item.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {isLoading ? <p>Loading products...</p> : (
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                                {uniqueMasterProductNames.map(productName => {
+                                    const initialPrice = productPrices[productName] || 0;
+                                    return (
+                                        <AdminProductCard 
+                                            key={productName}
+                                            productName={productName}
+                                            initialPrice={initialPrice}
+                                            onUpdatePrice={handlePriceUpdate}
+                                        />
+                                    )
+                                })}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
             </div>
-            <Card>
-                <CardHeader>
-                    <CardTitle>Master Product Pricing</CardTitle>
-                    <CardDescription>A complete catalog of all products in the system. Updating a price here will change it across all stores that stock the item.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                     {isLoading ? <p>Loading products...</p> : (
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                            {uniqueMasterProductNames.map(productName => {
-                                const initialPrice = productPrices[productName] || 0;
-                                return (
-                                    <AdminProductCard 
-                                        key={productName}
-                                        productName={productName}
-                                        initialPrice={initialPrice}
-                                        onUpdatePrice={handlePriceUpdate}
-                                    />
-                                )
-                            })}
-                        </div>
-                     )}
-                </CardContent>
-            </Card>
         </div>
     );
 }
