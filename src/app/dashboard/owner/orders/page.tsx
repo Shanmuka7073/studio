@@ -179,7 +179,7 @@ export default function OrdersDashboardPage() {
       );
   }, [firestore, myStore]);
 
-  const voiceOrdersQuery = useMemoFirebase(() => {
+  const pendingVoiceOrdersQuery = useMemoFirebase(() => {
       if (!firestore || !user) return null; // Guard against no user
       // Fetch all pending voice orders, as they are unassigned.
       return query(
@@ -224,34 +224,31 @@ export default function OrdersDashboardPage() {
   useEffect(() => {
     const currentOrdersMap = new Map(allOrders.map(order => [order.id, order]));
     
-    // Process only if there's a previous state to compare against and not in an active alert
     if (prevOrdersRef.current.size > 0 && !newOrderAlert) {
-        currentOrdersMap.forEach((currentOrder, orderId) => {
-            const prevOrder = prevOrdersRef.current.get(orderId);
+      currentOrdersMap.forEach((currentOrder, orderId) => {
+        const prevOrder = prevOrdersRef.current.get(orderId);
 
-            // This is a genuinely new order for this store owner
-            if (!prevOrder && currentOrder.status === 'Pending') {
-                setNewOrderAlert(currentOrder);
-                textToSpeech("You have a new order").then(playAudio).catch(console.error);
-            }
-            // Check for status updates on existing orders
-            else if (prevOrder && prevOrder.status !== currentOrder.status) {
-                const toastMessage = `Order #${currentOrder.id.substring(0, 7)} for ${currentOrder.customerName} is now "${currentOrder.status}".`;
-                toast({
-                    title: "Order Status Updated",
-                    description: toastMessage,
-                });
+        // A new "Pending" order appeared that wasn't there before.
+        if (!prevOrder && currentOrder.status === 'Pending') {
+            setNewOrderAlert(currentOrder);
+            textToSpeech("You have a new order").then(playAudio).catch(console.error);
+        }
+        else if (prevOrder && prevOrder.status !== currentOrder.status) {
+          const toastMessage = `Order #${currentOrder.id.substring(0, 7)} for ${currentOrder.customerName} is now "${currentOrder.status}".`;
+          toast({
+            title: "Order Status Updated",
+            description: toastMessage,
+          });
 
-                if (currentOrder.status === 'Out for Delivery') {
-                    textToSpeech("An order has been picked up for delivery").then(playAudio).catch(console.error);
-                } else if (currentOrder.status === 'Delivered') {
-                    textToSpeech("An order has been delivered").then(playAudio).catch(console.error);
-                }
-            }
-        });
+          if (currentOrder.status === 'Out for Delivery') {
+            textToSpeech("An order has been picked up for delivery").then(playAudio).catch(console.error);
+          } else if (currentOrder.status === 'Delivered') {
+            textToSpeech("An order has been delivered").then(playAudio).catch(console.error);
+          }
+        }
+      });
     }
 
-    // Update the previous state for the next render
     prevOrdersRef.current = currentOrdersMap;
   }, [allOrders, toast, newOrderAlert]);
 
@@ -263,12 +260,10 @@ export default function OrdersDashboardPage() {
     
     const updatePayload: any = { status: newStatus };
     
-    // If it's a voice order being accepted by the store, assign it.
     if (collectionName === 'voice-orders' && newStatus !== 'Pending' && myStore) {
         updatePayload.storeId = myStore.id;
     }
     
-    // If order is ready for delivery, ensure deliveryPartnerId is null to make it available
     if (newStatus === 'Out for Delivery') {
         updatePayload.deliveryPartnerId = null;
     }
@@ -279,7 +274,6 @@ export default function OrdersDashboardPage() {
                 title: "Status Updated",
                 description: `Order ${orderId.substring(0,7)} marked as ${newStatus}.`,
             });
-            // If the action was taken from the new order alert, close it.
             if (newOrderAlert?.id === orderId) {
                 setNewOrderAlert(null);
             }
@@ -309,7 +303,6 @@ export default function OrdersDashboardPage() {
     try {
         return format(new Date(date as string), 'PPP');
     } catch {
-        // Fallback for different date string formats if needed
         return 'Invalid Date';
     }
   }
@@ -454,4 +447,5 @@ export default function OrdersDashboardPage() {
   );
 }
 
+    
     
