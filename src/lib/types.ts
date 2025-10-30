@@ -62,6 +62,13 @@ export type DeliveryPartner = {
   totalEarnings: number;
   lastPayoutDate?: Timestamp;
   payoutsEnabled: boolean;
+  payoutMethod?: 'bank' | 'upi';
+  upiId?: string;
+  bankDetails?: {
+    accountHolderName: string;
+    accountNumber: string;
+    ifscCode: string;
+  };
 };
 
 export type Payout = {
@@ -71,4 +78,6 @@ export type Payout = {
   requestDate: Timestamp | Date | string;
   completionDate?: Timestamp;
   status: 'pending' | 'completed' | 'failed';
+  payoutMethod: 'bank' | 'upi';
+  payoutDetails: any; // upiId or bankDetails
 };

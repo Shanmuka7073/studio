@@ -5,16 +5,197 @@ import { Order, Store, DeliveryPartner, Payout } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MapPin, Check, Banknote, History } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { MapPin, Check, Banknote, History, Landmark, Receipt, CreditCard, ChevronDown, ChevronUp } from 'lucide-react';
 import { useFirebase, useCollection, useDoc, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, query, where, doc, updateDoc, Timestamp, increment, writeBatch, orderBy } from 'firebase/firestore';
+import { collection, query, where, doc, updateDoc, Timestamp, increment, writeBatch, orderBy, setDoc } from 'firebase/firestore';
 import { useEffect, useState, useMemo, useTransition } from 'react';
 import { getStores } from '@/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
 const DELIVERY_FEE = 30;
+
+const payoutDetailsSchema = z.object({
+  payoutMethod: z.enum(['bank', 'upi']),
+  upiId: z.string().optional(),
+  accountHolderName: z.string().optional(),
+  accountNumber: z.string().optional(),
+  ifscCode: z.string().optional(),
+}).refine(data => {
+    if (data.payoutMethod === 'upi') {
+        return !!data.upiId && data.upiId.includes('@');
+    }
+    if (data.payoutMethod === 'bank') {
+        return !!data.accountHolderName && !!data.accountNumber && !!data.ifscCode;
+    }
+    return false;
+}, {
+    message: "Please fill in all required fields for the selected payout method.",
+    path: ['payoutMethod'],
+});
+
+type PayoutDetailsFormValues = z.infer<typeof payoutDetailsSchema>;
+
+function PayoutSettingsCard({ partnerData, isLoading, partnerId }: { partnerData: DeliveryPartner | null, isLoading: boolean, partnerId: string }) {
+    const { firestore } = useFirebase();
+    const { toast } = useToast();
+    const [isSaving, startSaveTransition] = useTransition();
+    const [isEditing, setIsEditing] = useState(false);
+
+    const form = useForm<PayoutDetailsFormValues>({
+        resolver: zodResolver(payoutDetailsSchema),
+        defaultValues: {
+            payoutMethod: partnerData?.payoutMethod || 'bank',
+            upiId: partnerData?.upiId || '',
+            accountHolderName: partnerData?.bankDetails?.accountHolderName || '',
+            accountNumber: partnerData?.bankDetails?.accountNumber || '',
+            ifscCode: partnerData?.bankDetails?.ifscCode || '',
+        }
+    });
+    
+    const watchPayoutMethod = form.watch('payoutMethod');
+
+    useEffect(() => {
+        form.reset({
+            payoutMethod: partnerData?.payoutMethod || 'bank',
+            upiId: partnerData?.upiId || '',
+            accountHolderName: partnerData?.bankDetails?.accountHolderName || '',
+            accountNumber: partnerData?.bankDetails?.accountNumber || '',
+            ifscCode: partnerData?.bankDetails?.ifscCode || '',
+        });
+    }, [partnerData, form.reset, isEditing]);
+
+
+    const onSubmit = (data: PayoutDetailsFormValues) => {
+        if (!firestore || !partnerId) return;
+
+        const updateData: Partial<DeliveryPartner> = {
+            payoutMethod: data.payoutMethod,
+            upiId: data.payoutMethod === 'upi' ? data.upiId : '',
+            bankDetails: data.payoutMethod === 'bank' ? {
+                accountHolderName: data.accountHolderName!,
+                accountNumber: data.accountNumber!,
+                ifscCode: data.ifscCode!,
+            } : { accountHolderName: '', accountNumber: '', ifscCode: '' },
+        };
+        
+        startSaveTransition(async () => {
+            const partnerRef = doc(firestore, 'deliveryPartners', partnerId);
+            try {
+                await setDoc(partnerRef, updateData, { merge: true });
+                toast({ title: "Payout details saved!", description: "Your payment information has been updated." });
+                setIsEditing(false);
+            } catch (error) {
+                const permissionError = new FirestorePermissionError({
+                    path: partnerRef.path,
+                    operation: 'update',
+                    requestResourceData: updateData,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            }
+        });
+    };
+    
+    const hasDetails = partnerData?.payoutMethod && (partnerData.upiId || partnerData.bankDetails?.accountNumber);
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <Landmark className="h-6 w-6 text-primary" />
+                    <span>Payout Settings</span>
+                </CardTitle>
+                <CardDescription>Manage your bank account or UPI details for receiving payments.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {isLoading ? <p>Loading settings...</p> : (
+                    !isEditing && hasDetails ? (
+                        <div className="space-y-4">
+                            {partnerData.payoutMethod === 'upi' ? (
+                                <div>
+                                    <p className="text-sm font-medium">UPI ID</p>
+                                    <p className="text-lg font-mono bg-muted/50 p-2 rounded-md">{partnerData.upiId}</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    <p className="text-sm font-medium">Bank Account</p>
+                                    <div className="text-lg bg-muted/50 p-3 rounded-md text-sm space-y-1 font-mono">
+                                        <p><strong>Holder:</strong> {partnerData.bankDetails?.accountHolderName}</p>
+                                        <p><strong>A/C No:</strong> {partnerData.bankDetails?.accountNumber}</p>
+                                        <p><strong>IFSC:</strong> {partnerData.bankDetails?.ifscCode}</p>
+                                    </div>
+                                </div>
+                            )}
+                            <Button variant="outline" onClick={() => setIsEditing(true)}>Change Details</Button>
+                        </div>
+                    ) : (
+                         <Form {...form}>
+                            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                                <FormField
+                                    control={form.control}
+                                    name="payoutMethod"
+                                    render={({ field }) => (
+                                        <FormItem className="space-y-3">
+                                            <FormLabel>Payout Method</FormLabel>
+                                            <FormControl>
+                                                <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex gap-4">
+                                                    <FormItem className="flex items-center space-x-3 space-y-0">
+                                                        <FormControl><RadioGroupItem value="bank" /></FormControl>
+                                                        <FormLabel className="font-normal">Bank Account</FormLabel>
+                                                    </FormItem>
+                                                    <FormItem className="flex items-center space-x-3 space-y-0">
+                                                        <FormControl><RadioGroupItem value="upi" /></FormControl>
+                                                        <FormLabel className="font-normal">UPI</FormLabel>
+                                                    </FormItem>
+                                                </RadioGroup>
+                                            </FormControl>
+                                        </FormItem>
+                                    )}
+                                />
+                                
+                                {watchPayoutMethod === 'upi' && (
+                                    <FormField control={form.control} name="upiId" render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>UPI ID</FormLabel>
+                                            <FormControl><Input placeholder="yourname@bank" {...field} /></FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )} />
+                                )}
+
+                                {watchPayoutMethod === 'bank' && (
+                                    <div className="space-y-4">
+                                        <FormField control={form.control} name="accountHolderName" render={({ field }) => (
+                                            <FormItem><FormLabel>Account Holder Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                        <FormField control={form.control} name="accountNumber" render={({ field }) => (
+                                            <FormItem><FormLabel>Account Number</FormLabel><FormControl><Input placeholder="1234567890" {...field} /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                         <FormField control={form.control} name="ifscCode" render={({ field }) => (
+                                            <FormItem><FormLabel>IFSC Code</FormLabel><FormControl><Input placeholder="SBIN0001234" {...field} /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                    </div>
+                                )}
+                                <div className="flex gap-2">
+                                     <Button type="submit" disabled={isSaving}>{isSaving ? 'Saving...' : 'Save Details'}</Button>
+                                     {hasDetails && <Button variant="ghost" onClick={() => setIsEditing(false)}>Cancel</Button>}
+                                </div>
+                            </form>
+                         </Form>
+                    )
+                )}
+            </CardContent>
+        </Card>
+    );
+}
 
 function PayoutCard({ partnerData, isLoading, onPayout }: { partnerData: DeliveryPartner | null, isLoading: boolean, onPayout: () => void }) {
     const [isCashingOut, startCashOutTransition] = useTransition();
@@ -26,6 +207,7 @@ function PayoutCard({ partnerData, isLoading, onPayout }: { partnerData: Deliver
     }
 
     const totalEarnings = partnerData?.totalEarnings || 0;
+    const hasPayoutDetails = partnerData && (partnerData.bankDetails?.accountNumber || partnerData.upiId);
 
     return (
         <Card className="bg-primary/5">
@@ -50,7 +232,8 @@ function PayoutCard({ partnerData, isLoading, onPayout }: { partnerData: Deliver
                 <Button
                     size="lg"
                     onClick={handlePayout}
-                    disabled={isCashingOut || isLoading || totalEarnings <= 0}
+                    disabled={isCashingOut || isLoading || totalEarnings <= 0 || !hasPayoutDetails}
+                    title={!hasPayoutDetails ? "Please set up your payout details first" : ""}
                 >
                     {isCashingOut ? 'Processing...' : 'Request Payout'}
                 </Button>
@@ -255,8 +438,13 @@ export default function DeliveriesPage() {
           toast({ variant: 'destructive', title: 'Payout Error', description: 'No balance available to cash out.' });
           return;
       }
+       if (!partnerData.payoutMethod || (!partnerData.upiId && !partnerData.bankDetails?.accountNumber)) {
+        toast({ variant: 'destructive', title: 'Payout Details Missing', description: 'Please set up your bank or UPI details in Payout Settings before requesting a payout.' });
+        return;
+      }
 
       const payoutAmount = partnerData.totalEarnings;
+      const payoutDetails = partnerData.payoutMethod === 'upi' ? { upiId: partnerData.upiId } : { bankDetails: partnerData.bankDetails };
 
       try {
         const batch = writeBatch(firestore);
@@ -267,6 +455,8 @@ export default function DeliveriesPage() {
             partnerId: user.uid,
             requestDate: Timestamp.now(),
             status: 'pending',
+            payoutMethod: partnerData.payoutMethod,
+            payoutDetails: payoutDetails,
         });
 
         const partnerRef = doc(firestore, 'deliveryPartners', user.uid);
@@ -322,8 +512,10 @@ export default function DeliveriesPage() {
     <div className="container mx-auto py-12 px-4 md:px-6 space-y-12">
       <div className="grid md:grid-cols-2 gap-8">
         <PayoutCard partnerData={partnerData} isLoading={partnerLoading} onPayout={handlePayoutRequest} />
-        {user && <PayoutHistoryCard partnerId={user.uid} />}
+        {user && <PayoutSettingsCard partnerData={partnerData} isLoading={partnerLoading} partnerId={user.uid} />}
       </div>
+      
+      {user && <PayoutHistoryCard partnerId={user.uid} />}
 
       <div>
         <h1 className="text-4xl font-bold mb-8 font-headline">My Active Deliveries</h1>

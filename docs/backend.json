@@ -430,6 +430,24 @@
         "payoutsEnabled": {
           "type": "boolean",
           "description": "Whether the partner is eligible for payouts."
+        },
+        "payoutMethod": {
+          "type": "string",
+          "enum": ["bank", "upi"],
+          "description": "The preferred method for receiving payouts."
+        },
+        "upiId": {
+          "type": "string",
+          "description": "The partner's UPI ID for payments."
+        },
+        "bankDetails": {
+          "type": "object",
+          "description": "The partner's bank account details.",
+          "properties": {
+            "accountHolderName": { "type": "string" },
+            "accountNumber": { "type": "string" },
+            "ifscCode": { "type": "string" }
+          }
         }
       },
       "required": ["userId", "totalEarnings", "payoutsEnabled"]
@@ -466,9 +484,18 @@
           "type": "string",
           "enum": ["pending", "completed", "failed"],
           "description": "The status of the payout request."
+        },
+        "payoutMethod": {
+            "type": "string",
+            "enum": ["bank", "upi"],
+            "description": "The method used for this specific payout."
+        },
+        "payoutDetails": {
+            "type": "object",
+            "description": "A snapshot of the payout details used for this transaction (e.g., UPI ID or bank account)."
         }
       },
-      "required": ["id", "partnerId", "amount", "requestDate", "status"]
+      "required": ["id", "partnerId", "amount", "requestDate", "status", "payoutMethod", "payoutDetails"]
     }
   },
   "auth": {
