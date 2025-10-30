@@ -55,3 +55,20 @@ export type Order = {
   store?: Store; // Optional: Denormalized or joined store data
   deliveryPartnerId?: string; // ID of the user who is delivering
 };
+
+
+export type DeliveryPartner = {
+  userId: string; // The user's UID
+  totalEarnings: number;
+  lastPayoutDate?: Timestamp;
+  payoutsEnabled: boolean;
+};
+
+export type Payout = {
+  id: string;
+  partnerId: string;
+  amount: number;
+  requestDate: Timestamp | Date | string;
+  completionDate?: Timestamp;
+  status: 'pending' | 'completed' | 'failed';
+};

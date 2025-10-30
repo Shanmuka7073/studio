@@ -1,17 +1,18 @@
 
 'use client';
 
-import { Order, Store, DeliveryPartner } from '@/lib/types';
+import { Order, Store, DeliveryPartner, Payout } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MapPin, Check, Banknote } from 'lucide-react';
+import { MapPin, Check, Banknote, History } from 'lucide-react';
 import { useFirebase, useCollection, useDoc, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, query, where, doc, updateDoc, Timestamp, increment, writeBatch } from 'firebase/firestore';
+import { collection, query, where, doc, updateDoc, Timestamp, increment, writeBatch, orderBy } from 'firebase/firestore';
 import { useEffect, useState, useMemo, useTransition } from 'react';
 import { getStores } from '@/lib/data';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
 
 const DELIVERY_FEE = 30;
 
@@ -46,13 +47,79 @@ function PayoutCard({ partnerData, isLoading, onPayout }: { partnerData: Deliver
                         <p className="text-3xl font-bold">₹{totalEarnings.toFixed(2)}</p>
                     )}
                 </div>
-                <Button 
-                    size="lg" 
+                <Button
+                    size="lg"
                     onClick={handlePayout}
                     disabled={isCashingOut || isLoading || totalEarnings <= 0}
                 >
                     {isCashingOut ? 'Processing...' : 'Request Payout'}
                 </Button>
+            </CardContent>
+        </Card>
+    )
+}
+
+function PayoutHistoryCard({ partnerId }: { partnerId: string }) {
+    const { firestore } = useFirebase();
+
+    const payoutsQuery = useMemoFirebase(() => {
+        if (!firestore || !partnerId) return null;
+        return query(
+            collection(firestore, `deliveryPartners/${partnerId}/payouts`),
+            orderBy('requestDate', 'desc')
+        );
+    }, [firestore, partnerId]);
+
+    const { data: payouts, isLoading } = useCollection<Payout>(payoutsQuery);
+    
+    const getStatusVariant = (status: Payout['status']): "default" | "secondary" | "destructive" | "outline" => {
+        switch (status) {
+            case 'completed': return 'default';
+            case 'pending': return 'secondary';
+            case 'failed': return 'destructive';
+            default: return 'outline';
+        }
+    }
+
+    const formatDateSafe = (date: any) => {
+        if (!date) return 'N/A';
+        const jsDate = date.seconds ? new Date(date.seconds * 1000) : new Date(date);
+        return `${format(jsDate, 'PPP')} (${formatDistanceToNow(jsDate, { addSuffix: true })})`
+    }
+
+    return (
+         <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <History className="h-6 w-6 text-primary" />
+                    <span>Payout History</span>
+                </CardTitle>
+                <CardDescription>A record of all your payout requests.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {isLoading ? <p>Loading payout history...</p> : 
+                !payouts || payouts.length === 0 ? <p className="text-muted-foreground">You have not requested any payouts yet.</p> : (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Date</TableHead>
+                                <TableHead>Amount</TableHead>
+                                <TableHead className="text-right">Status</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {payouts.map((payout) => (
+                                <TableRow key={payout.id}>
+                                    <TableCell>{formatDateSafe(payout.requestDate)}</TableCell>
+                                    <TableCell className="font-medium">₹{payout.amount.toFixed(2)}</TableCell>
+                                    <TableCell className="text-right">
+                                        <Badge variant={getStatusVariant(payout.status)}>{payout.status}</Badge>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                )}
             </CardContent>
         </Card>
     )
@@ -74,7 +141,7 @@ export default function DeliveriesPage() {
         where('deliveryPartnerId', '==', user.uid)
     );
   }, [firestore, user]);
-  
+
   // Query 2: Get orders that are ready for pickup and have no partner assigned.
   const availableDeliveriesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -151,16 +218,16 @@ export default function DeliveriesPage() {
 
   const handleMarkAsDelivered = (orderId: string) => {
     if (!firestore || !user) return;
-    
+
     startUpdateTransition(async () => {
         const orderRef = doc(firestore, 'orders', orderId);
         const partnerRef = doc(firestore, 'deliveryPartners', user.uid);
-        
+
         try {
             const batch = writeBatch(firestore);
-            
+
             batch.update(orderRef, { status: 'Delivered' });
-            batch.set(partnerRef, { 
+            batch.set(partnerRef, {
                 totalEarnings: increment(DELIVERY_FEE),
                 userId: user.uid,
                 payoutsEnabled: true,
@@ -190,10 +257,10 @@ export default function DeliveriesPage() {
       }
 
       const payoutAmount = partnerData.totalEarnings;
-      
+
       try {
         const batch = writeBatch(firestore);
-        
+
         const newPayoutRef = doc(collection(firestore, `deliveryPartners/${user.uid}/payouts`));
         batch.set(newPayoutRef, {
             amount: payoutAmount,
@@ -207,7 +274,7 @@ export default function DeliveriesPage() {
             totalEarnings: 0,
             lastPayoutDate: Timestamp.now(),
         });
-        
+
         await batch.commit();
 
         toast({
@@ -232,7 +299,7 @@ export default function DeliveriesPage() {
     }
     window.open(url, '_blank');
   };
-  
+
   const isLoading = activeDeliveriesLoading || availableDeliveriesLoading || completedDeliveriesLoading || stores.length === 0;
 
   const formatDate = (date: any) => {
@@ -253,9 +320,11 @@ export default function DeliveriesPage() {
 
   return (
     <div className="container mx-auto py-12 px-4 md:px-6 space-y-12">
-      
-      <PayoutCard partnerData={partnerData} isLoading={partnerLoading} onPayout={handlePayoutRequest} />
-      
+      <div className="grid md:grid-cols-2 gap-8">
+        <PayoutCard partnerData={partnerData} isLoading={partnerLoading} onPayout={handlePayoutRequest} />
+        {user && <PayoutHistoryCard partnerId={user.uid} />}
+      </div>
+
       <div>
         <h1 className="text-4xl font-bold mb-8 font-headline">My Active Deliveries</h1>
         <Card>
@@ -429,5 +498,3 @@ export default function DeliveriesPage() {
     </div>
   );
 }
-
-    
