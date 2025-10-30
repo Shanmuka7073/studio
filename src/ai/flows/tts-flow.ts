@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A flow for Text-to-Speech conversion.
@@ -53,7 +54,7 @@ const ttsFlow = ai.defineFlow(
     },
     async (query) => {
         const { media } = await ai.generate({
-            model: googleAI.model('gemini-2.5-flash-preview-tts'),
+            model: googleAI.model('tts-1'),
             config: {
                 responseModalities: ['AUDIO'],
                 speechConfig: {
