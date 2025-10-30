@@ -9,6 +9,7 @@ import { Footer } from '@/components/layout/footer';
 import { CartProvider } from '@/lib/cart';
 import { FirebaseClientProvider } from '@/firebase';
 import { AssistantProvider } from '@/components/assistant/assistant-provider';
+import { NotificationPermissionManager } from '@/components/layout/notification-permission-manager';
 
 
 const ptSans = PT_Sans({
@@ -45,6 +46,7 @@ export default function RootLayout({
               <div className="relative flex min-h-dvh flex-col bg-background">
                 <Header />
                 <main className="flex-1 pb-10">{children}</main>
+                <NotificationPermissionManager />
                 <Footer />
               </div>
               <Toaster />

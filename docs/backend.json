@@ -144,6 +144,10 @@
         "longitude": {
             "type": "number",
             "description": "The longitude of the user's location."
+        },
+        "fcmToken": {
+            "type": "string",
+            "description": "The Firebase Cloud Messaging token for push notifications."
         }
       },
       "required": [
