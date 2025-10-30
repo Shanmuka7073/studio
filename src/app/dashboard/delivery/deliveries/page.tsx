@@ -19,6 +19,8 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const DELIVERY_FEE = 30;
 
@@ -42,6 +44,65 @@ const payoutDetailsSchema = z.object({
 });
 
 type PayoutDetailsFormValues = z.infer<typeof payoutDetailsSchema>;
+
+function OrderDetailsDialog({ order, isOpen, onClose, onAccept }: { order: Order | null; isOpen: boolean; onClose: () => void, onAccept?: () => void }) {
+    if (!order) return null;
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onClose}>
+            <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>Order Details</DialogTitle>
+                    <DialogDescription>
+                        ID: {order.id} | Placed by: {order.customerName}
+                    </DialogDescription>
+                </DialogHeader>
+                <ScrollArea className="max-h-[60vh]">
+                    <div className="grid gap-4 py-4 pr-6">
+                        {order.items && order.items.length > 0 ? (
+                           <Card>
+                                <CardHeader><CardTitle className="text-lg">Order Items</CardTitle></CardHeader>
+                                <CardContent>
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Item</TableHead>
+                                                <TableHead>Qty</TableHead>
+                                                <TableHead className="text-right">Price</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {order.items.map((item, index) => (
+                                                <TableRow key={index}>
+                                                    <TableCell>{item.name}</TableCell>
+                                                    <TableCell>{item.quantity}</TableCell>
+                                                    <TableCell className="text-right">₹{item.price.toFixed(2)}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </CardContent>
+                            </Card>
+                        ) : (
+                            <p>No items listed for this order.</p>
+                        )}
+                         <Card>
+                            <CardHeader><CardTitle className="text-lg">Delivery Details</CardTitle></CardHeader>
+                            <CardContent className="text-sm space-y-2">
+                                 <p><strong>Pickup:</strong> {order.store?.name} - {order.store?.address}</p>
+                                 <p><strong>Drop-off:</strong> {order.customerName} - {order.deliveryAddress}</p>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </ScrollArea>
+                <DialogFooter className="gap-2 sm:gap-0">
+                    <Button variant="outline" onClick={onClose}>Close</Button>
+                    {onAccept && <Button onClick={onAccept}>Accept Job & Confirm Pickup</Button>}
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
 
 function PayoutSettingsCard({ partnerData, isLoading, partnerId }: { partnerData: DeliveryPartner | null, isLoading: boolean, partnerId: string }) {
     const { firestore } = useFirebase();
@@ -315,6 +376,7 @@ export default function DeliveriesPage() {
   const [stores, setStores] = useState<Store[]>([]);
   const [isUpdating, startUpdateTransition] = useTransition();
   const { toast } = useToast();
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   // Query 1: Get orders assigned to the current delivery partner.
   const myActiveDeliveriesQuery = useMemoFirebase(() => {
@@ -388,6 +450,7 @@ export default function DeliveriesPage() {
                 title: "Pickup Confirmed!",
                 description: `You are now assigned to deliver order #${orderId.substring(0, 7)}.`
             });
+            setSelectedOrder(null);
         } catch (error) {
              console.error("Failed to confirm pickup:", error);
             const permissionError = new FirestorePermissionError({
@@ -513,6 +576,14 @@ export default function DeliveriesPage() {
 
   return (
     <div className="container mx-auto py-12 px-4 md:px-6 space-y-12">
+        {selectedOrder && (
+             <OrderDetailsDialog 
+                order={selectedOrder} 
+                isOpen={!!selectedOrder}
+                onClose={() => setSelectedOrder(null)}
+                onAccept={selectedOrder.status === 'Out for Delivery' && !selectedOrder.deliveryPartnerId ? () => handleConfirmPickup(selectedOrder.id) : undefined}
+             />
+        )}
       <div className="grid md:grid-cols-2 gap-8">
         <PayoutCard partnerData={partnerData} isLoading={partnerLoading} onPayout={handlePayoutRequest} />
         {user && <PayoutSettingsCard partnerData={partnerData} isLoading={partnerLoading} partnerId={user.uid} />}
@@ -610,7 +681,8 @@ export default function DeliveriesPage() {
                   <TableRow>
                     <TableHead>Store Pickup</TableHead>
                     <TableHead>Customer</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead>Order Value</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -623,15 +695,25 @@ export default function DeliveriesPage() {
                       <TableCell>
                           <div className="font-medium">{order.customerName}</div>
                       </TableCell>
-                      <TableCell>
-                          <div className="flex items-center gap-2">
+                      <TableCell className="font-medium">
+                        ₹{order.totalAmount.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSelectedOrder(order)}
+                              >
+                                View Details
+                              </Button>
                               <Button
                                   variant="default"
                                   size="sm"
                                   onClick={() => handleConfirmPickup(order.id)}
                                   disabled={isUpdating}
                               >
-                                  Accept Job & Confirm Pickup
+                                  Accept Job
                               </Button>
                           </div>
                       </TableCell>
