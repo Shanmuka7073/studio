@@ -10,10 +10,11 @@ import { format, parseISO } from 'date-fns';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
-import { useState, useEffect, useMemo, useRef }from 'react';
+import { collection, query, where, orderBy, doc, writeBatch, increment } from 'firebase/firestore';
+import { useState, useEffect, useMemo, useRef, useTransition } from 'react';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useToast } from '@/hooks/use-toast';
+import { CheckCircle } from 'lucide-react';
 
 const DELIVERY_FEE = 30;
 
@@ -38,6 +39,7 @@ const playAlarm = () => {
 export default function MyOrdersPage() {
   const { user, isUserLoading, firestore } = useFirebase();
   const { toast } = useToast();
+  const [isUpdating, startUpdateTransition] = useTransition();
   
   const regularOrdersQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
@@ -102,6 +104,41 @@ export default function MyOrdersPage() {
     }
   }, [allOrders, toast]);
 
+  const handleConfirmDelivery = (order: Order) => {
+    if (!firestore || !user?.uid || !order.deliveryPartnerId) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not confirm delivery. Partner information is missing.' });
+        return;
+    }
+
+    startUpdateTransition(async () => {
+        const orderRef = doc(firestore, 'orders', order.id);
+        const partnerRef = doc(firestore, 'deliveryPartners', order.deliveryPartnerId!);
+
+        try {
+            const batch = writeBatch(firestore);
+
+            batch.update(orderRef, { status: 'Delivered' });
+            batch.set(partnerRef, {
+                totalEarnings: increment(DELIVERY_FEE),
+            }, { merge: true });
+
+            await batch.commit();
+
+            toast({
+                title: "Order Confirmed!",
+                description: "Thank you for confirming your delivery."
+            });
+        } catch (error) {
+            console.error("Failed to confirm delivery by customer:", error);
+            const permissionError = new FirestorePermissionError({
+                path: orderRef.path,
+                operation: 'update',
+                requestResourceData: { status: 'Delivered' },
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        }
+    });
+  };
 
   const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
     switch (status) {
@@ -241,6 +278,18 @@ export default function MyOrdersPage() {
                             <h4 className="font-semibold">Delivery Address</h4>
                             <p className="text-sm text-muted-foreground">{order.deliveryAddress}</p>
                         </div>
+                        {order.status === 'Out for Delivery' && (
+                            <div className="mt-6 border-t pt-4 text-center">
+                                <p className="text-sm text-muted-foreground mb-2">Has your order arrived?</p>
+                                <Button
+                                    onClick={() => handleConfirmDelivery(order)}
+                                    disabled={isUpdating}
+                                >
+                                    <CheckCircle className="mr-2 h-4 w-4" />
+                                    {isUpdating ? 'Confirming...' : 'Confirm Delivery Received'}
+                                </Button>
+                            </div>
+                        )}
                     </div>
                   </AccordionContent>
                 </AccordionItem>
