@@ -197,7 +197,7 @@ export default function OrdersDashboardPage() {
   }, [firestore, myStore]);
   
   const { data: regularOrders, isLoading: regularOrdersLoading } = useCollection<Order>(regularOrdersQuery);
-  const { data: pendingVoiceOrders, isLoading: voiceOrdersLoading } = useCollection<Order>(voiceOrdersQuery);
+  const { data: pendingVoiceOrders, isLoading: voiceOrdersLoading } = useCollection<Order>(pendingVoiceOrdersQuery);
   const { data: assignedVoiceOrders, isLoading: assignedVoiceOrdersLoading } = useCollection<Order>(assignedVoiceOrdersQuery);
 
   const allOrders = useMemo(() => {
@@ -219,17 +219,20 @@ export default function OrdersDashboardPage() {
       });
   }, [regularOrders, pendingVoiceOrders, assignedVoiceOrders]);
 
-  const prevOrdersRef = useRef<Order[]>([]);
+  const prevOrdersRef = useRef<Map<string, Order>>(new Map());
 
   useEffect(() => {
-    if (allOrders && allOrders.length > 0) {
-        allOrders.forEach(currentOrder => {
-            const prevOrder = prevOrdersRef.current.find(p => p.id === currentOrder.id);
-            
-            // Check for new pending orders
+    const currentOrdersMap = new Map(allOrders.map(order => [order.id, order]));
+    
+    // Process only if there's a previous state to compare against and not in an active alert
+    if (prevOrdersRef.current.size > 0 && !newOrderAlert) {
+        currentOrdersMap.forEach((currentOrder, orderId) => {
+            const prevOrder = prevOrdersRef.current.get(orderId);
+
+            // This is a genuinely new order for this store owner
             if (!prevOrder && currentOrder.status === 'Pending') {
-                 setNewOrderAlert(currentOrder);
-                 textToSpeech("You have a new order").then(playAudio).catch(console.error);
+                setNewOrderAlert(currentOrder);
+                textToSpeech("You have a new order").then(playAudio).catch(console.error);
             }
             // Check for status updates on existing orders
             else if (prevOrder && prevOrder.status !== currentOrder.status) {
@@ -247,8 +250,10 @@ export default function OrdersDashboardPage() {
             }
         });
     }
-    prevOrdersRef.current = allOrders || [];
-  }, [allOrders, toast]);
+
+    // Update the previous state for the next render
+    prevOrdersRef.current = currentOrdersMap;
+  }, [allOrders, toast, newOrderAlert]);
 
 
   const handleStatusChange = (orderId: string, collectionName: 'orders' | 'voice-orders', newStatus: Order['status']) => {
@@ -323,7 +328,9 @@ export default function OrdersDashboardPage() {
                         A new order has been placed by {newOrderAlert.customerName}. Please review the details and accept or reject it.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
-                <OrderDetailsDialog order={newOrderAlert} isOpen={true} onClose={() => {}} />
+                <DialogContent>
+                    <OrderDetailsDialog order={newOrderAlert} isOpen={true} onClose={() => {}} />
+                </DialogContent>
                 <AlertDialogFooter>
                     <AlertDialogCancel asChild>
                         <Button variant="destructive" onClick={() => handleAlertAction('reject')}>Reject Order</Button>
@@ -446,3 +453,5 @@ export default function OrdersDashboardPage() {
     </div>
   );
 }
+
+    

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useFirebase, errorEmitter, useCollection, useMemoFirebase } from '@/firebase';
@@ -63,12 +64,15 @@ export default function MyOrdersPage() {
 
   }, [regularOrders, voiceOrders]);
 
-  const prevOrdersRef = useRef<Order[]>([]);
+  const prevOrdersRef = useRef<Map<string, Order>>(new Map());
 
   useEffect(() => {
     if (allOrders && allOrders.length > 0) {
-      allOrders.forEach(currentOrder => {
-        const prevOrder = prevOrdersRef.current.find(p => p.id === currentOrder.id);
+      const currentOrdersMap = new Map(allOrders.map(order => [order.id, order]));
+      
+      currentOrdersMap.forEach((currentOrder, orderId) => {
+        const prevOrder = prevOrdersRef.current.get(orderId);
+        
         if (prevOrder && prevOrder.status !== currentOrder.status) {
           const toastMessage = `Your order #${currentOrder.id.substring(0, 7)} is now "${currentOrder.status}".`;
           toast({
@@ -83,8 +87,9 @@ export default function MyOrdersPage() {
           }
         }
       });
+
+      prevOrdersRef.current = currentOrdersMap;
     }
-    prevOrdersRef.current = allOrders || [];
   }, [allOrders, toast]);
 
 
@@ -94,6 +99,7 @@ export default function MyOrdersPage() {
         case 'Processing': return 'secondary';
         case 'Out for Delivery': return 'outline';
         case 'Pending': return 'secondary';
+        case 'Cancelled': return 'destructive';
         default: return 'secondary';
     }
   }
@@ -236,3 +242,5 @@ export default function MyOrdersPage() {
     </div>
   );
 }
+
+    
