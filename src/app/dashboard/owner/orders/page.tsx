@@ -228,7 +228,9 @@ export default function OrdersDashboardPage() {
                     description: toastMessage,
                 });
 
-                if (currentOrder.status === 'Delivered') {
+                if (currentOrder.status === 'Out for Delivery') {
+                    textToSpeech("An order has been picked up for delivery").then(playAudio).catch(console.error);
+                } else if (currentOrder.status === 'Delivered') {
                     textToSpeech("An order has been delivered").then(playAudio).catch(console.error);
                 }
             }
