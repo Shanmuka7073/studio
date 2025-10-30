@@ -23,6 +23,22 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 const DELIVERY_FEE = 30;
+const DELIVERY_PROXIMITY_THRESHOLD_KM = 0.5; // 500 meters
+
+function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371; // Radius of the Earth in kilometers
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) *
+      Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Distance in kilometers
+}
+
 
 const payoutDetailsSchema = z.object({
   payoutMethod: z.enum(['bank', 'upi']),
@@ -463,37 +479,70 @@ export default function DeliveriesPage() {
      });
   };
 
-  const handleMarkAsDelivered = (orderId: string) => {
-    if (!firestore || !user?.uid) return;
+  const handleMarkAsDelivered = (order: Order) => {
+    if (!navigator.geolocation) {
+        toast({
+            variant: 'destructive',
+            title: 'Geolocation Not Supported',
+            description: "Cannot verify your location.",
+        });
+        return;
+    }
 
     startUpdateTransition(async () => {
-        const orderRef = doc(firestore, 'orders', orderId);
-        const partnerRef = doc(firestore, 'deliveryPartners', user.uid);
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                const { latitude: partnerLat, longitude: partnerLng } = position.coords;
+                const distance = haversineDistance(partnerLat, partnerLng, order.deliveryLat, order.deliveryLng);
 
-        try {
-            const batch = writeBatch(firestore);
+                if (distance > DELIVERY_PROXIMITY_THRESHOLD_KM) {
+                    toast({
+                        variant: 'destructive',
+                        title: 'Too Far Away',
+                        description: `You must be within ${DELIVERY_PROXIMITY_THRESHOLD_KM * 1000} meters of the delivery location. You are currently ${Math.round(distance * 1000)}m away.`,
+                    });
+                    return;
+                }
 
-            batch.update(orderRef, { status: 'Delivered' });
-            batch.set(partnerRef, {
-                totalEarnings: increment(DELIVERY_FEE),
-                userId: user.uid,
-                payoutsEnabled: true,
-             }, { merge: true });
+                if (!firestore || !user?.uid) return;
 
-            await batch.commit();
+                const orderRef = doc(firestore, 'orders', order.id);
+                const partnerRef = doc(firestore, 'deliveryPartners', user.uid);
 
-            toast({
-                title: "Delivery Complete!",
-                description: `Order #${orderId.substring(0, 7)} marked as delivered. ₹${DELIVERY_FEE} added to your earnings.`
-            });
-        } catch (error) {
-            console.error("Failed to mark as delivered:", error);
-            toast({
-                variant: 'destructive',
-                title: 'Update Failed',
-                description: 'Could not update the order status and your earnings. Please try again.'
-            });
-        }
+                try {
+                    const batch = writeBatch(firestore);
+
+                    batch.update(orderRef, { status: 'Delivered' });
+                    batch.set(partnerRef, {
+                        totalEarnings: increment(DELIVERY_FEE),
+                        userId: user.uid,
+                        payoutsEnabled: true,
+                    }, { merge: true });
+
+                    await batch.commit();
+
+                    toast({
+                        title: "Delivery Complete!",
+                        description: `Order #${order.id.substring(0, 7)} marked as delivered. ₹${DELIVERY_FEE} added to your earnings.`
+                    });
+                } catch (error) {
+                    console.error("Failed to mark as delivered:", error);
+                    toast({
+                        variant: 'destructive',
+                        title: 'Update Failed',
+                        description: 'Could not update the order status and your earnings. Please try again.'
+                    });
+                }
+            },
+            (error) => {
+                console.error("Geolocation error:", error);
+                toast({
+                    variant: 'destructive',
+                    title: 'Location Error',
+                    description: 'Could not get your current location. Please enable location services and try again.',
+                });
+            }
+        );
     });
   };
 
@@ -646,7 +695,7 @@ export default function DeliveriesPage() {
                            <Button
                                   variant="secondary"
                                   size="sm"
-                                  onClick={() => handleMarkAsDelivered(order.id)}
+                                  onClick={() => handleMarkAsDelivered(order)}
                                   disabled={isUpdating}
                               >
                                   <Check className="mr-2 h-4 w-4" />
