@@ -172,8 +172,6 @@ export default function OrdersDashboardPage() {
   const voiceOrdersQuery = useMemoFirebase(() => {
       if (!firestore) return null;
       // Fetch all pending voice orders, as they are unassigned.
-      // Also fetch any voice orders that have been assigned to this store.
-      // This requires a composite index, which should be configured.
       return query(
           collection(firestore, 'voice-orders'),
           where('status', '==', 'Pending')
