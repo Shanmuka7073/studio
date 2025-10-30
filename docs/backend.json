@@ -197,6 +197,10 @@
         "deliveryLng": {
             "type": "number",
             "description": "The longitude of the delivery location."
+        },
+        "deliveryPartnerId": {
+            "type": "string",
+            "description": "The ID of the user who is assigned to deliver this order."
         }
       },
       "required": [
@@ -673,5 +677,3 @@
     ]
   }
 }
-
-    
