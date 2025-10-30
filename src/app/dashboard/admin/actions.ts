@@ -36,23 +36,27 @@ export async function getAdminStats(): Promise<{
         const usersPromise = auth.listUsers();
         const storesPromise = firestore.collection('stores').where('isClosed', '!=', true).count().get();
         const partnersPromise = firestore.collection('deliveryPartners').count().get();
-        const ordersPromise = firestore.collection('orders').where('status', '==', 'Delivered').count().get();
+        const ordersPromise = firestore.collectionGroup('orders').where('status', '==', 'Delivered').count().get();
+        const voiceOrdersPromise = firestore.collectionGroup('voice-orders').where('status', '==', 'Delivered').count().get();
 
-        const [usersResult, storesSnapshot, partnersSnapshot, ordersSnapshot] = await Promise.all([
+
+        const [usersResult, storesSnapshot, partnersSnapshot, ordersSnapshot, voiceOrdersSnapshot] = await Promise.all([
             usersPromise,
             storesPromise,
             partnersPromise,
             ordersPromise,
+            voiceOrdersSnapshot,
         ]);
         
         // Filter out admin user from total customers count
         const totalUsers = usersResult.users.filter(u => u.email !== 'admin@gmail.com').length;
+        const totalOrdersDelivered = ordersSnapshot.data().count + voiceOrdersSnapshot.data().count;
 
         return {
             totalUsers: totalUsers,
             totalStores: storesSnapshot.data().count,
             totalDeliveryPartners: partnersSnapshot.data().count,
-            totalOrdersDelivered: ordersSnapshot.data().count,
+            totalOrdersDelivered: totalOrdersDelivered,
         };
 
     } catch (error) {
