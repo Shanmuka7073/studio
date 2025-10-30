@@ -23,7 +23,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 const DELIVERY_FEE = 30;
-const DELIVERY_PROXIMITY_THRESHOLD_KM = 0.5; // 500 meters
+const DELIVERY_PROXIMITY_THRESHOLD_KM = 0.1; // 100 meters
 
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371; // Radius of the Earth in kilometers
