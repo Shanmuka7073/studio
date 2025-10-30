@@ -86,7 +86,7 @@ export default function MyOrdersPage() {
     }
   }
 
-  const effectiveLoading = isUserLoading || (user && (regularOrdersLoading || voiceOrdersLoading));
+  const effectiveLoading = isUserLoading || regularOrdersLoading || voiceOrdersLoading;
 
   const formatDate = (date: any) => {
     if (!date) return 'N/A';
