@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Order, Store, DeliveryPartner, Payout } from '@/lib/types';
@@ -634,6 +635,56 @@ export default function DeliveriesPage() {
       }
   };
 
+  const handleOptimizedRoute = () => {
+    if (!myActiveDeliveriesWithStores || myActiveDeliveriesWithStores.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "No Active Deliveries",
+        description: "There are no active deliveries to create a route for."
+      });
+      return;
+    }
+    
+    // Get unique store locations (pickups)
+    const storeWaypoints = [...new Map(myActiveDeliveriesWithStores.map(order =>
+        [order.storeId, `${order.store.latitude},${order.store.longitude}`]
+    )).values()];
+
+    // Get all customer locations (dropoffs)
+    const customerWaypoints = myActiveDeliveriesWithStores.map(order => 
+        `${order.deliveryLat},${order.deliveryLng}`
+    );
+
+    // Combine waypoints, assuming one destination is the last customer
+    const waypoints = [...storeWaypoints, ...customerWaypoints];
+    const destination = waypoints.pop();
+
+    if (!destination) {
+        toast({ title: "No destination found" });
+        return;
+    }
+
+    let url = `https://www.google.com/maps/dir/?api=1&destination=${destination}`;
+
+    if (waypoints.length > 0) {
+        url += `&waypoints=${waypoints.join('|')}`;
+    }
+
+    // Optionally add origin from current location
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(position => {
+            const { latitude, longitude } = position.coords;
+            const originUrl = url + `&origin=${latitude},${longitude}`;
+            window.open(originUrl, '_blank');
+        }, () => {
+            // Can't get location, open without origin
+            window.open(url, '_blank');
+        });
+    } else {
+        window.open(url, '_blank');
+    }
+  };
+
   const isLoading = activeDeliveriesLoading || availableDeliveriesLoading || completedDeliveriesLoading || stores.length === 0;
 
   const formatDate = (date: any) => {
@@ -674,7 +725,15 @@ export default function DeliveriesPage() {
         <h1 className="text-4xl font-bold mb-8 font-headline">My Active Deliveries</h1>
         <Card>
           <CardHeader>
-            <CardTitle>Orders You Are Delivering</CardTitle>
+             <div className="flex justify-between items-center">
+                <CardTitle>Orders You Are Delivering</CardTitle>
+                {myActiveDeliveriesWithStores.length > 0 && (
+                     <Button onClick={handleOptimizedRoute}>
+                        <Route className="mr-2 h-4 w-4" />
+                        View Optimized Route
+                    </Button>
+                )}
+            </div>
           </CardHeader>
           <CardContent>
             {activeDeliveriesLoading ? (
@@ -696,30 +755,10 @@ export default function DeliveriesPage() {
                       <TableCell>
                         <div className="font-medium">{order.store?.name}</div>
                         <div className="text-sm text-muted-foreground">{order.store?.address}</div>
-                        {order.store && (
-                          <Button
-                              variant="link"
-                              size="sm"
-                              className="px-0 h-auto"
-                              onClick={() => openInGoogleMaps(order.store!.latitude, order.store!.longitude)}
-                          >
-                              <MapPin className="mr-2 h-4 w-4" />
-                              Route to Store
-                          </Button>
-                        )}
                       </TableCell>
                       <TableCell>
                           <div className="font-medium">{order.customerName}</div>
                           <div className="text-sm text-muted-foreground">{order.deliveryAddress}</div>
-                          <Button
-                            variant="link"
-                            size="sm"
-                            className="px-0 h-auto"
-                            onClick={() => openInGoogleMaps(order.deliveryLat, order.deliveryLng, order.store?.latitude, order.store?.longitude)}
-                          >
-                               <MapPin className="mr-2 h-4 w-4" />
-                              Route to Customer
-                          </Button>
                       </TableCell>
                       <TableCell className="text-right">
                            <Button
