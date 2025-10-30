@@ -46,7 +46,7 @@ export type Order = {
   deliveryLng: number;
   items: OrderItem[];
   totalAmount: number;
-  status: 'Pending' | 'Processing' | 'Out for Delivery' | 'Delivered';
+  status: 'Pending' | 'Processing' | 'Out for Delivery' | 'Delivered' | 'Cancelled';
   orderDate: Timestamp | Date | string; // Allow string for serialized format
   phone: string;
   email: string;

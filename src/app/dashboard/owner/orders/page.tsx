@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect, useTransition, useMemo, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useRouter } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -141,6 +142,7 @@ function StatusManager({ order, onStatusChange }: { order: Order; onStatusChange
                 <SelectItem value="Processing">Processing</SelectItem>
                 <SelectItem value="Out for Delivery">Out for Delivery</SelectItem>
                 <SelectItem value="Delivered">Delivered</SelectItem>
+                <SelectItem value="Cancelled">Cancelled</SelectItem>
             </SelectContent>
         </Select>
     )
@@ -150,6 +152,7 @@ function StatusManager({ order, onStatusChange }: { order: Order; onStatusChange
 export default function OrdersDashboardPage() {
   const { firestore, user, isUserLoading } = useFirebase();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [newOrderAlert, setNewOrderAlert] = useState<Order | null>(null);
   const router = useRouter();
   const { toast } = useToast();
 
@@ -222,7 +225,14 @@ export default function OrdersDashboardPage() {
     if (allOrders && allOrders.length > 0) {
         allOrders.forEach(currentOrder => {
             const prevOrder = prevOrdersRef.current.find(p => p.id === currentOrder.id);
-            if (prevOrder && prevOrder.status !== currentOrder.status) {
+            
+            // Check for new pending orders
+            if (!prevOrder && currentOrder.status === 'Pending') {
+                 setNewOrderAlert(currentOrder);
+                 textToSpeech("You have a new order").then(playAudio).catch(console.error);
+            }
+            // Check for status updates on existing orders
+            else if (prevOrder && prevOrder.status !== currentOrder.status) {
                 const toastMessage = `Order #${currentOrder.id.substring(0, 7)} for ${currentOrder.customerName} is now "${currentOrder.status}".`;
                 toast({
                     title: "Order Status Updated",
@@ -264,6 +274,10 @@ export default function OrdersDashboardPage() {
                 title: "Status Updated",
                 description: `Order ${orderId.substring(0,7)} marked as ${newStatus}.`,
             });
+            // If the action was taken from the new order alert, close it.
+            if (newOrderAlert?.id === orderId) {
+                setNewOrderAlert(null);
+            }
         })
         .catch(async (serverError) => {
             const permissionError = new FirestorePermissionError({
@@ -273,6 +287,13 @@ export default function OrdersDashboardPage() {
             });
             errorEmitter.emit('permission-error', permissionError);
         });
+  };
+
+  const handleAlertAction = (action: 'accept' | 'reject') => {
+    if (!newOrderAlert) return;
+    const newStatus = action === 'accept' ? 'Processing' : 'Cancelled';
+    const collectionName = newOrderAlert.voiceMemoUrl ? 'voice-orders' : 'orders';
+    handleStatusChange(newOrderAlert.id, collectionName, newStatus);
   };
 
   const formatDate = (date: any) => {
@@ -293,6 +314,27 @@ export default function OrdersDashboardPage() {
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
        <OrderDetailsDialog order={selectedOrder} isOpen={!!selectedOrder} onClose={() => setSelectedOrder(null)} />
+       {newOrderAlert && (
+         <AlertDialog open={!!newOrderAlert} onOpenChange={() => {}}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>You Have a New Order!</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        A new order has been placed by {newOrderAlert.customerName}. Please review the details and accept or reject it.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <OrderDetailsDialog order={newOrderAlert} isOpen={true} onClose={() => {}} />
+                <AlertDialogFooter>
+                    <AlertDialogCancel asChild>
+                        <Button variant="destructive" onClick={() => handleAlertAction('reject')}>Reject Order</Button>
+                    </AlertDialogCancel>
+                    <AlertDialogAction asChild>
+                        <Button onClick={() => handleAlertAction('accept')}>Accept Order</Button>
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+         </AlertDialog>
+       )}
       <h1 className="text-4xl font-bold font-headline mb-8">Order Management</h1>
       <Card>
         <CardHeader>
