@@ -32,7 +32,7 @@ const playAlarm = () => {
     gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
     
     oscillator.start();
-    oscillator.stop(audioContext.currentTime + 0.3); // Play for 300ms
+    oscillator.stop(audioContext.currentTime + 1); // Play for 1 second
 };
 
 
@@ -234,14 +234,23 @@ export default function OrdersDashboardPage() {
   useEffect(() => {
     const currentOrdersMap = new Map(allOrders.map(order => [order.id, order]));
     
-    if (prevOrdersRef.current.size > 0 && !newOrderAlert) { 
+    // Don't run on the very first load of data
+    if (prevOrdersRef.current.size > 0) {
         currentOrdersMap.forEach((currentOrder, orderId) => {
             const prevOrder = prevOrdersRef.current.get(orderId);
 
-            // A new "Pending" order appeared that wasn't there before
-            if (!prevOrder && currentOrder.status === 'Pending') {
-                setNewOrderAlert(currentOrder);
-                playAlarm();
+            // A new order with "Pending" status appeared
+            if (!prevOrder && currentOrder.status === 'Pending' && !newOrderAlert) {
+                // If it's a voice order, only alert if storeId is missing (unclaimed)
+                if (currentOrder.voiceMemoUrl && !currentOrder.storeId) {
+                    setNewOrderAlert(currentOrder);
+                    playAlarm();
+                } 
+                // If it's a regular cart order, alert if it belongs to my store
+                else if (currentOrder.storeId === myStore?.id) {
+                    setNewOrderAlert(currentOrder);
+                    playAlarm();
+                }
             }
             // An existing order changed status
             else if (prevOrder && prevOrder.status !== currentOrder.status) {
@@ -259,7 +268,7 @@ export default function OrdersDashboardPage() {
     }
 
     prevOrdersRef.current = currentOrdersMap;
-  }, [allOrders, toast, newOrderAlert, myStore?.id]);
+  }, [allOrders, toast, myStore?.id, newOrderAlert]);
 
 
   const handleStatusChange = (orderId: string, collectionName: 'orders' | 'voice-orders', newStatus: Order['status']) => {

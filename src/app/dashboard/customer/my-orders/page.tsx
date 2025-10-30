@@ -31,7 +31,7 @@ const playAlarm = () => {
     gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
     
     oscillator.start();
-    oscillator.stop(audioContext.currentTime + 0.3); // Play for 300ms
+    oscillator.stop(audioContext.currentTime + 1); // Play for 1 second
 };
 
 
