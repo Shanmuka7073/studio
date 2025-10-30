@@ -14,14 +14,26 @@ import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { useState, useEffect, useMemo, useRef }from 'react';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useToast } from '@/hooks/use-toast';
-import { textToSpeech } from '@/ai/flows/tts-flow';
 
 const DELIVERY_FEE = 30;
 
-const playAudio = (audioDataUri: string) => {
-  const audio = new Audio(audioDataUri);
-  audio.play().catch(e => console.error("Audio playback failed:", e));
+const playAlarm = () => {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    if (!audioContext) return;
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(880, audioContext.currentTime); // A5 note
+    gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+    
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.3); // Play for 300ms
 };
+
 
 export default function MyOrdersPage() {
   const { user, isUserLoading, firestore } = useFirebase();
@@ -80,10 +92,8 @@ export default function MyOrdersPage() {
             description: toastMessage,
           });
           
-          if (currentOrder.status === 'Out for Delivery') {
-            textToSpeech("Your order is out for delivery").then(playAudio).catch(console.error);
-          } else if (currentOrder.status === 'Delivered') {
-            textToSpeech("Your order has been delivered").then(playAudio).catch(console.error);
+          if (currentOrder.status === 'Out for Delivery' || currentOrder.status === 'Delivered') {
+            playAlarm();
           }
         }
       });

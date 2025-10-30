@@ -17,13 +17,24 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useRouter } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { textToSpeech } from '@/ai/flows/tts-flow';
 
-
-const playAudio = (audioDataUri: string) => {
-  const audio = new Audio(audioDataUri);
-  audio.play().catch(e => console.error("Audio playback failed:", e));
+const playAlarm = () => {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    if (!audioContext) return;
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(880, audioContext.currentTime); // A5 note
+    gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+    
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.3); // Play for 300ms
 };
+
 
 const formatDateSafe = (date: any) => {
     if (!date) return 'N/A';
@@ -223,28 +234,27 @@ export default function OrdersDashboardPage() {
   useEffect(() => {
     const currentOrdersMap = new Map(allOrders.map(order => [order.id, order]));
     
-    if (prevOrdersRef.current.size > 0) { // Only check for changes after initial load
-      currentOrdersMap.forEach((currentOrder, orderId) => {
-        const prevOrder = prevOrdersRef.current.get(orderId);
+    if (prevOrdersRef.current.size > 0 && !newOrderAlert) { 
+        currentOrdersMap.forEach((currentOrder, orderId) => {
+            const prevOrder = prevOrdersRef.current.get(orderId);
 
-        // A new "Pending" order appeared that wasn't there before for this store.
-        if (!prevOrder && currentOrder.status === 'Pending' && (!currentOrder.storeId || currentOrder.storeId === myStore?.id) && !newOrderAlert) {
-            setNewOrderAlert(currentOrder);
-            textToSpeech("You have a new order").then(playAudio).catch(console.error);
-        }
-        else if (prevOrder && prevOrder.status !== currentOrder.status) {
-          const toastMessage = `Order #${currentOrder.id.substring(0, 7)} for ${currentOrder.customerName} is now "${currentOrder.status}".`;
-          toast({
-            title: "Order Status Updated",
-            description: toastMessage,
-          });
+            // A new "Pending" order appeared that wasn't there before
+            if (!prevOrder && currentOrder.status === 'Pending') {
+                setNewOrderAlert(currentOrder);
+                playAlarm();
+            }
+            // An existing order changed status
+            else if (prevOrder && prevOrder.status !== currentOrder.status) {
+              const toastMessage = `Order #${currentOrder.id.substring(0, 7)} for ${currentOrder.customerName} is now "${currentOrder.status}".`;
+              toast({
+                title: "Order Status Updated",
+                description: toastMessage,
+              });
 
-          if (currentOrder.status === 'Out for Delivery') {
-            textToSpeech("An order has been picked up for delivery").then(playAudio).catch(console.error);
-          } else if (currentOrder.status === 'Delivered') {
-            textToSpeech("An order has been delivered").then(playAudio).catch(console.error);
-          }
-        }
+              if (currentOrder.status === 'Out for Delivery' || currentOrder.status === 'Delivered') {
+                playAlarm();
+              }
+            }
       });
     }
 
@@ -311,18 +321,19 @@ export default function OrdersDashboardPage() {
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
        <OrderDetailsDialog order={selectedOrder} isOpen={!!selectedOrder} onClose={() => setSelectedOrder(null)} />
-       {newOrderAlert && (
-         <AlertDialog open={!!newOrderAlert} onOpenChange={() => {}}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>You Have a New Order!</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        A new order has been placed by {newOrderAlert.customerName}. Please review the details and accept or reject it.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                 <ScrollArea className="max-h-[60vh]">
+       
+       <AlertDialog open={!!newOrderAlert} onOpenChange={() => {}}>
+          <AlertDialogContent>
+              <AlertDialogHeader>
+                  <AlertDialogTitle>You Have a New Order!</AlertDialogTitle>
+                  <AlertDialogDescription>
+                      A new order has been placed by {newOrderAlert?.customerName}. Please review the details and accept or reject it.
+                  </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="p-1">
+                 <ScrollArea className="max-h-[50vh]">
                     <div className="grid gap-4 py-4 pr-6">
-                         {newOrderAlert.translatedList && (
+                         {newOrderAlert?.translatedList && (
                              <Card>
                                 <CardHeader>
                                     <CardTitle className="text-lg">Translated Shopping List</CardTitle>
@@ -334,7 +345,7 @@ export default function OrdersDashboardPage() {
                                 </CardContent>
                             </Card>
                         )}
-                         {newOrderAlert.voiceMemoUrl && (
+                         {newOrderAlert?.voiceMemoUrl && (
                             <Card>
                                 <CardHeader><CardTitle className="text-lg">Customer Voice Memo</CardTitle></CardHeader>
                                 <CardContent>
@@ -342,7 +353,7 @@ export default function OrdersDashboardPage() {
                                 </CardContent>
                             </Card>
                         )}
-                        {newOrderAlert.items && newOrderAlert.items.length > 0 && (
+                        {newOrderAlert?.items && newOrderAlert.items.length > 0 && (
                            <Card>
                                 <CardHeader><CardTitle className="text-lg">Items from Cart</CardTitle></CardHeader>
                                 <CardContent>
@@ -370,25 +381,26 @@ export default function OrdersDashboardPage() {
                          <Card>
                             <CardHeader><CardTitle className="text-lg">Customer Details</CardTitle></CardHeader>
                             <CardContent className="text-sm space-y-2">
-                                 <p><strong>Name:</strong> {newOrderAlert.customerName}</p>
-                                 <p><strong>Address:</strong> {newOrderAlert.deliveryAddress}</p>
-                                 <p><strong>Email:</strong> {newOrderAlert.email}</p>
-                                 <p><strong>Phone:</strong> {newOrderAlert.phone}</p>
+                                 <p><strong>Name:</strong> {newOrderAlert?.customerName}</p>
+                                 <p><strong>Address:</strong> {newOrderAlert?.deliveryAddress}</p>
+                                 <p><strong>Email:</strong> {newOrderAlert?.email}</p>
+                                 <p><strong>Phone:</strong> {newOrderAlert?.phone}</p>
                             </CardContent>
                         </Card>
                     </div>
                 </ScrollArea>
-                <AlertDialogFooter>
-                    <AlertDialogCancel asChild>
-                        <Button variant="destructive" onClick={() => handleAlertAction('reject')}>Reject Order</Button>
-                    </AlertDialogCancel>
-                    <AlertDialogAction asChild>
-                        <Button onClick={() => handleAlertAction('accept')}>Accept Order</Button>
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-         </AlertDialog>
-       )}
+              </div>
+              <AlertDialogFooter>
+                  <AlertDialogAction asChild>
+                      <Button variant="destructive" onClick={() => handleAlertAction('reject')}>Reject Order</Button>
+                  </AlertDialogAction>
+                  <AlertDialogAction asChild>
+                      <Button onClick={() => handleAlertAction('accept')}>Accept Order</Button>
+                  </AlertDialogAction>
+              </AlertDialogFooter>
+          </AlertDialogContent>
+       </AlertDialog>
+
       <h1 className="text-4xl font-bold font-headline mb-8">Order Management</h1>
       <Card>
         <CardHeader>
