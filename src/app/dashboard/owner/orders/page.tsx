@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useFirebase, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase } from '@/firebase';
@@ -216,9 +217,16 @@ export default function OrdersDashboardPage() {
     
     const orderDocRef = doc(firestore, collectionName, orderId);
     
-    const updatePayload: { status: Order['status'], storeId?: string } = { status: newStatus };
+    const updatePayload: any = { status: newStatus };
+    
+    // If it's a voice order being accepted by the store, assign it.
     if (collectionName === 'voice-orders' && newStatus !== 'Pending' && myStore) {
         updatePayload.storeId = myStore.id;
+    }
+    
+    // If order is ready for delivery, ensure deliveryPartnerId is null to make it available
+    if (newStatus === 'Out for Delivery') {
+        updatePayload.deliveryPartnerId = null;
     }
 
     updateDoc(orderDocRef, updatePayload)
@@ -256,7 +264,7 @@ export default function OrdersDashboardPage() {
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
        <OrderDetailsDialog order={selectedOrder} isOpen={!!selectedOrder} onClose={() => setSelectedOrder(null)} />
-      <h1 className="text-4xl font-bold mb-8 font-headline">Order Management</h1>
+      <h1 className="text-4xl font-bold font-headline mb-8">Order Management</h1>
       <Card>
         <CardHeader>
           <CardTitle>{myStore ? `Incoming Orders for ${myStore.name}` : 'Your Orders'}</CardTitle>
