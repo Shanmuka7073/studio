@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useFirebase, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase } from '@/firebase';
