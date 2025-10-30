@@ -11,13 +11,15 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef }from 'react';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { useToast } from '@/hooks/use-toast';
 
 const DELIVERY_FEE = 30;
 
 export default function MyOrdersPage() {
   const { user, isUserLoading, firestore } = useFirebase();
+  const { toast } = useToast();
   
   const regularOrdersQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
@@ -55,6 +57,23 @@ export default function MyOrdersPage() {
     });
 
   }, [regularOrders, voiceOrders]);
+
+  const prevOrdersRef = useRef<Order[]>([]);
+
+  useEffect(() => {
+    if (allOrders && allOrders.length > 0 && prevOrdersRef.current.length > 0) {
+      allOrders.forEach(currentOrder => {
+        const prevOrder = prevOrdersRef.current.find(p => p.id === currentOrder.id);
+        if (prevOrder && prevOrder.status !== currentOrder.status) {
+          toast({
+            title: "Order Status Updated",
+            description: `Your order #${currentOrder.id.substring(0, 7)} is now "${currentOrder.status}".`
+          });
+        }
+      });
+    }
+    prevOrdersRef.current = allOrders || [];
+  }, [allOrders, toast]);
 
 
   const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
