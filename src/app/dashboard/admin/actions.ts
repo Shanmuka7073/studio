@@ -10,10 +10,13 @@ import { getAuth } from 'firebase-admin/auth';
 
 // Helper function for robust server-side Firebase admin initialization
 function getAdminServices() {
+    // Check if the app is already initialized to avoid errors
     if (getApps().length === 0) {
-        // Automatically uses GOOGLE_APPLICATION_CREDENTIALS in a server environment
+        // This will automatically use the GOOGLE_APPLICATION_CREDENTIALS environment
+        // variable on the server for authentication.
         initializeApp();
     }
+    // Return the services from the initialized app.
     const app = getApp();
     return {
         firestore: getFirestore(app),
@@ -31,9 +34,9 @@ export async function getAdminStats(): Promise<{
         const { firestore, auth } = getAdminServices();
 
         const usersPromise = auth.listUsers();
-        const storesPromise = firestore.collection('stores').where('isClosed', '!=', true).get();
-        const partnersPromise = firestore.collection('deliveryPartners').get();
-        const ordersPromise = firestore.collection('orders').where('status', '==', 'Delivered').get();
+        const storesPromise = firestore.collection('stores').where('isClosed', '!=', true).count().get();
+        const partnersPromise = firestore.collection('deliveryPartners').count().get();
+        const ordersPromise = firestore.collection('orders').where('status', '==', 'Delivered').count().get();
 
         const [usersResult, storesSnapshot, partnersSnapshot, ordersSnapshot] = await Promise.all([
             usersPromise,
@@ -42,14 +45,14 @@ export async function getAdminStats(): Promise<{
             ordersPromise,
         ]);
         
-        // Filter out admin user from total customers
+        // Filter out admin user from total customers count
         const totalUsers = usersResult.users.filter(u => u.email !== 'admin@gmail.com').length;
 
         return {
             totalUsers: totalUsers,
-            totalStores: storesSnapshot.size,
-            totalDeliveryPartners: partnersSnapshot.size,
-            totalOrdersDelivered: ordersSnapshot.size,
+            totalStores: storesSnapshot.data().count,
+            totalDeliveryPartners: partnersSnapshot.data().count,
+            totalOrdersDelivered: ordersSnapshot.data().count,
         };
 
     } catch (error) {
