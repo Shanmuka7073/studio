@@ -126,7 +126,7 @@ function StatusManager({ order, onStatusChange }: { order: Order; onStatusChange
 
     return (
         <Select onValueChange={handleStatusChange} defaultValue={order.status} disabled={isUpdating}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full md:w-[180px]">
                 <SelectValue placeholder="Update status" />
             </SelectTrigger>
             <SelectContent>
@@ -288,44 +288,85 @@ export default function OrdersDashboardPage() {
           ) : allOrders.length === 0 ? (
             <p className="text-muted-foreground">No new orders found.</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Order ID</TableHead>
-                   <TableHead>Type</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-center">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {allOrders.map((order) => (
-                  <TableRow key={order.id}>
-                    <TableCell className="font-medium truncate max-w-[100px]">{order.id}</TableCell>
-                     <TableCell>
-                      {order.voiceMemoUrl ? (
-                        <Badge variant="outline">Voice</Badge>
-                      ) : (
-                        <Badge variant="secondary">Cart</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>{order.customerName}</TableCell>
-                    <TableCell>{formatDate(order.orderDate)}</TableCell>
-                    <TableCell>
-                      <StatusManager order={order} onStatusChange={handleStatusChange} />
-                    </TableCell>
-                    <TableCell className="text-right">₹{order.totalAmount.toFixed(2)}</TableCell>
-                    <TableCell className="text-right">
-                        <Button variant="outline" size="sm" onClick={() => setSelectedOrder(order)}>
-                            View Details
-                        </Button>
-                    </TableCell>
-                  </TableRow>
+            <>
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-4">
+                {allOrders.map(order => (
+                    <Card key={order.id}>
+                        <CardHeader>
+                             <div className="flex justify-between items-start">
+                                <div>
+                                    <CardTitle className="text-lg">{order.customerName}</CardTitle>
+                                    <p className="text-xs text-muted-foreground">ID: {order.id.substring(0,7)}...</p>
+                                </div>
+                                <Badge variant={order.voiceMemoUrl ? 'outline' : 'secondary'}>
+                                    {order.voiceMemoUrl ? 'Voice' : 'Cart'}
+                                </Badge>
+                             </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                             <div className="flex justify-between items-center text-sm">
+                                <span className="text-muted-foreground">Date</span>
+                                <span>{formatDate(order.orderDate)}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-sm">
+                                <span className="text-muted-foreground">Total</span>
+                                <span className="font-bold">₹{order.totalAmount.toFixed(2)}</span>
+                            </div>
+                             <div className="space-y-2">
+                                <label className="text-sm font-medium text-muted-foreground">Status</label>
+                                <StatusManager order={order} onStatusChange={handleStatusChange} />
+                            </div>
+                            <Button variant="outline" size="sm" onClick={() => setSelectedOrder(order)} className="w-full">
+                                View Details
+                            </Button>
+                        </CardContent>
+                    </Card>
                 ))}
-              </TableBody>
-            </Table>
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden md:block">
+                <Table>
+                <TableHeader>
+                    <TableRow>
+                    <TableHead>Order ID</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-center">Actions</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {allOrders.map((order) => (
+                    <TableRow key={order.id}>
+                        <TableCell className="font-medium truncate max-w-[100px]">{order.id}</TableCell>
+                        <TableCell>
+                        {order.voiceMemoUrl ? (
+                            <Badge variant="outline">Voice</Badge>
+                        ) : (
+                            <Badge variant="secondary">Cart</Badge>
+                        )}
+                        </TableCell>
+                        <TableCell>{order.customerName}</TableCell>
+                        <TableCell>{formatDate(order.orderDate)}</TableCell>
+                        <TableCell>
+                        <StatusManager order={order} onStatusChange={handleStatusChange} />
+                        </TableCell>
+                        <TableCell className="text-right">₹{order.totalAmount.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">
+                            <Button variant="outline" size="sm" onClick={() => setSelectedOrder(order)}>
+                                View Details
+                            </Button>
+                        </TableCell>
+                    </TableRow>
+                    ))}
+                </TableBody>
+                </Table>
+            </div>
+            </>
           )}
         </CardContent>
       </Card>
