@@ -1,37 +1,22 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Settings, ArrowRight, Tag, Users, Store, Truck, ShoppingBag } from 'lucide-react';
+import { Users, Store, Truck, ShoppingBag } from 'lucide-react';
 import Link from 'next/link';
 import { useFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
-import placeholderImagesData from '@/lib/placeholder-images.json';
-import groceryData from '@/lib/grocery-data.json';
-import Image from 'next/image';
-import { Button } from '@/components/ui/button';
-import { useTransition, useState, useEffect, useMemo, Suspense } from 'react';
-import { useToast } from '@/hooks/use-toast';
-import { Input } from '@/components/ui/input';
-import { getUniqueProductNames, updatePriceForProductByName, getAdminStats } from './actions';
+import { useState, useEffect } from 'react';
+import { getAdminStats } from './actions';
 import { Skeleton } from '@/components/ui/skeleton';
-
 
 const ADMIN_EMAIL = 'admin@gmail.com';
 
-const createSlug = (text: string) => {
-  return text
-    .toLowerCase()
-    .replace(/\s+/g, '-') // Replace spaces with -
-    .replace(/[^\w-]+/g, '') // Remove all non-word chars
-    .replace(/--+/g, '-') // Replace multiple - with single -
-    .replace(/^-+/, '') // Trim - from start of text
-    .replace(/-+$/, ''); // Trim - from end of text
+type AdminStats = {
+    totalUsers: number;
+    totalStores: number;
+    totalDeliveryPartners: number;
+    totalOrdersDelivered: number;
 };
-
-const allMasterProductNames = groceryData.categories.flatMap(category => Array.isArray(category.items) ? category.items : []);
-const uniqueMasterProductNames = [...new Set(allMasterProductNames)];
-const imageMap = new Map(placeholderImagesData.placeholderImages.map(img => [img.id, img]));
-
 
 function StatCard({ title, value, icon: Icon, loading }: { title: string, value: number, icon: React.ElementType, loading?: boolean }) {
     return (
@@ -47,172 +32,59 @@ function StatCard({ title, value, icon: Icon, loading }: { title: string, value:
     )
 }
 
-async function StatsCards() {
-    const stats = await getAdminStats();
-    
-    const statItems = [
-        { title: 'Total Customers', value: stats.totalUsers, icon: Users },
-        { title: 'Total Stores', value: stats.totalStores, icon: Store },
-        { title: 'Delivery Partners', value: stats.totalDeliveryPartners, icon: Truck },
-        { title: 'Orders Delivered', value: stats.totalOrdersDelivered, icon: ShoppingBag },
-    ];
-
-    return (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
-            {statItems.map(item => <StatCard key={item.title} {...item} />)}
-        </div>
-    )
-}
-
-
-function AdminProductCard({ productName, initialPrice, onUpdatePrice }: { productName: string, initialPrice: number, onUpdatePrice: (name: string, price: number) => void }) {
-    const [isUpdating, startUpdateTransition] = useTransition();
-    const [price, setPrice] = useState(initialPrice.toString());
-    const { toast } = useToast();
-
-    const imageId = `prod-${createSlug(productName)}`;
-    const image = imageMap.get(imageId) || { imageUrl: 'https://placehold.co/200x200/E2E8F0/64748B?text=No+Image', imageHint: 'none' };
-    
-    const handleUpdatePrice = () => {
-        const newPrice = parseFloat(price);
-        if (isNaN(newPrice) || newPrice < 0) {
-            toast({
-                variant: 'destructive',
-                title: 'Invalid Price',
-                description: 'Please enter a valid, non-negative number.',
-            });
-            return;
-        }
-
-        startUpdateTransition(async () => {
-            const result = await updatePriceForProductByName(productName, newPrice);
-            if (result.success) {
-                toast({
-                    title: 'Price Updated!',
-                    description: `Price for ${productName} set to ₹${newPrice.toFixed(2)} across ${result.updatedCount} store(s).`,
-                });
-                onUpdatePrice(productName, newPrice);
-            } else {
-                 toast({
-                    variant: 'destructive',
-                    title: 'Update Failed',
-                    description: result.error || 'An unexpected error occurred.',
-                });
-            }
-        });
-    }
-
-    return (
-        <Card className="overflow-hidden">
-            <Image
-                src={image.imageUrl}
-                alt={productName}
-                width={200}
-                height={200}
-                className="w-full h-32 object-cover"
-                data-ai-hint={image.imageHint}
-            />
-            <CardContent className="p-2 space-y-2">
-                <p className="text-sm font-medium truncate text-center">{productName}</p>
-                <div className="flex gap-2 items-center">
-                     <span className="font-bold">₹</span>
-                    <Input
-                        type="number"
-                        placeholder="Price"
-                        value={price}
-                        onChange={(e) => setPrice(e.target.value)}
-                        disabled={isUpdating}
-                        className="h-8"
-                    />
-                </div>
-                 <Button onClick={handleUpdatePrice} disabled={isUpdating} size="sm" className="w-full">
-                    {isUpdating ? 'Updating...' : 'Update Price'}
-                </Button>
-            </CardContent>
-        </Card>
-    );
-}
-
-
 export default function AdminDashboardPage() {
     const { user, isUserLoading } = useFirebase();
     const router = useRouter();
-
-    const [productPrices, setProductPrices] = useState<Record<string, number>>({});
-    const [productsLoading, setProductsLoading] = useState(true);
+    const [stats, setStats] = useState<AdminStats | null>(null);
+    const [statsLoading, setStatsLoading] = useState(true);
 
     useEffect(() => {
-        async function fetchProducts() {
-            setProductsLoading(true);
-            const priceMap = await getUniqueProductNames();
-            // Also ensure all master products have a default price if not in DB
-            const allPrices = uniqueMasterProductNames.reduce((acc, name) => {
-                acc[name] = priceMap[name] || 0; // Default to 0 if not set
-                return acc;
-            }, {} as Record<string, number>);
-            setProductPrices(allPrices);
-            setProductsLoading(false);
+        if (!isUserLoading && (!user || user.email !== ADMIN_EMAIL)) {
+            router.replace('/dashboard');
         }
-        fetchProducts();
-    }, []);
+    }, [isUserLoading, user, router]);
 
-    const handlePriceUpdate = (productName: string, newPrice: number) => {
-        setProductPrices(prev => ({ ...prev, [productName]: newPrice }));
-    };
+    useEffect(() => {
+        async function fetchStats() {
+            setStatsLoading(true);
+            const fetchedStats = await getAdminStats();
+            setStats(fetchedStats);
+            setStatsLoading(false);
+        }
 
-    if (!isUserLoading && (!user || user.email !== ADMIN_EMAIL)) {
-        router.replace('/dashboard');
-        return <p>Access Denied. Redirecting...</p>;
-    }
-    
-    const isLoading = isUserLoading || productsLoading;
+        if (user && user.email === ADMIN_EMAIL) {
+            fetchStats();
+        }
+    }, [user]);
 
-    if (isLoading || !user) {
+    if (isUserLoading || !user || user.email !== ADMIN_EMAIL) {
         return <p>Loading admin dashboard...</p>
     }
+
+    const statItems = [
+        { title: 'Total Customers', value: stats?.totalUsers ?? 0, icon: Users },
+        { title: 'Total Stores', value: stats?.totalStores ?? 0, icon: Store },
+        { title: 'Delivery Partners', value: stats?.totalDeliveryPartners ?? 0, icon: Truck },
+        { title: 'Orders Delivered', value: stats?.totalOrdersDelivered ?? 0, icon: ShoppingBag },
+    ];
 
     return (
         <div className="container mx-auto py-12 px-4 md:px-6">
             <div className="text-center mb-12">
                 <h1 className="text-4xl font-bold font-headline">Admin Dashboard</h1>
-                <p className="text-lg text-muted-foreground mt-2">Manage your application's settings and products.</p>
+                <p className="text-lg text-muted-foreground mt-2">A high-level overview of your application's activity.</p>
             </div>
             
-            <Suspense fallback={
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
-                    <StatCard title="Total Customers" value={0} icon={Users} loading />
-                    <StatCard title="Total Stores" value={0} icon={Store} loading />
-                    <StatCard title="Delivery Partners" value={0} icon={Truck} loading />
-                    <StatCard title="Orders Delivered" value={0} icon={ShoppingBag} loading />
-                </div>
-            }>
-                <StatsCards />
-            </Suspense>
-
-            <div className="space-y-8">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Master Product Pricing</CardTitle>
-                        <CardDescription>A complete catalog of all products in the system. Updating a price here will change it across all stores that stock the item.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {isLoading ? <p>Loading products...</p> : (
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                                {uniqueMasterProductNames.map(productName => {
-                                    const initialPrice = productPrices[productName] || 0;
-                                    return (
-                                        <AdminProductCard 
-                                            key={productName}
-                                            productName={productName}
-                                            initialPrice={initialPrice}
-                                            onUpdatePrice={handlePriceUpdate}
-                                        />
-                                    )
-                                })}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+                {statItems.map(item => (
+                    <StatCard 
+                        key={item.title} 
+                        title={item.title}
+                        value={item.value}
+                        icon={item.icon}
+                        loading={statsLoading}
+                    />
+                ))}
             </div>
         </div>
     );
