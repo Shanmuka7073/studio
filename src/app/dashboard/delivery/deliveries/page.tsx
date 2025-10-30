@@ -64,14 +64,16 @@ function PayoutSettingsCard({ partnerData, isLoading, partnerId }: { partnerData
     const watchPayoutMethod = form.watch('payoutMethod');
 
     useEffect(() => {
-        form.reset({
-            payoutMethod: partnerData?.payoutMethod || 'bank',
-            upiId: partnerData?.upiId || '',
-            accountHolderName: partnerData?.bankDetails?.accountHolderName || '',
-            accountNumber: partnerData?.bankDetails?.accountNumber || '',
-            ifscCode: partnerData?.bankDetails?.ifscCode || '',
-        });
-    }, [partnerData, form.reset, isEditing]);
+        if (!isLoading && partnerData) {
+            form.reset({
+                payoutMethod: partnerData.payoutMethod || 'bank',
+                upiId: partnerData.upiId || '',
+                accountHolderName: partnerData.bankDetails?.accountHolderName || '',
+                accountNumber: partnerData.bankDetails?.accountNumber || '',
+                ifscCode: partnerData.bankDetails?.ifscCode || '',
+            });
+        }
+    }, [partnerData, form, isLoading, isEditing]);
 
 
     const onSubmit = (data: PayoutDetailsFormValues) => {
@@ -317,33 +319,33 @@ export default function DeliveriesPage() {
 
   // Query 1: Get orders assigned to the current delivery partner.
   const myActiveDeliveriesQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
+    if (!firestore || !user?.uid) return null;
     return query(
         collection(firestore, 'orders'),
         where('status', '==', 'Out for Delivery'),
         where('deliveryPartnerId', '==', user.uid)
     );
-  }, [firestore, user]);
+  }, [firestore, user?.uid]);
 
   // Query 2: Get orders that are ready for pickup and have no partner assigned.
   const availableDeliveriesQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
+    if (!firestore || !user?.uid) return null;
     return query(
         collection(firestore, 'orders'),
         where('status', '==', 'Out for Delivery'),
         where('deliveryPartnerId', '==', null)
     );
-  }, [firestore]);
+  }, [firestore, user?.uid]);
 
   // Query 3: Get completed orders for the earnings history.
   const completedDeliveriesQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
+    if (!firestore || !user?.uid) return null;
     return query(
       collection(firestore, 'orders'),
       where('status', '==', 'Delivered'),
       where('deliveryPartnerId', '==', user.uid)
     );
-  }, [firestore, user]);
+  }, [firestore, user?.uid]);
 
   // Hooks for each query
   const { data: myActiveDeliveries, isLoading: activeDeliveriesLoading } = useCollection<Order>(myActiveDeliveriesQuery);
@@ -351,9 +353,9 @@ export default function DeliveriesPage() {
   const { data: completedDeliveries, isLoading: completedDeliveriesLoading } = useCollection<Order>(completedDeliveriesQuery);
 
   const partnerDocRef = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
+    if (!firestore || !user?.uid) return null;
     return doc(firestore, 'deliveryPartners', user.uid);
-  }, [firestore, user]);
+  }, [firestore, user?.uid]);
   const { data: partnerData, isLoading: partnerLoading } = useDoc<DeliveryPartner>(partnerDocRef);
 
   useEffect(() => {
@@ -376,7 +378,7 @@ export default function DeliveriesPage() {
 
 
   const handleConfirmPickup = (orderId: string) => {
-    if (!firestore || !user) return;
+    if (!firestore || !user?.uid) return;
      startUpdateTransition(async () => {
         const orderRef = doc(firestore, 'orders', orderId);
         try {
@@ -400,7 +402,7 @@ export default function DeliveriesPage() {
   };
 
   const handleMarkAsDelivered = (orderId: string) => {
-    if (!firestore || !user) return;
+    if (!firestore || !user?.uid) return;
 
     startUpdateTransition(async () => {
         const orderRef = doc(firestore, 'orders', orderId);
@@ -449,8 +451,10 @@ export default function DeliveriesPage() {
       try {
         const batch = writeBatch(firestore);
 
+        // This creates a new document with a random ID in the subcollection.
         const newPayoutRef = doc(collection(firestore, `deliveryPartners/${user.uid}/payouts`));
         batch.set(newPayoutRef, {
+            id: newPayoutRef.id, // Explicitly set the ID in the document data
             amount: payoutAmount,
             partnerId: user.uid,
             requestDate: Timestamp.now(),
