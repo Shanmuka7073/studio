@@ -675,53 +675,51 @@ export default function DeliveriesPage() {
 
   const handleOptimizedRoute = () => {
     if (!myActiveDeliveriesWithStores || myActiveDeliveriesWithStores.length === 0) {
-      toast({
-        variant: "destructive",
-        title: "No Active Deliveries",
-        description: "There are no active deliveries to create a route for."
-      });
-      return;
-    }
-    
-    // Get unique store locations (pickups)
-    const storeWaypoints = [...new Map(myActiveDeliveriesWithStores.map(order =>
-        [order.storeId, `${order.store.latitude},${order.store.longitude}`]
-    )).values()];
-
-    // Get all customer locations (dropoffs)
-    const customerWaypoints = myActiveDeliveriesWithStores.map(order => 
-        `${order.deliveryLat},${order.deliveryLng}`
-    );
-
-    // Combine waypoints, assuming one destination is the last customer
-    const waypoints = [...storeWaypoints, ...customerWaypoints];
-    const destination = waypoints.pop();
-
-    if (!destination) {
-        toast({ title: "No destination found" });
+        toast({
+            variant: "destructive",
+            title: "No Active Deliveries",
+            description: "There are no active deliveries to create a route for."
+        });
         return;
     }
 
-    let url = `https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving&dir_action=navigate`;
+    const baseUrl = `https://www.google.com/maps/dir/`;
 
-    if (waypoints.length > 0) {
-        url += `&waypoints=${waypoints.join('|')}&optimize=true`;
-    }
+    // Get unique store locations (pickups) and format them with labels
+    const storeWaypoints = [...new Map(myActiveDeliveriesWithStores.map(order => {
+        const label = `Pickup: ${order.store!.name.replace(/ /g, '+')}`;
+        const coords = `${order.store!.latitude},${order.store!.longitude}`;
+        return [order.storeId, `${label}/${coords}`];
+    })).values()];
 
-    // Optionally add origin from current location
+    // Get all customer locations (dropoffs) and format them with labels
+    const customerWaypoints = myActiveDeliveriesWithStores.map(order => {
+        const label = `Drop-off: ${order.customerName.replace(/ /g, '+')}`;
+        const coords = `${order.deliveryLat},${order.deliveryLng}`;
+        return `${label}/${coords}`;
+    });
+
+    const allWaypoints = [...storeWaypoints, ...customerWaypoints];
+
+    const generateRoute = (origin: string | null = null) => {
+        let url = baseUrl;
+        const waypointsInOrder = origin ? [origin, ...allWaypoints] : allWaypoints;
+        url += waypointsInOrder.join('/');
+        window.open(url, '_blank');
+    };
+    
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(position => {
             const { latitude, longitude } = position.coords;
-            const originUrl = url + `&origin=${latitude},${longitude}`;
-            window.open(originUrl, '_blank');
+            generateRoute(`My+Location/${latitude},${longitude}`);
         }, () => {
             // Can't get location, open without origin
-            window.open(url, '_blank');
+            generateRoute();
         });
     } else {
-        window.open(url, '_blank');
+        generateRoute();
     }
-  };
+};
 
 
   const isLoading = activeDeliveriesLoading || availableDeliveriesLoading || completedDeliveriesLoading || stores.length === 0;
