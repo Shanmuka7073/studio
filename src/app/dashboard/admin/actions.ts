@@ -9,19 +9,16 @@ import { getAuth } from 'firebase-admin/auth';
 
 
 // Helper function for robust server-side Firebase admin initialization
-function getAdminFirestore() {
+function getAdminServices() {
     if (getApps().length === 0) {
         // Automatically uses GOOGLE_APPLICATION_CREDENTIALS in a server environment
         initializeApp();
     }
-    return getFirestore(getApp());
-}
-
-function getAdminAuth() {
-    if (getApps().length === 0) {
-        initializeApp();
-    }
-    return getAuth(getApp());
+    const app = getApp();
+    return {
+        firestore: getFirestore(app),
+        auth: getAuth(app),
+    };
 }
 
 export async function getAdminStats(): Promise<{
@@ -31,8 +28,7 @@ export async function getAdminStats(): Promise<{
     totalOrdersDelivered: number,
 }> {
     try {
-        const firestore = getAdminFirestore();
-        const auth = getAdminAuth();
+        const { firestore, auth } = getAdminServices();
 
         const usersPromise = auth.listUsers();
         const storesPromise = firestore.collection('stores').where('isClosed', '!=', true).get();
@@ -58,6 +54,7 @@ export async function getAdminStats(): Promise<{
 
     } catch (error) {
         console.error('Failed to fetch admin stats:', error);
+        // In case of an error, return zeros to prevent the page from crashing.
         return {
             totalUsers: 0,
             totalStores: 0,
@@ -74,7 +71,7 @@ export async function updatePriceForProductByName(productName: string, newPrice:
     }
 
     try {
-        const firestore = getAdminFirestore();
+        const { firestore } = getAdminServices();
         const productsQuery = firestore.collectionGroup('products').where('name', '==', productName);
         const productsSnapshot = await productsQuery.get();
 
@@ -112,7 +109,7 @@ export async function updatePriceForProductByName(productName: string, newPrice:
 
 export async function getUniqueProductNames(): Promise<Record<string, number>> {
     try {
-        const firestore = getAdminFirestore();
+        const { firestore } = getAdminServices();
         const productsSnapshot = await firestore.collectionGroup('products').get();
 
         if (productsSnapshot.empty) {
