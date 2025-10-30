@@ -25,27 +25,26 @@ const playAudio = (audioDataUri: string) => {
   audio.play().catch(e => console.error("Audio playback failed:", e));
 };
 
+const formatDateSafe = (date: any) => {
+    if (!date) return 'N/A';
+    if (date.seconds) {
+        return format(new Date(date.seconds * 1000), 'PPP p');
+    }
+    if (typeof date === 'string') {
+        try {
+        return format(new Date(date), 'PPP p');
+        } catch {
+        return 'Invalid Date';
+        }
+    }
+    if (date instanceof Date) {
+        return format(date, 'PPP p');
+    }
+    return 'N/A';
+}
 
 function OrderDetailsDialog({ order, isOpen, onClose }: { order: Order | null; isOpen: boolean; onClose: () => void }) {
     if (!order) return null;
-
-    const formatDateSafe = (date: any) => {
-        if (!date) return 'N/A';
-        if (date.seconds) {
-          return format(new Date(date.seconds * 1000), 'PPP p');
-        }
-        if (typeof date === 'string') {
-           try {
-             return format(new Date(date), 'PPP p');
-           } catch {
-             return 'Invalid Date';
-           }
-        }
-        if (date instanceof Date) {
-            return format(date, 'PPP p');
-        }
-        return 'N/A';
-    }
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -224,12 +223,12 @@ export default function OrdersDashboardPage() {
   useEffect(() => {
     const currentOrdersMap = new Map(allOrders.map(order => [order.id, order]));
     
-    if (prevOrdersRef.current.size > 0 && !newOrderAlert) {
+    if (prevOrdersRef.current.size > 0) { // Only check for changes after initial load
       currentOrdersMap.forEach((currentOrder, orderId) => {
         const prevOrder = prevOrdersRef.current.get(orderId);
 
-        // A new "Pending" order appeared that wasn't there before.
-        if (!prevOrder && currentOrder.status === 'Pending') {
+        // A new "Pending" order appeared that wasn't there before for this store.
+        if (!prevOrder && currentOrder.status === 'Pending' && (!currentOrder.storeId || currentOrder.storeId === myStore?.id) && !newOrderAlert) {
             setNewOrderAlert(currentOrder);
             textToSpeech("You have a new order").then(playAudio).catch(console.error);
         }
@@ -250,7 +249,7 @@ export default function OrdersDashboardPage() {
     }
 
     prevOrdersRef.current = currentOrdersMap;
-  }, [allOrders, toast, newOrderAlert]);
+  }, [allOrders, toast, newOrderAlert, myStore?.id]);
 
 
   const handleStatusChange = (orderId: string, collectionName: 'orders' | 'voice-orders', newStatus: Order['status']) => {
@@ -321,9 +320,64 @@ export default function OrdersDashboardPage() {
                         A new order has been placed by {newOrderAlert.customerName}. Please review the details and accept or reject it.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
-                <DialogContent>
-                    <OrderDetailsDialog order={newOrderAlert} isOpen={true} onClose={() => {}} />
-                </DialogContent>
+                 <ScrollArea className="max-h-[60vh]">
+                    <div className="grid gap-4 py-4 pr-6">
+                         {newOrderAlert.translatedList && (
+                             <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-lg">Translated Shopping List</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <pre className="text-sm whitespace-pre-wrap font-sans bg-muted/50 p-4 rounded-md">
+                                        {newOrderAlert.translatedList}
+                                    </pre>
+                                </CardContent>
+                            </Card>
+                        )}
+                         {newOrderAlert.voiceMemoUrl && (
+                            <Card>
+                                <CardHeader><CardTitle className="text-lg">Customer Voice Memo</CardTitle></CardHeader>
+                                <CardContent>
+                                     <audio src={newOrderAlert.voiceMemoUrl} controls className="w-full" />
+                                </CardContent>
+                            </Card>
+                        )}
+                        {newOrderAlert.items && newOrderAlert.items.length > 0 && (
+                           <Card>
+                                <CardHeader><CardTitle className="text-lg">Items from Cart</CardTitle></CardHeader>
+                                <CardContent>
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Item</TableHead>
+                                                <TableHead>Qty</TableHead>
+                                                <TableHead className="text-right">Price</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {newOrderAlert.items.map((item, index) => (
+                                                <TableRow key={index}>
+                                                    <TableCell>{item.name}</TableCell>
+                                                    <TableCell>{item.quantity}</TableCell>
+                                                    <TableCell className="text-right">₹{item.price.toFixed(2)}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </CardContent>
+                            </Card>
+                        )}
+                         <Card>
+                            <CardHeader><CardTitle className="text-lg">Customer Details</CardTitle></CardHeader>
+                            <CardContent className="text-sm space-y-2">
+                                 <p><strong>Name:</strong> {newOrderAlert.customerName}</p>
+                                 <p><strong>Address:</strong> {newOrderAlert.deliveryAddress}</p>
+                                 <p><strong>Email:</strong> {newOrderAlert.email}</p>
+                                 <p><strong>Phone:</strong> {newOrderAlert.phone}</p>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </ScrollArea>
                 <AlertDialogFooter>
                     <AlertDialogCancel asChild>
                         <Button variant="destructive" onClick={() => handleAlertAction('reject')}>Reject Order</Button>
@@ -446,6 +500,3 @@ export default function OrdersDashboardPage() {
     </div>
   );
 }
-
-    
-    
