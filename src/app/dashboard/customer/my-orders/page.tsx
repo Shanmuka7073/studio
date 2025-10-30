@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useFirebase, errorEmitter, useCollection, useMemoFirebase } from '@/firebase';
@@ -14,8 +13,14 @@ import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { useState, useEffect, useMemo, useRef }from 'react';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useToast } from '@/hooks/use-toast';
+import { textToSpeech } from '@/ai/flows/tts-flow';
 
 const DELIVERY_FEE = 30;
+
+const playAudio = (audioDataUri: string) => {
+  const audio = new Audio(audioDataUri);
+  audio.play().catch(e => console.error("Audio playback failed:", e));
+};
 
 export default function MyOrdersPage() {
   const { user, isUserLoading, firestore } = useFirebase();
@@ -61,14 +66,19 @@ export default function MyOrdersPage() {
   const prevOrdersRef = useRef<Order[]>([]);
 
   useEffect(() => {
-    if (allOrders && allOrders.length > 0 && prevOrdersRef.current.length > 0) {
+    if (allOrders && allOrders.length > 0) {
       allOrders.forEach(currentOrder => {
         const prevOrder = prevOrdersRef.current.find(p => p.id === currentOrder.id);
         if (prevOrder && prevOrder.status !== currentOrder.status) {
+          const toastMessage = `Your order #${currentOrder.id.substring(0, 7)} is now "${currentOrder.status}".`;
           toast({
             title: "Order Status Updated",
-            description: `Your order #${currentOrder.id.substring(0, 7)} is now "${currentOrder.status}".`
+            description: toastMessage,
           });
+
+          if (currentOrder.status === 'Delivered') {
+            textToSpeech("Your order has been delivered").then(playAudio).catch(console.error);
+          }
         }
       });
     }

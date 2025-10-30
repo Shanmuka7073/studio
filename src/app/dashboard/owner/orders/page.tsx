@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useFirebase, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase } from '@/firebase';
@@ -10,12 +9,19 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { useState, useEffect, useTransition, useMemo } from 'react';
+import { useState, useEffect, useTransition, useMemo, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useRouter } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { textToSpeech } from '@/ai/flows/tts-flow';
+
+
+const playAudio = (audioDataUri: string) => {
+  const audio = new Audio(audioDataUri);
+  audio.play().catch(e => console.error("Audio playback failed:", e));
+};
 
 
 function OrderDetailsDialog({ order, isOpen, onClose }: { order: Order | null; isOpen: boolean; onClose: () => void }) {
@@ -208,6 +214,28 @@ export default function OrdersDashboardPage() {
         return secondsB - secondsA;
       });
   }, [regularOrders, pendingVoiceOrders, assignedVoiceOrders]);
+
+  const prevOrdersRef = useRef<Order[]>([]);
+
+  useEffect(() => {
+    if (allOrders && allOrders.length > 0) {
+        allOrders.forEach(currentOrder => {
+            const prevOrder = prevOrdersRef.current.find(p => p.id === currentOrder.id);
+            if (prevOrder && prevOrder.status !== currentOrder.status) {
+                const toastMessage = `Order #${currentOrder.id.substring(0, 7)} for ${currentOrder.customerName} is now "${currentOrder.status}".`;
+                toast({
+                    title: "Order Status Updated",
+                    description: toastMessage,
+                });
+
+                if (currentOrder.status === 'Delivered') {
+                    textToSpeech("An order has been delivered").then(playAudio).catch(console.error);
+                }
+            }
+        });
+    }
+    prevOrdersRef.current = allOrders || [];
+  }, [allOrders, toast]);
 
 
   const handleStatusChange = (orderId: string, collectionName: 'orders' | 'voice-orders', newStatus: Order['status']) => {
