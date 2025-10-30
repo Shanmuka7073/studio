@@ -170,13 +170,13 @@ export default function OrdersDashboardPage() {
   }, [firestore, myStore]);
 
   const voiceOrdersQuery = useMemoFirebase(() => {
-      if (!firestore) return null;
+      if (!firestore || !user) return null; // Guard against no user
       // Fetch all pending voice orders, as they are unassigned.
       return query(
           collection(firestore, 'voice-orders'),
           where('status', '==', 'Pending')
       );
-  }, [firestore]);
+  }, [firestore, user]);
 
   const assignedVoiceOrdersQuery = useMemoFirebase(() => {
       if (!firestore || !myStore) return null;
