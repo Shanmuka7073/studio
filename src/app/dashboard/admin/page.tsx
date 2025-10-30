@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -18,15 +17,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 
 const ADMIN_EMAIL = 'admin@gmail.com';
-
-const adminCards = [
-    {
-        title: 'Site Configuration',
-        description: 'Manage global settings, such as the placeholder image catalog.',
-        href: '/dashboard/site-config',
-        icon: Settings,
-    },
-];
 
 const createSlug = (text: string) => {
   return text
@@ -200,25 +190,6 @@ export default function AdminDashboardPage() {
             </Suspense>
 
             <div className="space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto mb-12">
-                    {adminCards.map((card) => (
-                        <Link href={card.href} key={card.title} className="block hover:shadow-xl transition-shadow rounded-lg">
-                            <Card className="h-full flex flex-col">
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-2xl font-bold font-headline">{card.title}</CardTitle>
-                                    <card.icon className="h-8 w-8 text-primary" />
-                                </CardHeader>
-                                <CardContent className="flex-1 flex flex-col justify-between">
-                                    <CardDescription>{card.description}</CardDescription>
-                                    <div className="flex items-center text-primary font-semibold mt-4">
-                                        <span>Go to {card.title}</span>
-                                        <ArrowRight className="ml-2 h-4 w-4" />
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </Link>
-                    ))}
-                </div>
                 <Card>
                     <CardHeader>
                         <CardTitle>Master Product Pricing</CardTitle>
