@@ -13,7 +13,7 @@ function getAdminServices() {
     // Check if the app is already initialized to avoid errors
     if (getApps().length === 0) {
         // This will automatically use the GOOGLE_APPLICATION_CREDENTIALS environment
-        // variable on the server for authentication.
+        // variable on the server for authentication, which is handled by App Hosting.
         initializeApp();
     }
     // Return the services from the initialized app.
