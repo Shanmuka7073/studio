@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { MapPin, Check, Banknote, History, Landmark, Receipt, CreditCard, ChevronDown, ChevronUp } from 'lucide-react';
+import { MapPin, Check, Banknote, History, Landmark, Receipt, CreditCard, ChevronDown, ChevronUp, Route } from 'lucide-react';
 import { useFirebase, useCollection, useDoc, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, query, where, doc, updateDoc, Timestamp, increment, writeBatch, orderBy, setDoc } from 'firebase/firestore';
 import { useEffect, useState, useMemo, useTransition } from 'react';
@@ -39,6 +39,14 @@ function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c; // Distance in kilometers
 }
 
+const openInGoogleMaps = (destLat: number, destLng: number, originLat?: number, originLng?: number) => {
+    let url = `https://www.google.com/maps/dir/?api=1&destination=${destLat},${destLng}`;
+    if (originLat && originLng) {
+        url += `&origin=${originLat},${originLng}`;
+    }
+    window.open(url, '_blank');
+};
+
 
 const payoutDetailsSchema = z.object({
   payoutMethod: z.enum(['bank', 'upi']),
@@ -61,7 +69,7 @@ const payoutDetailsSchema = z.object({
 
 type PayoutDetailsFormValues = z.infer<typeof payoutDetailsSchema>;
 
-function OrderDetailsDialog({ order, isOpen, onClose, onAccept }: { order: Order | null; isOpen: boolean; onClose: () => void, onAccept?: () => void }) {
+function OrderDetailsDialog({ order, isOpen, onClose, onAccept, distance }: { order: Order | null; isOpen: boolean; onClose: () => void; onAccept?: () => void; distance?: number; }) {
     if (!order) return null;
 
     return (
@@ -104,9 +112,24 @@ function OrderDetailsDialog({ order, isOpen, onClose, onAccept }: { order: Order
                         )}
                          <Card>
                             <CardHeader><CardTitle className="text-lg">Delivery Details</CardTitle></CardHeader>
-                            <CardContent className="text-sm space-y-2">
+                            <CardContent className="text-sm space-y-4">
                                  <p><strong>Pickup:</strong> {order.store?.name} - {order.store?.address}</p>
                                  <p><strong>Drop-off:</strong> {order.customerName} - {order.deliveryAddress}</p>
+                                 {distance !== undefined && (
+                                     <div className="border-t pt-4 mt-4 flex items-center justify-between">
+                                        <div className="font-bold">
+                                            Total Distance: {distance.toFixed(2)} km
+                                        </div>
+                                         <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={() => openInGoogleMaps(order.deliveryLat, order.deliveryLng, order.store?.latitude, order.store?.longitude)}
+                                        >
+                                            <Route className="mr-2 h-4 w-4" />
+                                            View Route on Map
+                                        </Button>
+                                     </div>
+                                 )}
                             </CardContent>
                         </Card>
                     </div>
@@ -393,6 +416,7 @@ export default function DeliveriesPage() {
   const [isUpdating, startUpdateTransition] = useTransition();
   const { toast } = useToast();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedOrderDistance, setSelectedOrderDistance] = useState<number | undefined>(undefined);
 
   // Query 1: Get orders assigned to the current delivery partner.
   const myActiveDeliveriesQuery = useMemoFirebase(() => {
@@ -452,6 +476,19 @@ export default function DeliveriesPage() {
 
   const myActiveDeliveriesWithStores = useMemo(() => joinStoresToOrders(myActiveDeliveries), [myActiveDeliveries, stores]);
   const availableDeliveriesWithStores = useMemo(() => joinStoresToOrders(availableDeliveries), [availableDeliveries, stores]);
+
+  const handleViewDetails = (order: Order) => {
+      setSelectedOrder(order);
+      if (order.store) {
+          const distance = haversineDistance(
+              order.store.latitude,
+              order.store.longitude,
+              order.deliveryLat,
+              order.deliveryLng
+          );
+          setSelectedOrderDistance(distance);
+      }
+  };
 
 
   const handleConfirmPickup = (orderId: string) => {
@@ -597,14 +634,6 @@ export default function DeliveriesPage() {
       }
   };
 
-  const openInGoogleMaps = (destLat: number, destLng: number, originLat?: number, originLng?: number) => {
-    let url = `https://www.google.com/maps/dir/?api=1&destination=${destLat},${destLng}`;
-    if (originLat && originLng) {
-        url += `&origin=${originLat},${originLng}`;
-    }
-    window.open(url, '_blank');
-  };
-
   const isLoading = activeDeliveriesLoading || availableDeliveriesLoading || completedDeliveriesLoading || stores.length === 0;
 
   const formatDate = (date: any) => {
@@ -631,6 +660,7 @@ export default function DeliveriesPage() {
                 isOpen={!!selectedOrder}
                 onClose={() => setSelectedOrder(null)}
                 onAccept={selectedOrder.status === 'Out for Delivery' && !selectedOrder.deliveryPartnerId ? () => handleConfirmPickup(selectedOrder.id) : undefined}
+                distance={selectedOrderDistance}
              />
         )}
       <div className="grid md:grid-cols-2 gap-8">
@@ -752,7 +782,7 @@ export default function DeliveriesPage() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => setSelectedOrder(order)}
+                                onClick={() => handleViewDetails(order)}
                               >
                                 View Details
                               </Button>
