@@ -36,6 +36,7 @@ export async function getAdminStats(): Promise<{
         const usersPromise = auth.listUsers();
         const storesPromise = firestore.collection('stores').where('isClosed', '!=', true).count().get();
         const partnersPromise = firestore.collection('deliveryPartners').count().get();
+        // Combined query for both regular and voice orders that are delivered
         const ordersPromise = firestore.collectionGroup('orders').where('status', '==', 'Delivered').count().get();
         const voiceOrdersPromise = firestore.collectionGroup('voice-orders').where('status', '==', 'Delivered').count().get();
 

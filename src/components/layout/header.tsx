@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Package2, Menu, UserCircle, Store, ShoppingBag, Truck, Mic, LayoutDashboard, Settings, Shield, Tag } from 'lucide-react';
+import { Package2, Menu, UserCircle, Store, ShoppingBag, Truck, Mic, LayoutDashboard, Settings, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -26,7 +26,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { getAuth, signOut } from 'firebase/auth';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useEffect } from 'react';
 
 const ADMIN_EMAIL = 'admin@gmail.com';
 
@@ -177,7 +176,7 @@ export function Header() {
             <span className="sr-only">Toggle navigation menu</span>
           </Button>
         </SheetTrigger>
-        <SheetContent side="left">
+        <SheetContent side="left" className="flex flex-col">
            <SheetHeader>
             <SheetTitle>
                  <Link
@@ -189,8 +188,8 @@ export function Header() {
                 </Link>
             </SheetTitle>
           </SheetHeader>
-          <div className="flex h-full flex-col justify-between">
-            <nav className="grid gap-6 text-lg font-medium mt-8">
+          <div className="flex-1 overflow-y-auto">
+            <nav className="grid gap-4 text-lg font-medium mt-8">
                 {navLinks.map(({ href, label }) => (
                 <SheetClose asChild key={href}>
                     <Link
@@ -205,7 +204,7 @@ export function Header() {
                 </SheetClose>
                 ))}
             </nav>
-            <div className="border-t pt-4">
+            <div className="mt-6 border-t pt-4">
                 <p className="px-3 text-sm font-medium text-muted-foreground mb-2">Dashboard</p>
                 <div className="grid gap-2">
                     <SheetClose asChild>
