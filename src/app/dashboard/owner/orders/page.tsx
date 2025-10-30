@@ -316,10 +316,10 @@ export default function OrdersDashboardPage() {
   const formatDate = (date: any) => {
     if (!date) return 'N/A';
     if (date.seconds) {
-      return format(new Date(date.seconds * 1000), 'PPP');
+      return format(new Date(date.seconds * 1000), 'PPP p');
     }
     try {
-        return format(new Date(date as string), 'PPP');
+        return format(new Date(date as string), 'PPP p');
     } catch {
         return 'Invalid Date';
     }

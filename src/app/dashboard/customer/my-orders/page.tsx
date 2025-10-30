@@ -119,21 +119,21 @@ export default function MyOrdersPage() {
   const formatDate = (date: any) => {
     if (!date) return 'N/A';
     if (date.seconds) {
-      return format(new Date(date.seconds * 1000), 'PPP');
+      return format(new Date(date.seconds * 1000), 'PPP p');
     }
     if (typeof date === 'string') {
         try {
-            return format(parseISO(date), 'PPP');
+            return format(parseISO(date), 'PPP p');
         } catch (e) {
              try {
-                return format(new Date(date), 'PPP');
+                return format(new Date(date), 'PPP p');
              } catch(e2) {
                 return 'Invalid Date';
              }
         }
     }
     if (date instanceof Date) {
-        return format(date, 'PPP');
+        return format(date, 'PPP p');
     }
     return 'N/A';
   }
