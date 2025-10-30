@@ -225,8 +225,11 @@ export default function DeliveriesPage() {
       }
   };
 
-  const openInGoogleMaps = (originLat: number, originLng: number, destLat: number, destLng: number) => {
-    const url = `https://www.google.com/maps/dir/?api=1&origin=${originLat},${originLng}&destination=${destLat},${destLng}`;
+  const openInGoogleMaps = (destLat: number, destLng: number, originLat?: number, originLng?: number) => {
+    let url = `https://www.google.com/maps/dir/?api=1&destination=${destLat},${destLng}`;
+    if (originLat && originLng) {
+        url += `&origin=${originLat},${originLng}`;
+    }
     window.open(url, '_blank');
   };
   
@@ -268,9 +271,9 @@ export default function DeliveriesPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Store Pickup</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Actions & Route</TableHead>
+                    <TableHead>Pickup Location (Store)</TableHead>
+                    <TableHead>Drop-off Location (Customer)</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -279,39 +282,41 @@ export default function DeliveriesPage() {
                       <TableCell>
                         <div className="font-medium">{order.store?.name}</div>
                         <div className="text-sm text-muted-foreground">{order.store?.address}</div>
+                        {order.store && (
+                          <Button
+                              variant="link"
+                              size="sm"
+                              className="px-0 h-auto"
+                              onClick={() => openInGoogleMaps(order.store!.latitude, order.store!.longitude)}
+                          >
+                              <MapPin className="mr-2 h-4 w-4" />
+                              Route to Store
+                          </Button>
+                        )}
                       </TableCell>
                       <TableCell>
                           <div className="font-medium">{order.customerName}</div>
-                          <div className="text-sm text-muted-foreground">{order.phone}</div>
+                          <div className="text-sm text-muted-foreground">{order.deliveryAddress}</div>
+                          <Button
+                            variant="link"
+                            size="sm"
+                            className="px-0 h-auto"
+                            onClick={() => openInGoogleMaps(order.deliveryLat, order.deliveryLng, order.store?.latitude, order.store?.longitude)}
+                          >
+                               <MapPin className="mr-2 h-4 w-4" />
+                              Route to Customer
+                          </Button>
                       </TableCell>
-                      <TableCell>
-                          <div className="flex items-center gap-2">
-                               {order.store && (
-                                  <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => openInGoogleMaps(
-                                          order.store!.latitude, 
-                                          order.store!.longitude,
-                                          order.deliveryLat,
-                                          order.deliveryLng,
-                                      )}
-                                  >
-                                      <MapPin className="mr-2 h-4 w-4" />
-                                      Route to Customer
-                                  </Button>
-                              )}
-                               <Button
-                                      variant="secondary"
-                                      size="sm"
-                                      onClick={() => handleMarkAsDelivered(order.id)}
-                                      disabled={isUpdating}
-                                  >
-                                      <Check className="mr-2 h-4 w-4" />
-                                      {isUpdating ? 'Updating...' : 'Mark as Delivered'}
-                                  </Button>
-                          </div>
-                          <div className="text-sm text-muted-foreground mt-2">{order.deliveryAddress}</div>
+                      <TableCell className="text-right">
+                           <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => handleMarkAsDelivered(order.id)}
+                                  disabled={isUpdating}
+                              >
+                                  <Check className="mr-2 h-4 w-4" />
+                                  {isUpdating ? 'Updating...' : 'Mark as Delivered'}
+                              </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -424,3 +429,5 @@ export default function DeliveriesPage() {
     </div>
   );
 }
+
+    
