@@ -165,7 +165,7 @@ export default function PricingPage() {
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Product</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <Select onValueChange={field.onChange} value={field.value}>
                                         <FormControl>
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Select a product to set its price variants" />
@@ -248,4 +248,3 @@ export default function PricingPage() {
     </div>
   );
 }
-    
