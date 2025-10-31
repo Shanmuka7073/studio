@@ -56,7 +56,7 @@ import groceryData from '@/lib/grocery-data.json';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Share2, MapPin, Trash2, AlertCircle, Upload, Image as ImageIcon, Loader2, Camera, CameraOff, Sparkles } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { getProductPrices } from '@/app/dashboard/admin/actions';
+import { getProductPrices } from '@/app/dashboard/admin/server-actions';
 import { Progress } from '@/components/ui/progress';
 import { generateSingleImage } from '@/ai/flows/image-generator-flow';
 
