@@ -34,8 +34,8 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import type { Store, Product } from '@/lib/types';
-import { useFirebase, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, deleteDocumentNonBlocking } from '@/firebase';
+import type { Store, Product, ProductPrice } from '@/lib/types';
+import { useFirebase, useDoc, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, query, where, addDoc, writeBatch, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { useRouter } from 'next/navigation';
@@ -312,13 +312,20 @@ function EditProductDialog({ storeId, product, isOpen, onOpenChange }: { storeId
     const [isPending, startTransition] = useTransition();
     const { firestore } = useFirebase();
 
+    // Fetch current prices for default values
+    const priceDocRef = useMemoFirebase(() => {
+        if (!firestore || !product?.name) return null;
+        return doc(firestore, 'productPrices', product.name.toLowerCase());
+    }, [firestore, product?.name]);
+    const { data: priceData, isLoading: pricesLoading } = useDoc<ProductPrice>(priceDocRef);
+
     const form = useForm<ProductFormValues>({
         resolver: zodResolver(productSchema),
         defaultValues: {
             name: product.name,
             description: product.description,
             category: product.category,
-            variants: product.variants || [],
+            variants: [],
         },
     });
 
@@ -328,10 +335,10 @@ function EditProductDialog({ storeId, product, isOpen, onOpenChange }: { storeId
                 name: product.name,
                 description: product.description,
                 category: product.category,
-                variants: product.variants || [],
+                variants: priceData?.variants || [],
             });
         }
-    }, [isOpen, product, form]);
+    }, [isOpen, product, priceData, form]);
 
     const { fields, append, remove } = useFieldArray({
         control: form.control,
@@ -356,11 +363,9 @@ function EditProductDialog({ storeId, product, isOpen, onOpenChange }: { storeId
                     description: data.description,
                     category: data.category,
                 };
-                // IMPORTANT: Do not save variants on the master product document anymore,
-                // only on the canonical price document.
+                
                 batch.update(productRef, productData);
 
-                // Update the canonical price document in /productPrices
                 const priceRef = doc(firestore, 'productPrices', data.name.toLowerCase());
                 batch.set(priceRef, {
                     productName: data.name.toLowerCase(),
@@ -377,7 +382,6 @@ function EditProductDialog({ storeId, product, isOpen, onOpenChange }: { storeId
 
             } catch (serverError) {
                 console.error("Failed to update product:", serverError);
-                // Not emitting a permission error here as it's a batch operation
                 toast({
                     variant: 'destructive',
                     title: 'Update Failed',
@@ -394,96 +398,98 @@ function EditProductDialog({ storeId, product, isOpen, onOpenChange }: { storeId
                     <DialogTitle>Edit Master Product</DialogTitle>
                     <DialogDescription>Update details for {product.name}. Changes will affect all stores.</DialogDescription>
                 </DialogHeader>
-                <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 max-h-[60vh] overflow-y-auto pr-4">
-                        <FormField
-                            control={form.control}
-                            name="name"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Product Name</FormLabel>
-                                    <FormControl><Input {...field} /></FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="category"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Category</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                        <FormControl><SelectTrigger><SelectValue placeholder="Select a category" /></SelectTrigger></FormControl>
-                                        <SelectContent>
-                                            {groceryData.categories.map(cat => (
-                                                <SelectItem key={cat.categoryName} value={cat.categoryName}>{cat.categoryName}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="description"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Product Description (Optional)</FormLabel>
-                                    <FormControl><Textarea {...field} /></FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                {pricesLoading ? <p>Loading prices...</p> : (
+                    <Form {...form}>
+                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 max-h-[60vh] overflow-y-auto pr-4">
+                            <FormField
+                                control={form.control}
+                                name="name"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Product Name</FormLabel>
+                                        <FormControl><Input {...field} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="category"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Category</FormLabel>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <FormControl><SelectTrigger><SelectValue placeholder="Select a category" /></SelectTrigger></FormControl>
+                                            <SelectContent>
+                                                {groceryData.categories.map(cat => (
+                                                    <SelectItem key={cat.categoryName} value={cat.categoryName}>{cat.categoryName}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="description"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Product Description (Optional)</FormLabel>
+                                        <FormControl><Textarea {...field} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
 
-                        <Card className="bg-muted/50 p-4">
-                            <CardHeader className="p-2">
-                                <CardTitle className="text-lg">Price Variants</CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-2 space-y-4">
-                                {fields.map((field, index) => (
-                                    <div key={field.id} className="flex items-end gap-2 p-3 border rounded-md bg-background">
-                                        <FormField
-                                            control={form.control}
-                                            name={`variants.${index}.weight`}
-                                            render={({ field }) => (
-                                                <FormItem className="flex-1">
-                                                    <FormLabel>Weight</FormLabel>
-                                                    <FormControl><Input {...field} /></FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={form.control}
-                                            name={`variants.${index}.price`}
-                                            render={({ field }) => (
-                                                <FormItem className="flex-1">
-                                                    <FormLabel>Price (₹)</FormLabel>
-                                                    <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)}>
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                ))}
-                                <Button type="button" variant="outline" size="sm" onClick={() => append({ weight: '', price: 0, sku: `new-${fields.length}` })}>
-                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Variant
+                            <Card className="bg-muted/50 p-4">
+                                <CardHeader className="p-2">
+                                    <CardTitle className="text-lg">Price Variants</CardTitle>
+                                </CardHeader>
+                                <CardContent className="p-2 space-y-4">
+                                    {fields.map((field, index) => (
+                                        <div key={field.id} className="flex items-end gap-2 p-3 border rounded-md bg-background">
+                                            <FormField
+                                                control={form.control}
+                                                name={`variants.${index}.weight`}
+                                                render={({ field }) => (
+                                                    <FormItem className="flex-1">
+                                                        <FormLabel>Weight</FormLabel>
+                                                        <FormControl><Input {...field} /></FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                            <FormField
+                                                control={form.control}
+                                                name={`variants.${index}.price`}
+                                                render={({ field }) => (
+                                                    <FormItem className="flex-1">
+                                                        <FormLabel>Price (₹)</FormLabel>
+                                                        <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                            <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)}>
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    ))}
+                                    <Button type="button" variant="outline" size="sm" onClick={() => append({ weight: '', price: 0, sku: `new-${fields.length}` })}>
+                                        <PlusCircle className="mr-2 h-4 w-4" /> Add Variant
+                                    </Button>
+                                </CardContent>
+                            </Card>
+                            <DialogFooter className="sticky bottom-0 bg-background pt-4">
+                                <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>Cancel</Button>
+                                <Button type="submit" disabled={isPending}>
+                                    {isPending ? "Saving..." : "Save Changes"}
                                 </Button>
-                            </CardContent>
-                        </Card>
-                        <DialogFooter className="sticky bottom-0 bg-background pt-4">
-                            <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>Cancel</Button>
-                            <Button type="submit" disabled={isPending}>
-                                {isPending ? "Saving..." : "Save Changes"}
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </Form>
+                            </DialogFooter>
+                        </form>
+                    </Form>
+                )}
             </DialogContent>
         </Dialog>
     );
@@ -1161,6 +1167,43 @@ function StoreDetails({ store, onUpdate }: { store: Store, onUpdate: () => void 
     );
 }
 
+// New component to fetch and display variants for a single product row in the admin table
+function AdminProductRow({ product, storeId, onEdit, onDelete }: { product: Product; storeId: string; onEdit: () => void; onDelete: () => void; }) {
+    const { firestore } = useFirebase();
+
+    const priceDocRef = useMemoFirebase(() => {
+        if (!firestore || !product.name) return null;
+        return doc(firestore, 'productPrices', product.name.toLowerCase());
+    }, [firestore, product.name]);
+
+    const { data: priceData, isLoading: pricesLoading } = useDoc<ProductPrice>(priceDocRef);
+
+    const variantsString = useMemo(() => {
+        if (pricesLoading) return "Loading prices...";
+        if (!priceData || !priceData.variants || priceData.variants.length === 0) return 'N/A';
+        return priceData.variants.map(v => `${v.weight} (₹${v.price})`).join(', ');
+    }, [priceData, pricesLoading]);
+
+    return (
+        <TableRow>
+            <TableCell>{product.name}</TableCell>
+            <TableCell>{product.category}</TableCell>
+            <TableCell>{variantsString}</TableCell>
+            <TableCell className="text-right">
+                <Button variant="ghost" size="icon" onClick={onEdit}>
+                    <Edit className="h-4 w-4" />
+                    <span className="sr-only">Edit {product.name}</span>
+                </Button>
+                <Button variant="ghost" size="icon" onClick={onDelete}>
+                    <Trash2 className="h-4 w-4" />
+                    <span className="sr-only">Delete {product.name}</span>
+                </Button>
+            </TableCell>
+        </TableRow>
+    );
+}
+
+
 function ManageStoreView({ store, isAdmin, adminStoreId }: { store: Store; isAdmin: boolean, adminStoreId?: string; }) {
     const { firestore } = useFirebase();
     const { toast } = useToast();
@@ -1310,34 +1353,22 @@ function ManageStoreView({ store, isAdmin, adminStoreId }: { store: Store; isAdm
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {products.map(product => (
-                            <TableRow key={product.id}>
-                                <TableCell>{product.name}</TableCell>
-                                <TableCell>{product.category}</TableCell>
-                                {isAdmin && <TableCell>{product.variants?.map(v => `${v.weight} (₹${v.price})`).join(', ') || 'N/A'}</TableCell>}
-                                {isAdmin && (
-                                    <TableCell className="text-right">
-                                         <Button 
-                                            variant="ghost" 
-                                            size="icon" 
-                                            onClick={() => setEditingProduct(product)}
-                                        >
-                                            <Edit className="h-4 w-4" />
-                                            <span className="sr-only">Edit {product.name}</span>
-                                        </Button>
-                                        <Button 
-                                            variant="ghost" 
-                                            size="icon" 
-                                            onClick={() => handleDeleteProduct(product.id, product.name)}
-                                            disabled={isDeleting}
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                            <span className="sr-only">Delete {product.name}</span>
-                                        </Button>
-                                    </TableCell>
-                                )}
-                            </TableRow>
-                        ))}
+                        {products.map(product => 
+                            isAdmin ? (
+                                <AdminProductRow 
+                                    key={product.id}
+                                    product={product}
+                                    storeId={store.id}
+                                    onEdit={() => setEditingProduct(product)}
+                                    onDelete={() => handleDeleteProduct(product.id, product.name)}
+                                />
+                            ) : (
+                                <TableRow key={product.id}>
+                                    <TableCell>{product.name}</TableCell>
+                                    <TableCell>{product.category}</TableCell>
+                                </TableRow>
+                            )
+                        )}
                     </TableBody>
                     </Table>
                 ) : (
@@ -1603,4 +1634,3 @@ export default function MyStorePage() {
     </div>
   );
 }
-    
