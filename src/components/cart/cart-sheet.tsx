@@ -99,7 +99,7 @@ export function CartSheetContent() {
           </div>
         )}
         {cartItems.length > 0 && (
-          <SheetFooter className="mt-auto pt-4 border-t -mx-6 px-6">
+          <SheetFooter className="mt-auto pt-4 border-t">
             <div className="w-full space-y-4">
               <div className="flex justify-between font-bold text-lg">
                 <span>Total</span>
