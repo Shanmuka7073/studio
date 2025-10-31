@@ -1,7 +1,8 @@
+
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Users, Store, Truck, ShoppingBag } from 'lucide-react';
+import { Users, Store, Truck, ShoppingBag, AlertCircle, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
@@ -9,7 +10,8 @@ import { useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { collection, query, where } from 'firebase/firestore';
-import type { Order } from '@/lib/types';
+import type { Order, Store as StoreType } from '@/lib/types';
+import { Button } from '@/components/ui/button';
 
 const ADMIN_EMAIL = 'admin@gmail.com';
 
@@ -27,6 +29,23 @@ function StatCard({ title, value, icon: Icon, loading }: { title: string, value:
     )
 }
 
+function CreateMasterStoreCard() {
+    return (
+        <Alert variant="destructive" className="mb-8">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Action Required: Create Master Store</AlertTitle>
+            <AlertDescription>
+                The master store for setting platform-wide product prices has not been created yet. This is required for the application to function correctly.
+                <Button asChild className="mt-4">
+                    <Link href="/dashboard/owner/my-store">
+                        Create Master Store <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                </Button>
+            </AlertDescription>
+        </Alert>
+    )
+}
+
 export default function AdminDashboardPage() {
     const { user, isUserLoading, firestore } = useFirebase();
     const router = useRouter();
@@ -36,11 +55,21 @@ export default function AdminDashboardPage() {
     const storesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'stores'), where('isClosed', '!=', true)) : null, [firestore]);
     const partnersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'deliveryPartners') : null, [firestore]);
     const deliveredOrdersQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'orders'), where('status', '==', 'Delivered')) : null, [firestore]);
+    
+    // Query to check for the master store
+    const adminStoreQuery = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return query(collection(firestore, 'stores'), where('name', '==', 'LocalBasket'));
+    }, [firestore]);
+
 
     const { data: users, isLoading: usersLoading } = useCollection(usersQuery);
     const { data: stores, isLoading: storesLoading } = useCollection(storesQuery);
     const { data: partners, isLoading: partnersLoading } = useCollection(partnersQuery);
     const { data: deliveredOrders, isLoading: ordersLoading } = useCollection<Order>(deliveredOrdersQuery);
+    const { data: adminStores, isLoading: adminStoreLoading } = useCollection<StoreType>(adminStoreQuery);
+
+    const masterStoreExists = useMemo(() => adminStores && adminStores.length > 0, [adminStores]);
 
     const stats = useMemo(() => ({
         totalUsers: users?.length ?? 0,
@@ -63,6 +92,10 @@ export default function AdminDashboardPage() {
         { title: 'Orders Delivered', value: stats.totalOrdersDelivered, icon: ShoppingBag },
     ];
 
+    if (isUserLoading || adminStoreLoading) {
+        return <p>Loading admin dashboard...</p>
+    }
+
     return (
         <div className="container mx-auto py-12 px-4 md:px-6">
             <div className="text-center mb-12">
@@ -70,6 +103,8 @@ export default function AdminDashboardPage() {
                 <p className="text-lg text-muted-foreground mt-2">A high-level overview of your application's activity.</p>
             </div>
             
+            {!masterStoreExists && <CreateMasterStoreCard />}
+
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
                 {statItems.map(item => (
                     <StatCard 
