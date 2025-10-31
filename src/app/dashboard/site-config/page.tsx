@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useMemo } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -101,6 +101,7 @@ export default function SiteConfigPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isSaving, startSaveTransition] = useTransition();
+  const [searchTerm, setSearchTerm] = useState('');
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -113,6 +114,19 @@ export default function SiteConfigPage() {
     control: form.control,
     name: 'images',
   });
+  
+  const filteredFields = useMemo(() => {
+    if (!searchTerm) {
+      return fields.map((field, index) => ({ ...field, originalIndex: index }));
+    }
+    return fields
+      .map((field, index) => ({ ...field, originalIndex: index }))
+      .filter(field => {
+        const productName = field.id.replace(/^prod-/, '').replace(/-/g, ' ');
+        return productName.toLowerCase().includes(searchTerm.toLowerCase());
+      });
+  }, [fields, searchTerm]);
+
 
   if (!isUserLoading && (!user || user.email !== ADMIN_EMAIL)) {
     router.replace('/');
@@ -141,9 +155,9 @@ export default function SiteConfigPage() {
     });
   };
 
-  const handleImageGenerated = (index: number, newImage: ImageInfo) => {
-    setValue(`images.${index}.imageUrl`, newImage.imageUrl);
-    setValue(`images.${index}.imageHint`, newImage.imageHint);
+  const handleImageGenerated = (originalIndex: number, newImage: ImageInfo) => {
+    setValue(`images.${originalIndex}.imageUrl`, newImage.imageUrl);
+    setValue(`images.${originalIndex}.imageHint`, newImage.imageHint);
   };
   
   if (isUserLoading || !user) {
@@ -170,8 +184,17 @@ export default function SiteConfigPage() {
         <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
             
+            <div className="mb-6">
+                <Input 
+                    placeholder="Search by product name..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                />
+            </div>
+
             <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-4">
-                {fields.map((field, index) => {
+                {filteredFields.map((field) => {
+                    const originalIndex = field.originalIndex;
                     // Extract product name from ID like 'prod-sweet-potato' -> 'sweet potato'
                     const productName = field.id.replace(/^prod-/, '').replace(/-/g, ' ');
                     return (
@@ -179,7 +202,7 @@ export default function SiteConfigPage() {
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                             <FormField
                                 control={form.control}
-                                name={`images.${index}.id`}
+                                name={`images.${originalIndex}.id`}
                                 render={({ field }) => (
                                     <FormItem>
                                     <FormLabel>Image ID</FormLabel>
@@ -192,7 +215,7 @@ export default function SiteConfigPage() {
                                 />
                                 <FormField
                                 control={form.control}
-                                name={`images.${index}.imageUrl`}
+                                name={`images.${originalIndex}.imageUrl`}
                                 render={({ field }) => (
                                     <FormItem>
                                     <FormLabel>Image URL</FormLabel>
@@ -205,7 +228,7 @@ export default function SiteConfigPage() {
                                 />
                                 <FormField
                                 control={form.control}
-                                name={`images.${index}.imageHint`}
+                                name={`images.${originalIndex}.imageHint`}
                                 render={({ field }) => (
                                     <FormItem>
                                     <FormLabel>Image Hint</FormLabel>
@@ -217,7 +240,7 @@ export default function SiteConfigPage() {
                                             type="button"
                                             variant="destructive"
                                             size="icon"
-                                            onClick={() => remove(index)}
+                                            onClick={() => remove(originalIndex)}
                                         >
                                             <Trash2 className="h-4 w-4" />
                                         </Button>
@@ -229,7 +252,7 @@ export default function SiteConfigPage() {
                             </div>
                              <div className="mt-4 flex justify-end">
                                 <SingleImageGenerator 
-                                    index={index}
+                                    index={originalIndex}
                                     productName={productName}
                                     onImageGenerated={handleImageGenerated}
                                 />
