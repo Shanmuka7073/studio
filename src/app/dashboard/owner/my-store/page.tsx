@@ -109,11 +109,10 @@ function StoreImageUploader({ store }: { store: Store }) {
 
     // Effect to handle camera stream
     useEffect(() => {
-        let stream: MediaStream | null = null;
         const setupCamera = async () => {
             if (isCameraOn) {
                 try {
-                    stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
                     streamRef.current = stream;
                     if (videoRef.current) {
                         videoRef.current.srcObject = stream;
@@ -125,7 +124,12 @@ function StoreImageUploader({ store }: { store: Store }) {
                         title: 'Camera Access Denied',
                         description: 'Please enable camera permissions in your browser settings.',
                     });
-                    setIsCameraOn(false); // Turn off the toggle if permission is denied
+                    setIsCameraOn(false);
+                }
+            } else {
+                 if (streamRef.current) {
+                    streamRef.current.getTracks().forEach(track => track.stop());
+                    streamRef.current = null;
                 }
             }
         };
@@ -213,7 +217,7 @@ function StoreImageUploader({ store }: { store: Store }) {
                 <CardDescription>Take a picture of your storefront.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-                 <div className="w-full aspect-video relative rounded-md overflow-hidden border">
+                 <div className="w-full aspect-video relative rounded-md overflow-hidden border bg-muted">
                     {capturedImage ? (
                         <Image src={capturedImage} alt="Captured preview" fill className="object-cover" />
                     ) : isCameraOn ? (
