@@ -47,7 +47,7 @@ service cloud.firestore {
      * @returns {boolean} - True if the user is an admin, false otherwise.
      */
      function isAdmin() {
-        return isSignedIn() && request.auth.email == 'admin@gmail.com';
+        return isSignedIn() && request.auth.token.email == 'admin@gmail.com';
      }
 
     /**
@@ -240,7 +240,7 @@ service cloud.firestore {
      */
     match /productPrices/{productName} {
         allow get, list: if true;
-        allow write: if isAdmin();
+        allow create, update, delete: if isAdmin();
     }
   }
 }
