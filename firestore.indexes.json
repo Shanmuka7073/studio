@@ -42,6 +42,16 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "stores",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "isClosed",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [
