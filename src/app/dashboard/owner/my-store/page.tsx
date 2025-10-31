@@ -66,6 +66,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Share2, MapPin, Trash2, AlertCircle, Upload, Image as ImageIcon, Loader2, Camera, CameraOff, Sparkles, PlusCircle, Edit, Link2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
+import { generateSingleImage } from '@/ai/flows/image-generator-flow';
 
 
 const ADMIN_EMAIL = 'admin@gmail.com';
@@ -95,7 +96,7 @@ const productSchema = z.object({
   name: z.string().min(3, 'Product name is required'),
   description: z.string().optional(),
   category: z.string().min(1, "Category is required"),
-  imageUrl: z.string().url("Please enter a valid image URL.").optional(),
+  imageUrl: z.string().url("Please enter a valid image URL.").optional().or(z.literal('')),
   variants: z.array(variantSchema).min(1, 'At least one price variant is required'),
 });
 
@@ -664,6 +665,7 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const { firestore } = useFirebase();
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -674,6 +676,41 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
     control: form.control,
     name: 'variants'
   });
+
+  const handleGenerateImage = async () => {
+    const productName = form.getValues('name');
+    if (!productName) {
+        toast({
+            variant: 'destructive',
+            title: 'Product Name Required',
+            description: 'Please enter a product name before generating an image.',
+        });
+        return;
+    }
+
+    setIsGeneratingImage(true);
+    try {
+        const imageUrl = await generateSingleImage(productName);
+        if (imageUrl) {
+            form.setValue('imageUrl', imageUrl);
+            toast({
+                title: 'Image Generated!',
+                description: 'The AI-generated image URL has been added.',
+            });
+        } else {
+            throw new Error('Image generation returned no URL.');
+        }
+    } catch (error) {
+        console.error("Image generation failed:", error);
+        toast({
+            variant: 'destructive',
+            title: 'Image Generation Failed',
+            description: 'Could not generate image. Please try again or add a URL manually.',
+        });
+    } finally {
+        setIsGeneratingImage(false);
+    }
+  };
 
   const onSubmit = (data: ProductFormValues) => {
     if (!firestore) return;
@@ -731,7 +768,7 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
     <Card>
       <CardHeader>
         <CardTitle>Add a Master Product</CardTitle>
-        <CardDescription>Add a new product to the platform's master catalog. You must provide an image URL.</CardDescription>
+        <CardDescription>Add a new product to the platform's master catalog. You can generate an image with AI or add a URL manually.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -749,20 +786,24 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
                 </FormItem>
               )}
             />
-             <FormField
+            <FormField
               control={form.control}
               name="imageUrl"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Product Image URL</FormLabel>
-                  <FormControl>
-                    <div className="flex items-center">
-                       <Link2 className="h-4 w-4 mr-2 text-muted-foreground"/>
-                       <Input placeholder="https://images.unsplash.com/..." {...field} />
+                  <FormLabel>Product Image URL (Optional)</FormLabel>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-grow">
+                        <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"/>
+                        <Input placeholder="https://images.unsplash.com/..." {...field} className="pl-9" />
                     </div>
-                  </FormControl>
+                    <Button type="button" variant="outline" onClick={handleGenerateImage} disabled={isGeneratingImage}>
+                        {isGeneratingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                        <span className="ml-2 hidden sm:inline">Generate with AI</span>
+                    </Button>
+                  </div>
                    <FormDescription>
-                    Paste a direct link to a product image (e.g., from Unsplash). Recommended format: WebP.
+                    Paste a direct image link or generate one with AI based on the product name.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
