@@ -254,6 +254,12 @@ export default function CheckoutPage() {
         const colRef = collection(firestore, collectionName);
         addDoc(colRef, orderData).then(() => {
             clearCart();
+            // Reset local state for next order
+            setAudioDataUri(null);
+            setTranslatedList(null);
+            setDeliveryCoords(null);
+            form.reset();
+
             toast({
                 title: "Order Placed!",
                 description: "Thank you for your purchase.",
@@ -464,3 +470,5 @@ export default function CheckoutPage() {
     </div>
   );
 }
+
+    
