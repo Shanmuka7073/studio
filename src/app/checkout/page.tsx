@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useCart } from '@/lib/cart';
@@ -114,11 +113,18 @@ export default function CheckoutPage() {
         };
         
         recognition.onresult = (event) => {
+            let interimTranscript = '';
             let finalTranscript = '';
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-                finalTranscript += event.results[i][0].transcript;
+
+            for (let i = 0; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    finalTranscript += event.results[i][0].transcript;
+                } else {
+                    interimTranscript += event.results[i][0].transcript;
+                }
             }
-            setVoiceOrderText(prev => prev + finalTranscript);
+            // By setting the text directly, we prevent the duplication bug.
+            setVoiceOrderText(finalTranscript + interimTranscript);
         };
         speechRecognitionRef.current = recognition;
     }
@@ -189,7 +195,7 @@ export default function CheckoutPage() {
     startPlaceOrderTransition(async () => {
         const totalAmount = isVoiceOrder ? DELIVERY_FEE : cartTotal + DELIVERY_FEE;
         
-        let collectionName = isVoiceOrder ? 'voice-orders' : 'orders';
+        let collectionName = 'orders';
         
         let orderData: any = {
             userId: user.uid,
@@ -216,6 +222,11 @@ export default function CheckoutPage() {
                 quantity: item.quantity,
                 price: item.variant.price,
             }));
+        }
+        
+        if (isVoiceOrder) {
+            collectionName = 'voice-orders';
+            delete orderData.items; // No items in voice order
         }
 
         const colRef = collection(firestore, collectionName);
@@ -424,6 +435,4 @@ export default function CheckoutPage() {
     </div>
   );
 }
-    
-
     
