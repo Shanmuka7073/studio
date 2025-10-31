@@ -112,20 +112,27 @@ export async function saveProductPrices(productName: string, variants: ProductVa
 export async function getUniqueProductNames(): Promise<string[]> {
     try {
         const { firestore } = getAdminServices();
-        const productsSnapshot = await firestore.collectionGroup('products').get();
+        const nameSet = new Set<string>();
 
-        if (productsSnapshot.empty) {
+        // Get all stores first
+        const storesSnapshot = await firestore.collection('stores').get();
+        if (storesSnapshot.empty) {
             return [];
         }
 
-        const nameSet = new Set<string>();
-        productsSnapshot.docs.forEach(doc => {
-            const product = doc.data() as Product;
-            if (product.name) {
-                nameSet.add(product.name);
+        // For each store, get its products
+        for (const storeDoc of storesSnapshot.docs) {
+            const productsSnapshot = await storeDoc.ref.collection('products').get();
+            if (!productsSnapshot.empty) {
+                productsSnapshot.forEach(productDoc => {
+                    const product = productDoc.data() as Product;
+                    if (product.name) {
+                        nameSet.add(product.name);
+                    }
+                });
             }
-        });
-
+        }
+        
         return Array.from(nameSet);
 
     } catch (error) {
