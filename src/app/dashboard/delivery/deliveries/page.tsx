@@ -102,7 +102,7 @@ function OrderDetailsDialog({ order, isOpen, onClose, onAccept, distance }: { or
                                         <TableBody>
                                             {order.items.map((item, index) => (
                                                 <TableRow key={index}>
-                                                    <TableCell>{item.name}</TableCell>
+                                                    <TableCell>{item.productName}</TableCell>
                                                     <TableCell>{item.quantity}</TableCell>
                                                     <TableCell className="text-right">₹{item.price.toFixed(2)}</TableCell>
                                                 </TableRow>

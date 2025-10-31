@@ -67,7 +67,7 @@ export type Order = {
   voiceMemoUrl?: string; // URL to the recorded voice memo
   translatedList?: string; // Bilingual translated list
   store?: Store; // Optional: Denormalized or joined store data
-  deliveryPartnerId?: string; // ID of the user who is delivering
+  deliveryPartnerId?: string | null; // ID of the user who is delivering
 };
 
 
@@ -101,4 +101,3 @@ export type ProductPrice = {
     productName: string; // The unique name of the product, matches the document ID.
     variants: ProductVariant[];
 }
-    
