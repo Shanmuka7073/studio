@@ -3,21 +3,8 @@
 
 import type { Product, ProductVariant } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
-import { getFirestore } from 'genkit/google-cloud';
-import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from '@genkit-ai/google-cloud';
 import groceryData from '@/lib/grocery-data.json';
-
-
-// Helper function for robust server-side Firebase admin initialization
-async function getAdminServices() {
-    const firestore = getFirestore();
-    return {
-        firestore,
-        // The auth part is not used in the functions below that need the services,
-        // but if it were, it would need a similar replacement if it caused conflicts.
-        // For now, we only need firestore.
-    };
-}
 
 export async function getAdminStats(): Promise<{
     totalUsers: number,
@@ -26,15 +13,10 @@ export async function getAdminStats(): Promise<{
     totalOrdersDelivered: number,
 }> {
     try {
-        const { firestore } = await getAdminServices();
-
-        // Admin SDK for auth is separate and might be okay, but let's assume we need to be careful.
-        // For now, getAdminStats doesn't use the admin auth SDK, so we can defer changing it.
-        // const usersPromise = auth.listUsers();
+        const firestore = getFirestore();
         
         const storesPromise = firestore.collection('stores').where('isClosed', '!=', true).count().get();
         const partnersPromise = firestore.collection('deliveryPartners').count().get();
-        // Combined query for both regular and voice orders that are delivered
         const ordersPromise = firestore.collectionGroup('orders').where('status', '==', 'Delivered').count().get();
         const voiceOrdersPromise = firestore.collectionGroup('voice-orders').where('status', '==', 'Delivered').count().get();
 
@@ -46,8 +28,7 @@ export async function getAdminStats(): Promise<{
             voiceOrdersSnapshot,
         ]);
         
-        // Temporarily disabling user count as it requires the full admin SDK which might be causing issues.
-        const totalUsers = 0; // usersResult.users.filter(u => u.email !== 'admin@gmail.com').length;
+        const totalUsers = 0; 
         const totalOrdersDelivered = ordersSnapshot.data().count + voiceOrdersSnapshot.data().count;
 
         return {
@@ -59,7 +40,6 @@ export async function getAdminStats(): Promise<{
 
     } catch (error) {
         console.error('Failed to fetch admin stats:', error);
-        // In case of an error, return zeros to prevent the page from crashing.
         return {
             totalUsers: 0,
             totalStores: 0,
@@ -76,7 +56,7 @@ export async function saveProductPrices(productName: string, variants: ProductVa
     }
 
     try {
-        const { firestore } = await getAdminServices();
+        const firestore = getFirestore();
         const productPriceRef = firestore.collection('productPrices').doc(productName.toLowerCase());
 
         await productPriceRef.set({
@@ -127,7 +107,7 @@ export async function getUniqueProductNames(): Promise<string[]> {
 
 export async function getProductPrices(): Promise<Record<string, ProductVariant[]>> {
      try {
-        const { firestore } = await getAdminServices();
+        const firestore = getFirestore();
         const pricesSnapshot = await firestore.collection('productPrices').get();
 
         if (pricesSnapshot.empty) {
