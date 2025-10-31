@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useTransition, useEffect, useMemo, useRef } from 'react';
@@ -99,55 +98,61 @@ const createSlug = (text: string) => {
 function StoreImageUploader({ store }: { store: Store }) {
     const { firestore } = useFirebase();
     const { toast } = useToast();
-    const [isUploading, setIsUploading] = useState(false);
-    const [uploadProgress, setUploadProgress] = useState(0);
+    const [uploading, setUploading] = useState(false);
+    const [progress, setProgress] = useState(0);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
         if (event.target.files && event.target.files[0]) {
             setSelectedFile(event.target.files[0]);
         }
     };
 
     const handleUpload = () => {
-        if (!selectedFile || !firestore) return;
+        if (!selectedFile || !firestore) {
+            toast({
+                variant: 'destructive',
+                title: 'No file selected',
+                description: 'Please select an image file to upload.',
+            });
+            return;
+        }
 
-        setIsUploading(true);
-        setUploadProgress(0);
+        setUploading(true);
+        setProgress(0);
 
         const storage = getStorage();
         const storageRef = ref(storage, `store-images/${store.id}/${selectedFile.name}`);
         const uploadTask = uploadBytesResumable(storageRef, selectedFile);
 
-        uploadTask.on('state_changed',
+        uploadTask.on(
+            'state_changed',
             (snapshot) => {
-                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                setUploadProgress(progress);
+                const currentProgress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                setProgress(currentProgress);
             },
             (error) => {
-                console.error("Image upload failed:", error);
+                console.error("Upload failed:", error);
                 toast({
                     variant: 'destructive',
-                    title: "Upload Failed",
-                    description: "There was an error uploading your image. Please check permissions and try again.",
+                    title: 'Upload Failed',
+                    description: 'There was an error uploading your image. Please check permissions and try again.',
                 });
-                setIsUploading(false);
-                setUploadProgress(0);
+                setUploading(false);
+                setSelectedFile(null);
             },
             () => {
                 getDownloadURL(uploadTask.snapshot.ref).then(async (downloadURL) => {
                     const storeRef = doc(firestore, 'stores', store.id);
-                    await updateDoc(storeRef, {
-                        imageUrl: downloadURL,
-                    });
+                    await updateDoc(storeRef, { imageUrl: downloadURL });
 
                     toast({
-                        title: "Image Uploaded!",
-                        description: "Your store image has been updated successfully.",
+                        title: 'Image Uploaded!',
+                        description: 'Your store image has been updated successfully.',
                     });
+                    setUploading(false);
                     setSelectedFile(null);
-                    setIsUploading(false);
                 });
             }
         );
@@ -160,11 +165,11 @@ function StoreImageUploader({ store }: { store: Store }) {
                 <CardDescription>Upload a picture to represent your storefront.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-                 <div className="w-full aspect-video relative rounded-md overflow-hidden border">
+                <div className="w-full aspect-video relative rounded-md overflow-hidden border">
                     {store.imageUrl ? (
                         <Image src={store.imageUrl} alt={store.name} fill className="object-cover" />
                     ) : (
-                         <div className="flex flex-col items-center justify-center h-full bg-muted/50 text-muted-foreground">
+                        <div className="flex flex-col items-center justify-center h-full bg-muted/50 text-muted-foreground">
                             <ImageIcon className="h-10 w-10 mb-2" />
                             <p className="text-sm">No image uploaded</p>
                         </div>
@@ -176,34 +181,42 @@ function StoreImageUploader({ store }: { store: Store }) {
                         ref={fileInputRef}
                         type="file"
                         accept="image/*"
-                        onChange={handleFileChange}
+                        onChange={handleFileSelect}
                         className="hidden"
                     />
-                    <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="flex-1" disabled={isUploading}>
-                       {selectedFile ? 'Change Image' : 'Select Image'}
+                    <Button
+                        variant="outline"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex-1"
+                        disabled={uploading}
+                    >
+                        {selectedFile ? 'Change Image' : 'Select Image'}
                     </Button>
-                    {selectedFile && !isUploading && (
-                         <Button onClick={handleUpload} className="flex-1">
+                    {selectedFile && (
+                        <Button onClick={handleUpload} className="flex-1" disabled={uploading}>
                             <Upload className="mr-2 h-4 w-4" />
                             Upload & Save
                         </Button>
                     )}
                 </div>
-                {isUploading && (
+
+                {uploading && (
                     <div className="space-y-2">
-                        <Progress value={uploadProgress} />
-                        <p className="text-xs text-center text-muted-foreground">Uploading... {Math.round(uploadProgress)}%</p>
+                        <Progress value={progress} />
+                        <p className="text-xs text-center text-muted-foreground">Uploading... {Math.round(progress)}%</p>
                     </div>
                 )}
-                {selectedFile && !isUploading && (
+                
+                {selectedFile && !uploading && (
                     <p className="text-sm text-muted-foreground">
-                        Selected file: <span className="font-medium">{selectedFile.name}</span>
+                        Selected: <span className="font-medium">{selectedFile.name}</span>
                     </p>
                 )}
             </CardContent>
         </Card>
-    )
+    );
 }
+
 
 function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPrices: Record<string, number> }) {
   const { toast } = useToast();
