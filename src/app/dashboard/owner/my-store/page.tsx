@@ -107,44 +107,43 @@ function StoreImageUploader({ store }: { store: Store }) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
 
-    const stopCamera = () => {
-        if (streamRef.current) {
-            streamRef.current.getTracks().forEach(track => track.stop());
-            streamRef.current = null;
-        }
-        setIsCameraOn(false);
-    };
-
-    const handleToggleCamera = async () => {
-        if (isCameraOn) {
-            stopCamera();
-            return;
-        }
-
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                streamRef.current = stream;
-                if (videoRef.current) {
-                    videoRef.current.srcObject = stream;
+    // Effect to handle camera stream
+    useEffect(() => {
+        let stream: MediaStream | null = null;
+        const setupCamera = async () => {
+            if (isCameraOn) {
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    streamRef.current = stream;
+                    if (videoRef.current) {
+                        videoRef.current.srcObject = stream;
+                    }
+                } catch (error) {
+                    console.error("Error accessing camera:", error);
+                    toast({
+                        variant: 'destructive',
+                        title: 'Camera Access Denied',
+                        description: 'Please enable camera permissions in your browser settings.',
+                    });
+                    setIsCameraOn(false); // Turn off the toggle if permission is denied
                 }
-                setIsCameraOn(true);
-                setCapturedImage(null); // Clear previous captures
-            } catch (error) {
-                console.error("Error accessing camera:", error);
-                toast({
-                    variant: 'destructive',
-                    title: 'Camera Access Denied',
-                    description: 'Please enable camera permissions in your browser settings.',
-                });
             }
-        } else {
-            toast({
-                variant: 'destructive',
-                title: 'Camera Not Supported',
-                description: 'Your browser does not support camera access.',
-            });
-        }
+        };
+        
+        setupCamera();
+
+        // Cleanup function
+        return () => {
+            if (streamRef.current) {
+                streamRef.current.getTracks().forEach(track => track.stop());
+                streamRef.current = null;
+            }
+        };
+    }, [isCameraOn, toast]);
+
+    const handleToggleCamera = () => {
+        setIsCameraOn(prev => !prev);
+        setCapturedImage(null); // Clear previous captures when toggling
     };
     
     const handleCapture = () => {
@@ -158,7 +157,7 @@ function StoreImageUploader({ store }: { store: Store }) {
                 context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
                 const dataUrl = canvas.toDataURL('image/jpeg');
                 setCapturedImage(dataUrl);
-                stopCamera();
+                setIsCameraOn(false); // Turn off camera after capture
             }
         }
     };
@@ -218,7 +217,7 @@ function StoreImageUploader({ store }: { store: Store }) {
                     {capturedImage ? (
                         <Image src={capturedImage} alt="Captured preview" fill className="object-cover" />
                     ) : isCameraOn ? (
-                         <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                         <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
                     ) : store.imageUrl ? (
                         <Image src={store.imageUrl} alt={store.name} fill className="object-cover" />
                     ) : (
