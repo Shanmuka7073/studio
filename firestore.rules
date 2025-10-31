@@ -12,7 +12,6 @@
  * - /stores/{storeId}: Store information, owned by a specific user.
  * - /stores/{storeId}/products/{productId}: Products listed under a store, managed by the store owner.
  * - /orders/{orderId}: Order information, with denormalized userId and storeId.
- * - /voice-orders/{voiceOrderId}: Voice orders, accessible by delivery partners.
  * - /orders/{orderId}/orderItems/{orderItemId}: Items within an order.
  * - /users/{userId}/productRecommendations/{productRecommendationId}: Product recommendations for a user.
  * - /cachedRecipes/{recipeId}: Cached recipe ingredients.
@@ -158,18 +157,6 @@ service cloud.firestore {
     }
 
     /**
-     * @description Defines rules for voice orders.
-     * @path /voice-orders/{voiceOrderId}
-     * @allow (get, list) - Delivery partners can get and list voice orders.
-     * @deny (create, update, delete) - No one can create, update, or delete voice orders.
-     * @principle Voice orders are read-only for delivery partners.
-     */
-    match /voice-orders/{voiceOrderId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if false;
-    }
-
-    /**
      * @description Defines rules for order items.
      * @path /orders/{orderId}/orderItems/{orderItemId}
      * @allow (get, list) - Anyone can get and list order items.
@@ -235,12 +222,12 @@ service cloud.firestore {
      * @description Defines rules for the admin-managed product prices.
      * @path /productPrices/{productName}
      * @allow (get, list) - All users can read the canonical prices.
-     * @allow (create, update, delete) - Only admins can manage the pricing information.
-     * @principle Centralized, admin-only control over pricing.
+     * @allow (write) - Only admins can write, and the document ID must match the lowercase productName.
+     * @principle Centralized, admin-only control over pricing, with data consistency enforcement.
      */
     match /productPrices/{productName} {
         allow get, list: if true;
-        allow create, update, delete: if isAdmin();
+        allow write: if isAdmin() && request.resource.data.productName.lower() == productName;
     }
   }
 }
