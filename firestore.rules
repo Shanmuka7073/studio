@@ -18,6 +18,7 @@
  * - /deliveryPartners/{partnerId}: Delivery partner earnings and payout information. Document ID is the same as the user ID.
  * - /deliveryPartners/{partnerId}/payouts/{payoutId}: Payout requests for delivery partners.
  * - /store-images/{storeId}/{fileName}: User uploaded store images.
+ * - /productPrices/{productName}: Admin-managed canonical pricing for product variants.
  *
  * Key Security Decisions:
  * - User listing is disallowed, except for the admin.
@@ -100,7 +101,8 @@ service cloud.firestore {
      * @principle Enforces document ownership for writes.
      */
     match /stores/{storeId} {
-      allow get, list: if true;
+      allow get: if true;
+      allow list: if resource == null || resource.data.isClosed == false;
       allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
       allow update: if isSignedIn() && resource.data.ownerId == request.auth.uid;
       allow delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
@@ -118,9 +120,7 @@ service cloud.firestore {
      */
     match /stores/{storeId}/products/{productId} {
       allow get, list: if true;
-      allow create: if isSignedIn() && get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid;
-      allow update: if isSignedIn() && get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid;
-      allow delete: if isSignedIn() && get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid;
+      allow create, update, delete: if isSignedIn() && get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid;
     }
 
     /**
@@ -219,6 +219,18 @@ service cloud.firestore {
       allow create: if isOwner(partnerId);
       allow update, delete: if false;
     }
+
+    /**
+     * @description Defines rules for canonical product prices.
+     * @path /productPrices/{productName}
+     * @allow (get, list) - All users can read prices.
+     * @allow (create, update, delete) - Only admins can manage prices.
+     * @principle Centralized, public price data managed by admins.
+     */
+    match /productPrices/{productName} {
+        allow get, list: if true;
+        allow write: if isAdmin();
+    }
   }
 }
 service firebase.storage {
@@ -231,3 +243,4 @@ service firebase.storage {
     }
   }
 }
+    

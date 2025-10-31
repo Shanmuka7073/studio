@@ -11,7 +11,9 @@ export type Product = {
   id: string;
   name: string; // Base name, e.g., 'Potatoes'
   description: string;
-  variants: ProductVariant[]; // Array of different weights and prices
+  // Variants are no longer stored on the store-specific product document.
+  // They are fetched from the central productPrices collection.
+  variants?: ProductVariant[]; 
   imageId: string;
   storeId: string;
   category?: string;
@@ -93,4 +95,10 @@ export type Payout = {
   payoutMethod: 'bank' | 'upi';
   payoutDetails: any; // upiId or bankDetails
 };
+
+// Represents the canonical pricing for a product, managed by the admin.
+export type ProductPrice = {
+    productName: string; // The unique name of the product, matches the document ID.
+    variants: ProductVariant[];
+}
     

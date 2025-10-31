@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useTransition, useEffect, useMemo, useRef } from 'react';
@@ -35,7 +36,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import type { Store, Product } from '@/lib/types';
 import { useFirebase, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, deleteDocumentNonBlocking } from '@/firebase';
-import { collection, query, where, addDoc, writeBatch, doc, updateDoc, getDocs } from 'firebase/firestore';
+import { collection, query, where, addDoc, writeBatch, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -342,9 +343,9 @@ function EditProductDialog({ storeId, product, isOpen, onOpenChange }: { storeId
 
         startTransition(async () => {
             try {
+                const batch = writeBatch(firestore);
                 const productRef = doc(firestore, 'stores', storeId, 'products', product.id);
                 
-                // Ensure SKUs are present
                 const variantsWithSkus = data.variants.map((variant, index) => ({
                     ...variant,
                     sku: variant.sku || `${createSlug(data.name)}-${createSlug(variant.weight)}-${index}`
@@ -354,10 +355,19 @@ function EditProductDialog({ storeId, product, isOpen, onOpenChange }: { storeId
                     name: data.name,
                     description: data.description,
                     category: data.category,
-                    variants: variantsWithSkus,
                 };
+                // IMPORTANT: Do not save variants on the master product document anymore,
+                // only on the canonical price document.
+                batch.update(productRef, productData);
 
-                await updateDoc(productRef, productData);
+                // Update the canonical price document in /productPrices
+                const priceRef = doc(firestore, 'productPrices', data.name.toLowerCase());
+                batch.set(priceRef, {
+                    productName: data.name.toLowerCase(),
+                    variants: variantsWithSkus,
+                });
+
+                await batch.commit();
                 
                 toast({
                     title: 'Product Updated!',
@@ -367,12 +377,12 @@ function EditProductDialog({ storeId, product, isOpen, onOpenChange }: { storeId
 
             } catch (serverError) {
                 console.error("Failed to update product:", serverError);
-                const permissionError = new FirestorePermissionError({
-                    path: `stores/${storeId}/products/${product.id}`,
-                    operation: 'update',
-                    requestResourceData: data,
+                // Not emitting a permission error here as it's a batch operation
+                toast({
+                    variant: 'destructive',
+                    title: 'Update Failed',
+                    description: 'Could not save product changes.',
                 });
-                errorEmitter.emit('permission-error', permissionError);
             }
         });
     };
@@ -531,13 +541,14 @@ function ProductChecklist({ storeId, adminStoreId }: { storeId: string; adminSto
             const isInStore = ownerProductMap.has(masterProduct.name);
 
             if (isChecked && !isInStore) {
-                // Add product to store
+                // Add product to store, but WITHOUT price variants
                 const newProductRef = doc(collection(firestore, 'stores', storeId, 'products'));
+                const { variants, ...productData } = masterProduct;
                 const newProductData = {
-                  ...masterProduct, // Copy all data from master
-                  storeId: storeId, // Set correct storeId
+                  ...productData, 
+                  storeId: storeId,
                 };
-                delete (newProductData as any).id; // Firestore generates ID, so remove from data
+                delete (newProductData as any).id;
                 batch.set(newProductRef, newProductData);
                 addedCount++;
             } else if (!isChecked && isInStore) {
@@ -652,6 +663,7 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
 
     startTransition(async () => {
       try {
+        const batch = writeBatch(firestore);
         const variantsWithSkus = data.variants.map((variant, index) => ({
             ...variant,
             sku: `${createSlug(data.name)}-${createSlug(variant.weight)}-${index}`
@@ -659,20 +671,27 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
 
         const imageInfo = await generateSingleImage(data.name);
 
-        const productData: Omit<Product, 'id'> = {
+        // 1. Add product to the master /stores/{adminId}/products collection
+        const productRef = doc(collection(firestore, 'stores', storeId, 'products'));
+        const productData: Omit<Product, 'id' | 'variants'> = {
           name: data.name,
           description: data.description,
           category: data.category,
           storeId,
-          variants: variantsWithSkus,
           imageId: imageInfo?.id || `prod-${createSlug(data.name)}`,
           imageUrl: imageInfo?.imageUrl || '',
           imageHint: imageInfo?.imageHint || '',
         };
+        batch.set(productRef, productData);
         
-        const productsCol = collection(firestore, 'stores', storeId, 'products');
+        // 2. Add pricing info to the canonical /productPrices collection
+        const priceRef = doc(firestore, 'productPrices', data.name.toLowerCase());
+        batch.set(priceRef, {
+            productName: data.name.toLowerCase(),
+            variants: variantsWithSkus
+        });
         
-        await addDoc(productsCol, productData);
+        await batch.commit();
         
         toast({
           title: 'Master Product Added!',
@@ -682,12 +701,7 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
 
       } catch (serverError) {
         console.error("Failed to create product:", serverError);
-        const permissionError = new FirestorePermissionError({
-          path: `stores/${storeId}/products`,
-          operation: 'create',
-          requestResourceData: data,
-        });
-        errorEmitter.emit('permission-error', permissionError);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not create master product.' });
       }
     });
   };
@@ -1204,16 +1218,22 @@ function ManageStoreView({ store, isAdmin, adminStoreId }: { store: Store; isAdm
         if (!firestore) return;
         
         startDeleteTransition(async () => {
+            const batch = writeBatch(firestore);
+
+            // Delete from the master /stores/{adminId}/products collection
             const productRef = doc(firestore, 'stores', store.id, 'products', productId);
+            batch.delete(productRef);
+
+            // Also delete from the canonical /productPrices collection
+            const priceRef = doc(firestore, 'productPrices', productName.toLowerCase());
+            batch.delete(priceRef);
+
             try {
-                // Using non-blocking delete for better UI experience
-                deleteDocumentNonBlocking(productRef);
-                
+                await batch.commit();
                 toast({
                     title: "Product Deleted",
-                    description: `${productName} has been removed from your inventory.`,
+                    description: `${productName} has been removed from the platform.`,
                 });
-                // The useCollection hook will automatically update the UI
             } catch (error) {
                  toast({
                     variant: 'destructive',
@@ -1284,8 +1304,8 @@ function ManageStoreView({ store, isAdmin, adminStoreId }: { store: Store; isAdm
                     <TableHeader>
                         <TableRow>
                             <TableHead>Name</TableHead>
-                            <TableHead>Variants</TableHead>
                             <TableHead>Category</TableHead>
+                            {isAdmin && <TableHead>Variants</TableHead>}
                             {isAdmin && <TableHead className="text-right">Actions</TableHead>}
                         </TableRow>
                     </TableHeader>
@@ -1293,8 +1313,8 @@ function ManageStoreView({ store, isAdmin, adminStoreId }: { store: Store; isAdm
                         {products.map(product => (
                             <TableRow key={product.id}>
                                 <TableCell>{product.name}</TableCell>
-                                <TableCell>{product.variants?.map(v => `${v.weight} (₹${v.price})`).join(', ') || 'N/A'}</TableCell>
                                 <TableCell>{product.category}</TableCell>
+                                {isAdmin && <TableCell>{product.variants?.map(v => `${v.weight} (₹${v.price})`).join(', ') || 'N/A'}</TableCell>}
                                 {isAdmin && (
                                     <TableCell className="text-right">
                                          <Button 
@@ -1583,3 +1603,4 @@ export default function MyStorePage() {
     </div>
   );
 }
+    

@@ -7,9 +7,12 @@ import { Button } from '@/components/ui/button';
 import { useCart } from '@/lib/cart';
 import type { Product, ProductVariant } from '@/lib/types';
 import { ShoppingCart } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { useFirebase } from '@/firebase';
+import { getProductPrice } from '@/lib/data';
+import { Skeleton } from './ui/skeleton';
 
 interface ProductCardProps {
   product: Product;
@@ -22,16 +25,38 @@ interface ProductCardProps {
 export default function ProductCard({ product, image }: ProductCardProps) {
   const { addItem } = useCart();
   const { toast } = useToast();
-  // Ensure product.variants is treated as an array even if it's undefined
-  const variants = product.variants || [];
-  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(variants.length > 0 ? variants[0] : null);
+  const { firestore } = useFirebase();
 
+  const [priceVariants, setPriceVariants] = useState<ProductVariant[]>([]);
+  const [isLoadingPrice, setIsLoadingPrice] = useState(true);
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
+
+  useEffect(() => {
+    const fetchPrice = async () => {
+      if (!firestore || !product.name) return;
+      setIsLoadingPrice(true);
+      const priceData = await getProductPrice(firestore, product.name);
+      if (priceData && priceData.variants.length > 0) {
+        setPriceVariants(priceData.variants);
+        setSelectedVariant(priceData.variants[0]);
+      } else {
+        setPriceVariants([]);
+        setSelectedVariant(null);
+      }
+      setIsLoadingPrice(false);
+    };
+
+    fetchPrice();
+  }, [firestore, product.name]);
+  
   // Use the AI-generated data URI if available, otherwise use the placeholder
   const displayImageUrl = product.imageUrl ? product.imageUrl : image.imageUrl;
   
   const handleAddToCart = () => {
     if (selectedVariant) {
-      addItem(product, selectedVariant);
+      // Pass the product with the dynamically fetched variants to the cart
+      const productWithPrice = { ...product, variants: priceVariants };
+      addItem(productWithPrice, selectedVariant);
     } else {
       toast({
         variant: 'destructive',
@@ -42,7 +67,7 @@ export default function ProductCard({ product, image }: ProductCardProps) {
   };
   
   const handleVariantChange = (sku: string) => {
-    const variant = variants.find(v => v.sku === sku);
+    const variant = priceVariants.find(v => v.sku === sku);
     if (variant) {
       setSelectedVariant(variant);
     }
@@ -62,23 +87,29 @@ export default function ProductCard({ product, image }: ProductCardProps) {
       </CardHeader>
       <CardContent className="p-2 pb-1 flex-1 text-center">
         <CardTitle className="text-sm font-headline truncate">{product.name}</CardTitle>
-        <p className="text-lg font-bold text-primary">₹{selectedVariant?.price.toFixed(2) ?? 'N/A'}</p>
+        {isLoadingPrice ? (
+            <Skeleton className="h-6 w-20 mx-auto mt-1" />
+        ) : (
+            <p className="text-lg font-bold text-primary">₹{selectedVariant?.price.toFixed(2) ?? 'N/A'}</p>
+        )}
       </CardContent>
       <CardFooter className="p-2 pt-0 flex-col items-stretch gap-2">
-         {variants.length > 1 ? (
+         {isLoadingPrice ? (
+            <Skeleton className="h-9 w-full" />
+         ) : priceVariants.length > 1 ? (
              <Select onValueChange={handleVariantChange} defaultValue={selectedVariant?.sku}>
                 <SelectTrigger className="text-xs h-9">
                     <SelectValue placeholder="Select weight" />
                 </SelectTrigger>
                 <SelectContent>
-                    {variants.map(variant => (
+                    {priceVariants.map(variant => (
                         <SelectItem key={variant.sku} value={variant.sku}>
                             {variant.weight} - ₹{variant.price.toFixed(2)}
                         </SelectItem>
                     ))}
                 </SelectContent>
             </Select>
-         ) : variants.length === 1 ? (
+         ) : priceVariants.length === 1 ? (
             <div className="h-9 flex items-center justify-center">
                 <p className="text-sm text-muted-foreground">{selectedVariant?.weight}</p>
             </div>
@@ -90,7 +121,7 @@ export default function ProductCard({ product, image }: ProductCardProps) {
         <Button
           onClick={handleAddToCart}
           className="w-full bg-accent hover:bg-accent/90 text-accent-foreground text-xs h-9"
-          disabled={!selectedVariant}
+          disabled={!selectedVariant || isLoadingPrice}
         >
           <ShoppingCart className="mr-1 h-3.5 w-3.5" />
           Add to Cart

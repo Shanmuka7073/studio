@@ -63,7 +63,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Product",
       "type": "object",
-      "description": "Represents a product listed by a store, with multiple price/weight variants.",
+      "description": "Represents a product listed by a store. Price is fetched from a central collection.",
       "properties": {
         "id": {
           "type": "string",
@@ -80,28 +80,6 @@
         "description": {
           "type": "string",
           "description": "A detailed description of the product."
-        },
-        "variants": {
-          "type": "array",
-          "description": "An array of different weights and prices for the product.",
-          "items": {
-            "type": "object",
-            "properties": {
-              "sku": {
-                "type": "string",
-                "description": "Unique identifier for the variant (e.g., 'prod-potatoes-1kg')."
-              },
-              "weight": {
-                "type": "string",
-                "description": "The weight or size of the variant (e.g., '500gm', '1kg')."
-              },
-              "price": {
-                "type": "number",
-                "description": "The price of this specific variant."
-              }
-            },
-            "required": ["sku", "weight", "price"]
-          }
         },
         "category": {
           "type": "string",
@@ -124,7 +102,6 @@
         "id",
         "storeId",
         "name",
-        "variants",
         "imageId"
       ]
     },

@@ -1,5 +1,5 @@
 
-import type { Store, Product } from './types';
+import type { Store, Product, ProductPrice } from './types';
 // Do not import placeholderData directly anymore to avoid caching issues.
 import {
   collection,
@@ -84,6 +84,23 @@ export async function getProduct(
   return undefined;
 }
 
+/**
+ * Fetches the canonical price for a given product from the `productPrices` collection.
+ * @param db The Firestore instance.
+ * @param productName The name of the product (case-insensitive).
+ * @returns The ProductPrice object or null if not found.
+ */
+export async function getProductPrice(db: Firestore, productName: string): Promise<ProductPrice | null> {
+    if (!productName) return null;
+    const priceDocRef = doc(db, 'productPrices', productName.toLowerCase());
+    const priceSnap = await getDoc(priceDocRef);
+    if (priceSnap.exists()) {
+        return priceSnap.data() as ProductPrice;
+    }
+    return null;
+}
+
+
 // --- Placeholder image functions ---
 
 export const getProductImage = async (imageId: string) => await getImage(imageId);
@@ -93,3 +110,4 @@ export const getStoreImage = async (store: Store) => {
     }
     return await getImage(store.imageId);
 };
+    
