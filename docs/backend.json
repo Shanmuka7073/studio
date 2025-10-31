@@ -95,7 +95,7 @@
         },
         "imageUrl": {
             "type": "string",
-            "description": "The URL of the product image, if generated."
+            "description": "The data URI of the AI-generated product image."
         },
         "imageHint": {
             "type": "string",
@@ -552,7 +552,7 @@
           "schema": {
             "$ref": "#/backend/entities/Product"
           },
-          "description": "Stores product information as a subcollection of a store.",
+          "description": "Stores product information as a a subcollection of a store. The 'imageUrl' is a data URI of an AI-generated image.",
           "params": [
             {
               "name": "storeId",
@@ -712,3 +712,5 @@
     ]
   }
 }
+
+    

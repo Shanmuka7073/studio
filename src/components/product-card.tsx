@@ -18,12 +18,15 @@ interface ProductCardProps {
 
 export default function ProductCard({ product, image }: ProductCardProps) {
   const { addItem } = useCart();
+  
+  // Use the AI-generated data URI if available, otherwise use the placeholder
+  const displayImageUrl = product.imageUrl ? product.imageUrl : image.imageUrl;
 
   return (
     <Card className="flex flex-col h-full overflow-hidden transition-all hover:shadow-lg">
       <CardHeader className="p-0">
         <Image
-          src={image.imageUrl}
+          src={displayImageUrl}
           alt={product.name}
           data-ai-hint={image.imageHint}
           width={300}
@@ -47,3 +50,5 @@ export default function ProductCard({ product, image }: ProductCardProps) {
     </Card>
   );
 }
+
+    

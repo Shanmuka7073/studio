@@ -9,6 +9,8 @@ export type Product = {
   imageId: string;
   storeId: string;
   category?: string;
+  imageUrl?: string; // Data URI for AI-generated image
+  imageHint?: string;
 };
 
 export type Store = {
@@ -82,3 +84,5 @@ export type Payout = {
   payoutMethod: 'bank' | 'upi';
   payoutDetails: any; // upiId or bankDetails
 };
+
+    

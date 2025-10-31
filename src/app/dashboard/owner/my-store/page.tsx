@@ -52,10 +52,11 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Checkbox } from '@/components/ui/checkbox';
 import groceryData from '@/lib/grocery-data.json';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Share2, MapPin, Trash2, AlertCircle, Upload, Image as ImageIcon, Loader2, Camera, CameraOff } from 'lucide-react';
+import { Share2, MapPin, Trash2, AlertCircle, Upload, Image as ImageIcon, Loader2, Camera, CameraOff, Sparkles } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getUniqueProductNames } from '@/app/dashboard/admin/actions';
 import { Progress } from '@/components/ui/progress';
+import { generateSingleImage } from '@/ai/flows/image-generator-flow';
 
 
 const storeSchema = z.object({
@@ -100,6 +101,8 @@ function StoreImageUploader({ store }: { store: Store }) {
     const { toast } = useToast();
     const [uploading, setUploading] = useState(false);
     const [progress, setProgress] = useState(0);
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     
     const [isCameraOn, setIsCameraOn] = useState(false);
     const [capturedImage, setCapturedImage] = useState<string | null>(null);
@@ -148,6 +151,7 @@ function StoreImageUploader({ store }: { store: Store }) {
     const handleToggleCamera = () => {
         setIsCameraOn(prev => !prev);
         setCapturedImage(null); // Clear previous captures when toggling
+        setSelectedFile(null);
     };
     
     const handleCapture = () => {
@@ -167,13 +171,17 @@ function StoreImageUploader({ store }: { store: Store }) {
     };
     
     const handleUpload = () => {
-        if (!capturedImage) return;
-
-        fetch(capturedImage)
-            .then(res => res.blob())
-            .then(blob => {
-                uploadBlob(blob);
-            });
+        if (capturedImage) {
+            fetch(capturedImage)
+                .then(res => res.blob())
+                .then(blob => {
+                    uploadBlob(blob);
+                });
+        } else if (selectedFile) {
+            uploadBlob(selectedFile);
+        } else {
+            return;
+        }
     };
 
     const uploadBlob = (blob: Blob) => {
@@ -204,17 +212,27 @@ function StoreImageUploader({ store }: { store: Store }) {
                     await updateDoc(storeRef, { imageUrl: downloadURL });
                     setUploading(false);
                     setCapturedImage(null);
+                    setSelectedFile(null);
                     toast({ title: 'Image Uploaded!' });
                 });
             }
         );
     };
 
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        if (event.target.files && event.target.files[0]) {
+            setSelectedFile(event.target.files[0]);
+            setCapturedImage(URL.createObjectURL(event.target.files[0]));
+            setIsCameraOn(false);
+        }
+    }
+
+
     return (
         <Card>
             <CardHeader>
                 <CardTitle>Store Image</CardTitle>
-                <CardDescription>Take a picture of your storefront.</CardDescription>
+                <CardDescription>Take or upload a picture of your storefront.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                  <div className="w-full aspect-video relative rounded-md overflow-hidden border bg-muted">
@@ -233,6 +251,8 @@ function StoreImageUploader({ store }: { store: Store }) {
                 </div>
                  {/* Hidden canvas for capturing frame */}
                  <canvas ref={canvasRef} style={{ display: 'none' }} />
+                 <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
+
 
                 {uploading ? (
                     <div className="space-y-2">
@@ -250,6 +270,13 @@ function StoreImageUploader({ store }: { store: Store }) {
                             <Button onClick={handleCapture}>Capture</Button>
                         )}
                         
+                        {!isCameraOn && !capturedImage && (
+                            <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+                                <Upload className="mr-2 h-4 w-4" />
+                                From Device
+                            </Button>
+                        )}
+
                         {capturedImage && (
                              <Button onClick={handleUpload}>
                                 <Upload className="mr-2 h-4 w-4" />
@@ -315,26 +342,38 @@ function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPric
     }
 
     startTransition(async () => {
-       const batch = writeBatch(firestore);
+        const batch = writeBatch(firestore);
+        
+        // Use Promise.all to wait for all image generations
+        const imageGenerationPromises = productsToAdd.map(async ([name]) => {
+            const imageInfo = await generateSingleImage(name);
+            return { name, imageInfo };
+        });
+
+        const generatedImages = await Promise.all(imageGenerationPromises);
+
         productsToAdd.forEach(([name, { price }]) => {
-          const newProductRef = doc(collection(firestore, 'stores', storeId, 'products'));
-          const category = groceryData.categories.find(c => Array.isArray(c.items) && c.items.includes(name))?.categoryName || 'Miscellaneous';
-          const imageId = `prod-${createSlug(name)}`;
-          
-          batch.set(newProductRef, {
-            name,
-            price: parseFloat(price),
-            description: '',
-            storeId: storeId,
-            imageId: imageId,
-            category: category,
-          });
+            const newProductRef = doc(collection(firestore, 'stores', storeId, 'products'));
+            const category = groceryData.categories.find(c => Array.isArray(c.items) && c.items.includes(name))?.categoryName || 'Miscellaneous';
+            
+            const generated = generatedImages.find(gen => gen.name === name);
+
+            batch.set(newProductRef, {
+                name,
+                price: parseFloat(price),
+                description: '',
+                storeId: storeId,
+                imageId: generated?.imageInfo?.id || `prod-${createSlug(name)}`,
+                imageUrl: generated?.imageInfo?.imageUrl || '',
+                imageHint: generated?.imageInfo?.imageHint || '',
+                category: category,
+            });
         });
         
         batch.commit().then(() => {
           toast({
             title: `${productsToAdd.length} Products Added!`,
-            description: 'The selected products have been added to your inventory.',
+            description: 'The selected products and their AI-generated images have been added.',
           });
           setSelectedProducts({});
         }).catch((serverError) => {
@@ -355,7 +394,7 @@ function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPric
     <Card>
       <CardHeader>
         <CardTitle>Bulk Add Products</CardTitle>
-        <CardDescription>Select from a master list of grocery items to quickly add to your store.</CardDescription>
+        <CardDescription>Select from a master list. Product images will be generated automatically by AI.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <Accordion type="multiple" className="w-full">
@@ -402,7 +441,14 @@ function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPric
           })}
         </Accordion>
         <Button onClick={handleAddSelectedProducts} disabled={isAdding || selectedCount === 0} className="w-full">
-            {isAdding ? 'Adding...' : `Add ${selectedCount} Selected Products`}
+            {isAdding ? (
+                <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Adding & Generating Images...
+                </>
+            ) : (
+                `Add ${selectedCount} Selected Products`
+            )}
         </Button>
       </CardContent>
     </Card>
@@ -423,37 +469,45 @@ function AddProductForm({ storeId }: { storeId: string }) {
   const onSubmit = (data: ProductFormValues) => {
     if (!firestore) return;
 
-    startTransition(() => {
-        const imageId = `prod-${createSlug(data.name)}`;
-        const productData = {
-            ...data,
-            storeId,
-            imageId: imageId,
-        };
-        
-        const productsCol = collection(firestore, 'stores', storeId, 'products');
-        
-        addDoc(productsCol, productData).then(() => {
+    startTransition(async () => {
+        try {
+            const imageInfo = await generateSingleImage(data.name);
+
+            const productData = {
+                ...data,
+                storeId,
+                imageId: imageInfo?.id || `prod-${createSlug(data.name)}`,
+                imageUrl: imageInfo?.imageUrl || '',
+                imageHint: imageInfo?.imageHint || '',
+            };
+            
+            const productsCol = collection(firestore, 'stores', storeId, 'products');
+            
+            await addDoc(productsCol, productData);
+            
             toast({
                 title: 'Product Added!',
-                description: `${data.name} has been added to your store.`,
+                description: `${data.name} has been added with an AI-generated image.`,
             });
             form.reset();
-        }).catch(async (serverError) => {
+
+        } catch (serverError) {
+            console.error("Failed to create product:", serverError);
             const permissionError = new FirestorePermissionError({
-              path: productsCol.path,
+              path: `stores/${storeId}/products`,
               operation: 'create',
-              requestResourceData: productData,
+              requestResourceData: data,
             });
             errorEmitter.emit('permission-error', permissionError);
-        });
+        }
     });
   };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Add a New Product</CardTitle>
+        <CardTitle>Add a Custom Product</CardTitle>
+        <CardDescription>An image will be generated by AI based on the product name.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -524,7 +578,17 @@ function AddProductForm({ storeId }: { storeId: string }) {
               )}
             />
             <Button type="submit" disabled={isPending} className="bg-accent hover:bg-accent/90 text-accent-foreground">
-              {isPending ? 'Adding...' : 'Add Product'}
+                {isPending ? (
+                    <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Adding & Generating Image...
+                    </>
+                ) : (
+                    <>
+                        <Sparkles className="mr-2 h-4 w-4" />
+                        Add Product
+                    </>
+                )}
             </Button>
           </form>
         </Form>
@@ -1109,3 +1173,5 @@ export default function MyStorePage() {
     </div>
   );
 }
+
+    
