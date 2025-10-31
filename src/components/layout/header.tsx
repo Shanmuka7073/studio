@@ -99,6 +99,12 @@ function UserMenu() {
             <>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>Admin</DropdownMenuLabel>
+                <Link href="/dashboard/owner/my-store" passHref>
+                    <DropdownMenuItem>
+                        <Store className="mr-2 h-4 w-4" />
+                        <span>Master Store</span>
+                    </DropdownMenuItem>
+                </Link>
                  <Link href="/dashboard/site-config" passHref>
                     <DropdownMenuItem>
                         <Settings className="mr-2 h-4 w-4" />
@@ -212,15 +218,24 @@ export function Header() {
                     ))}
                     {isAdmin && (
                         <>
-                         <SheetClose asChild>
-                            <Link
-                                href="/dashboard/site-config"
-                                className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
-                            >
-                                <Settings className="h-4 w-4" />
-                                Site Config
-                            </Link>
-                        </SheetClose>
+                            <SheetClose asChild>
+                                <Link
+                                    href="/dashboard/owner/my-store"
+                                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+                                >
+                                    <Store className="h-4 w-4" />
+                                    Master Store
+                                </Link>
+                            </SheetClose>
+                            <SheetClose asChild>
+                                <Link
+                                    href="/dashboard/site-config"
+                                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+                                >
+                                    <Settings className="h-4 w-4" />
+                                    Site Config
+                                </Link>
+                            </SheetClose>
                         </>
                     )}
                 </div>
