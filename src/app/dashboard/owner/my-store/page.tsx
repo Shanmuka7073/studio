@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -321,46 +322,45 @@ function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPric
 
     startTransition(async () => {
         const batch = writeBatch(firestore);
-        let productsAddedCount = 0;
         
-        try {
-            for (const name of productsToAdd) {
-                const variants = adminPrices[name.toLowerCase()];
-                if (!variants || variants.length === 0) {
-                    toast({
-                        variant: 'destructive',
-                        title: 'Pricing Not Found',
-                        description: `Admin has not set a price for "${name}". Please add it as a custom product or ask an admin to set the price.`,
-                    });
-                    continue; // Skip this product
-                }
-
-                const imageInfo = await generateSingleImage(name);
-                const newProductRef = doc(collection(firestore, 'stores', storeId, 'products'));
-                const category = groceryData.categories.find(c => Array.isArray(c.items) && c.items.includes(name))?.categoryName || 'Miscellaneous';
-                
-                const productData: Omit<Product, 'id'> = {
-                    name,
-                    variants,
-                    description: '',
-                    storeId,
-                    imageId: imageInfo?.id || `prod-${createSlug(name)}`,
-                    imageUrl: imageInfo?.imageUrl || '',
-                    imageHint: imageInfo?.imageHint || '',
-                    category,
-                };
-                
-                batch.set(newProductRef, productData);
-                productsAddedCount++;
+        for (const name of productsToAdd) {
+            const variants = adminPrices[name.toLowerCase()];
+            if (!variants || variants.length === 0) {
+                toast({
+                    variant: 'destructive',
+                    title: 'Pricing Not Found',
+                    description: `Admin has not set a price for "${name}". Please add it as a custom product or ask an admin to set the price.`,
+                });
+                continue; // Skip this product
             }
 
-            if (productsAddedCount > 0) {
-              await batch.commit();
+            const imageInfo = await generateSingleImage(name);
+            const newProductRef = doc(collection(firestore, 'stores', storeId, 'products'));
+            const category = groceryData.categories.find(c => Array.isArray(c.items) && c.items.includes(name))?.categoryName || 'Miscellaneous';
+            
+            const productData: Omit<Product, 'id'> = {
+                name,
+                variants,
+                description: '',
+                storeId,
+                imageId: imageInfo?.id || `prod-${createSlug(name)}`,
+                imageUrl: imageInfo?.imageUrl || '',
+                imageHint: imageInfo?.imageHint || '',
+                category,
+            };
+            
+            batch.set(newProductRef, productData);
+        }
 
-              toast({
-                  title: `${productsAddedCount} Products Added!`,
-                  description: 'The selected products and their prices have been added to your store.',
-              });
+        try {
+            await batch.commit();
+
+            const productsAddedCount = productsToAdd.length;
+            if (productsAddedCount > 0) {
+                toast({
+                    title: `${productsAddedCount} Products Added!`,
+                    description: 'The selected products and their prices have been added to your store.',
+                });
             }
             setSelectedProducts({});
 
@@ -1144,4 +1144,3 @@ export default function MyStorePage() {
     </div>
   );
 }
-    
