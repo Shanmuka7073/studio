@@ -52,7 +52,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Checkbox } from '@/components/ui/checkbox';
 import groceryData from '@/lib/grocery-data.json';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Share2, MapPin, Trash2, AlertCircle, Upload, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Share2, MapPin, Trash2, AlertCircle, Upload, Image as ImageIcon, Loader2, Camera, CameraOff } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getUniqueProductNames } from '@/app/dashboard/admin/actions';
 import { Progress } from '@/components/ui/progress';
@@ -100,31 +100,89 @@ function StoreImageUploader({ store }: { store: Store }) {
     const { toast } = useToast();
     const [uploading, setUploading] = useState(false);
     const [progress, setProgress] = useState(0);
-    const [selectedFile, setSelectedFile] = useState<File | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    
+    const [isCameraOn, setIsCameraOn] = useState(false);
+    const [capturedImage, setCapturedImage] = useState<string | null>(null);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const streamRef = useRef<MediaStream | null>(null);
 
-    const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-        if (event.target.files && event.target.files[0]) {
-            setSelectedFile(event.target.files[0]);
+    const stopCamera = () => {
+        if (streamRef.current) {
+            streamRef.current.getTracks().forEach(track => track.stop());
+            streamRef.current = null;
         }
+        setIsCameraOn(false);
     };
 
-    const handleUpload = () => {
-        if (!selectedFile || !firestore) {
-            toast({
-                variant: 'destructive',
-                title: 'No file selected',
-                description: 'Please select an image file to upload.',
-            });
+    const handleToggleCamera = async () => {
+        if (isCameraOn) {
+            stopCamera();
             return;
         }
+
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                streamRef.current = stream;
+                if (videoRef.current) {
+                    videoRef.current.srcObject = stream;
+                }
+                setIsCameraOn(true);
+                setCapturedImage(null); // Clear previous captures
+            } catch (error) {
+                console.error("Error accessing camera:", error);
+                toast({
+                    variant: 'destructive',
+                    title: 'Camera Access Denied',
+                    description: 'Please enable camera permissions in your browser settings.',
+                });
+            }
+        } else {
+            toast({
+                variant: 'destructive',
+                title: 'Camera Not Supported',
+                description: 'Your browser does not support camera access.',
+            });
+        }
+    };
+    
+    const handleCapture = () => {
+        if (videoRef.current && canvasRef.current) {
+            const video = videoRef.current;
+            const canvas = canvasRef.current;
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const context = canvas.getContext('2d');
+            if(context) {
+                context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+                const dataUrl = canvas.toDataURL('image/jpeg');
+                setCapturedImage(dataUrl);
+                stopCamera();
+            }
+        }
+    };
+    
+    const handleUpload = () => {
+        if (!capturedImage) return;
+
+        fetch(capturedImage)
+            .then(res => res.blob())
+            .then(blob => {
+                uploadBlob(blob);
+            });
+    };
+
+    const uploadBlob = (blob: Blob) => {
+        if (!firestore) return;
 
         setUploading(true);
         setProgress(0);
 
         const storage = getStorage();
-        const storageRef = ref(storage, `store-images/${store.id}/${selectedFile.name}`);
-        const uploadTask = uploadBytesResumable(storageRef, selectedFile);
+        const fileName = `${Date.now()}.jpg`;
+        const storageRef = ref(storage, `store-images/${store.id}/${fileName}`);
+        const uploadTask = uploadBytesResumable(storageRef, blob);
 
         uploadTask.on(
             'state_changed',
@@ -133,26 +191,17 @@ function StoreImageUploader({ store }: { store: Store }) {
                 setProgress(currentProgress);
             },
             (error) => {
-                console.error("Upload failed:", error);
-                toast({
-                    variant: 'destructive',
-                    title: 'Upload Failed',
-                    description: 'There was an error uploading your image. Please check permissions and try again.',
-                });
                 setUploading(false);
-                setSelectedFile(null);
+                console.error("Upload failed:", error);
+                toast({ variant: 'destructive', title: 'Upload Failed' });
             },
             () => {
                 getDownloadURL(uploadTask.snapshot.ref).then(async (downloadURL) => {
                     const storeRef = doc(firestore, 'stores', store.id);
                     await updateDoc(storeRef, { imageUrl: downloadURL });
-
-                    toast({
-                        title: 'Image Uploaded!',
-                        description: 'Your store image has been updated successfully.',
-                    });
                     setUploading(false);
-                    setSelectedFile(null);
+                    setCapturedImage(null);
+                    toast({ title: 'Image Uploaded!' });
                 });
             }
         );
@@ -162,61 +211,54 @@ function StoreImageUploader({ store }: { store: Store }) {
         <Card>
             <CardHeader>
                 <CardTitle>Store Image</CardTitle>
-                <CardDescription>Upload a picture to represent your storefront.</CardDescription>
+                <CardDescription>Take a picture of your storefront.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-                <div className="w-full aspect-video relative rounded-md overflow-hidden border">
-                    {store.imageUrl ? (
+                 <div className="w-full aspect-video relative rounded-md overflow-hidden border">
+                    {capturedImage ? (
+                        <Image src={capturedImage} alt="Captured preview" fill className="object-cover" />
+                    ) : isCameraOn ? (
+                         <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                    ) : store.imageUrl ? (
                         <Image src={store.imageUrl} alt={store.name} fill className="object-cover" />
                     ) : (
                         <div className="flex flex-col items-center justify-center h-full bg-muted/50 text-muted-foreground">
                             <ImageIcon className="h-10 w-10 mb-2" />
-                            <p className="text-sm">No image uploaded</p>
+                            <p className="text-sm">No image set</p>
                         </div>
                     )}
                 </div>
+                 {/* Hidden canvas for capturing frame */}
+                 <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-                <div className="flex items-center gap-4">
-                    <Input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileSelect}
-                        className="hidden"
-                    />
-                    <Button
-                        variant="outline"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="flex-1"
-                        disabled={uploading}
-                    >
-                        {selectedFile ? 'Change Image' : 'Select Image'}
-                    </Button>
-                    {selectedFile && (
-                        <Button onClick={handleUpload} className="flex-1" disabled={uploading}>
-                            <Upload className="mr-2 h-4 w-4" />
-                            Upload & Save
-                        </Button>
-                    )}
-                </div>
-
-                {uploading && (
+                {uploading ? (
                     <div className="space-y-2">
                         <Progress value={progress} />
                         <p className="text-xs text-center text-muted-foreground">Uploading... {Math.round(progress)}%</p>
                     </div>
-                )}
-                
-                {selectedFile && !uploading && (
-                    <p className="text-sm text-muted-foreground">
-                        Selected: <span className="font-medium">{selectedFile.name}</span>
-                    </p>
+                ) : (
+                    <div className="grid grid-cols-2 gap-4">
+                        <Button variant="outline" onClick={handleToggleCamera}>
+                            {isCameraOn ? <CameraOff className="mr-2 h-4 w-4" /> : <Camera className="mr-2 h-4 w-4" />}
+                            {isCameraOn ? 'Close Camera' : 'Open Camera'}
+                        </Button>
+                        
+                        {isCameraOn && !capturedImage && (
+                            <Button onClick={handleCapture}>Capture</Button>
+                        )}
+                        
+                        {capturedImage && (
+                             <Button onClick={handleUpload}>
+                                <Upload className="mr-2 h-4 w-4" />
+                                Upload & Save
+                            </Button>
+                        )}
+                    </div>
                 )}
             </CardContent>
         </Card>
     );
 }
-
 
 function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPrices: Record<string, number> }) {
   const { toast } = useToast();
