@@ -381,7 +381,7 @@ function ProductChecklist({ storeId, isAdmin, adminStoreId }: { storeId: string;
       <CardHeader>
         <CardTitle>Bulk Add Products</CardTitle>
         <CardDescription>
-            {isAdmin ? 'Select products to add to the master catalog. You must set prices manually.' : 'Select products to add to your store. Prices are set by the admin.'}
+            {isAdmin ? 'Please add products one-by-one to set master prices.' : 'Select products to add to your store. Prices are set by the admin.'}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -401,6 +401,7 @@ function ProductChecklist({ storeId, isAdmin, adminStoreId }: { storeId: string;
                           id={`${category.categoryName}-${item}`}
                           onCheckedChange={(checked) => handleProductSelection(item, !!checked)}
                           checked={selectedProducts[item] || false}
+                          disabled={isAdmin}
                         />
                         <label
                           htmlFor={`${category.categoryName}-${item}`}
@@ -416,7 +417,7 @@ function ProductChecklist({ storeId, isAdmin, adminStoreId }: { storeId: string;
             )
           })}
         </Accordion>
-        <Button onClick={handleAddSelectedProducts} disabled={isAdding || Object.values(selectedProducts).filter(Boolean).length === 0} className="w-full">
+        <Button onClick={handleAddSelectedProducts} disabled={isAdding || Object.values(selectedProducts).filter(Boolean).length === 0 || isAdmin} className="w-full">
           {isAdding ? 'Adding...' : `Add ${Object.values(selectedProducts).filter(Boolean).length} Selected Products`}
         </Button>
       </CardContent>
@@ -425,7 +426,7 @@ function ProductChecklist({ storeId, isAdmin, adminStoreId }: { storeId: string;
 }
 
 
-function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolean }) {
+function AddProductForm({ storeId, isAdmin, adminStoreId }: { storeId: string; isAdmin: boolean; adminStoreId?: string; }) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const { firestore } = useFirebase();
@@ -443,45 +444,65 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
   const onSubmit = (data: ProductFormValues) => {
     if (!firestore) return;
 
-    const variantsWithSkus = data.variants.map((variant, index) => ({
-      ...variant,
-      sku: `${createSlug(data.name)}-${createSlug(variant.weight)}-${index}`
-    }));
-
     startTransition(async () => {
-        try {
-            const imageInfo = await generateSingleImage(data.name);
+      try {
+        let variantsWithSkus = data.variants.map((variant, index) => ({
+          ...variant,
+          sku: `${createSlug(data.name)}-${createSlug(variant.weight)}-${index}`
+        }));
+        
+        // If not admin, fetch prices from admin store
+        if (!isAdmin && adminStoreId) {
+            const adminProductsRef = collection(firestore, 'stores', adminStoreId, 'products');
+            const q = query(adminProductsRef, where('name', '==', data.name));
+            const querySnapshot = await getDocs(q);
 
-            const productData: Omit<Product, 'id'> = {
-                name: data.name,
-                description: data.description,
-                category: data.category,
-                storeId,
-                variants: variantsWithSkus,
-                imageId: imageInfo?.id || `prod-${createSlug(data.name)}`,
-                imageUrl: imageInfo?.imageUrl || '',
-                imageHint: imageInfo?.imageHint || '',
-            };
-            
-            const productsCol = collection(firestore, 'stores', storeId, 'products');
-            
-            await addDoc(productsCol, productData);
-            
-            toast({
-                title: 'Product Added!',
-                description: `${data.name} has been added with an AI-generated image.`,
-            });
-            form.reset();
-
-        } catch (serverError) {
-            console.error("Failed to create product:", serverError);
-            const permissionError = new FirestorePermissionError({
-              path: `stores/${storeId}/products`,
-              operation: 'create',
-              requestResourceData: data,
-            });
-            errorEmitter.emit('permission-error', permissionError);
+            if (!querySnapshot.empty) {
+                const adminProduct = querySnapshot.docs[0].data() as Product;
+                // Overwrite variants with master variants
+                variantsWithSkus = adminProduct.variants;
+            } else {
+                 toast({
+                    variant: 'destructive',
+                    title: 'Price Not Found',
+                    description: `The master price for "${data.name}" has not been set by the admin yet.`,
+                });
+                return;
+            }
         }
+
+        const imageInfo = await generateSingleImage(data.name);
+
+        const productData: Omit<Product, 'id'> = {
+          name: data.name,
+          description: data.description,
+          category: data.category,
+          storeId,
+          variants: variantsWithSkus,
+          imageId: imageInfo?.id || `prod-${createSlug(data.name)}`,
+          imageUrl: imageInfo?.imageUrl || '',
+          imageHint: imageInfo?.imageHint || '',
+        };
+        
+        const productsCol = collection(firestore, 'stores', storeId, 'products');
+        
+        await addDoc(productsCol, productData);
+        
+        toast({
+          title: 'Product Added!',
+          description: `${data.name} has been added with an AI-generated image.`,
+        });
+        form.reset();
+
+      } catch (serverError) {
+        console.error("Failed to create product:", serverError);
+        const permissionError = new FirestorePermissionError({
+          path: `stores/${storeId}/products`,
+          operation: 'create',
+          requestResourceData: data,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      }
     });
   };
 
@@ -889,17 +910,10 @@ function ManageStoreView({ store, isAdmin, adminStoreId }: { store: Store; isAdm
         {needsLocationUpdate && <UpdateLocationForm store={store} onUpdate={() => {}} />}
         <div className="grid md:grid-cols-2 gap-8">
             <StoreImageUploader store={store} />
-            <AddProductForm storeId={store.id} isAdmin={isAdmin} />
+            <AddProductForm storeId={store.id} isAdmin={isAdmin} adminStoreId={adminStoreId} />
         </div>
          <div className="grid md:grid-cols-2 gap-8">
-             {isAdmin ? (
-                <Card>
-                    <CardHeader><CardTitle>Bulk Add Master Products</CardTitle></CardHeader>
-                    <CardContent><p className="text-muted-foreground">Please add products one-by-one to set master prices.</p></CardContent>
-                </Card>
-             ) : (
-                <ProductChecklist storeId={store.id} isAdmin={isAdmin} adminStoreId={adminStoreId} />
-             )}
+            <ProductChecklist storeId={store.id} isAdmin={isAdmin} adminStoreId={adminStoreId} />
             <PromoteStore store={store} />
         </div>
         <Card>
@@ -1143,9 +1157,9 @@ export default function MyStorePage() {
   const isAdmin = useMemo(() => user?.email === ADMIN_EMAIL, [user]);
 
   const ownerStoreQuery = useMemoFirebase(() => {
-      if (!firestore || !user) return null;
+      if (!firestore || !user || isAdmin) return null;
       return query(collection(firestore, 'stores'), where('ownerId', '==', user.uid));
-  }, [firestore, user]);
+  }, [firestore, user, isAdmin]);
 
   const { data: ownerStores, isLoading: isOwnerStoreLoading } = useCollection<Store>(ownerStoreQuery);
   const myStore = ownerStores?.[0];
@@ -1170,25 +1184,26 @@ export default function MyStorePage() {
     return <div className="container mx-auto py-12 px-4 md:px-6">Loading your store...</div>
   }
   
-  let content;
-  if (isAdmin) {
-    // If admin and the master store exists, show management view.
-    if (adminStore) {
-        content = <ManageStoreView store={adminStore} isAdmin={true} />;
-    } else {
-        // If admin and master store does NOT exist, show create form.
-        content = <CreateStoreForm user={user} isAdmin={true} />;
+  const renderContent = () => {
+    if (!user) {
+      return null; // Or a login prompt, but the useEffect will redirect
     }
-  } else {
-    // If regular user and their store exists, show management view.
-    if (myStore) {
-        content = <ManageStoreView store={myStore} isAdmin={false} adminStoreId={adminStore?.id} />;
-    } else {
-        // If regular user and their store does NOT exist, show create form.
-        content = <CreateStoreForm user={user} isAdmin={false} />;
-    }
-  }
 
+    if (isAdmin) {
+      if (adminStore) {
+        return <ManageStoreView store={adminStore} isAdmin={true} />;
+      } else {
+        return <CreateStoreForm user={user} isAdmin={true} />;
+      }
+    } else { // Regular user
+      if (myStore) {
+        return <ManageStoreView store={myStore} isAdmin={false} adminStoreId={adminStore?.id} />;
+      } else {
+        return <CreateStoreForm user={user} isAdmin={false} />;
+      }
+    }
+  };
+  
   const pageTitle = isAdmin
     ? (adminStore ? `Master Catalog: ${adminStore.name}` : 'Create Master Store')
     : (myStore ? `Dashboard: ${myStore.name}` : 'Create Your Store');
@@ -1198,7 +1213,7 @@ export default function MyStorePage() {
       <h1 className="text-4xl font-bold font-headline mb-8">
         {pageTitle}
       </h1>
-      {content}
+      {renderContent()}
     </div>
   );
 }
