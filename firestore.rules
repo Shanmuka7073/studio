@@ -193,14 +193,15 @@ service cloud.firestore {
       * @path /deliveryPartners/{partnerId}
       * @allow (get, update) - Delivery partner can get and update their own document.
       * @allow (create) - A delivery partner can create their document with their userId.
-      * @deny (list, delete) - Listing and deleting is not allowed.
-      * @principle Only the partner can manage their own data.
+      * @deny (list, delete) - Listing is only allowed for admins. Deleting is not allowed.
+      * @principle Only the partner can manage their own data, but admins can list all partners.
       */
     match /deliveryPartners/{partnerId} {
       allow get: if isOwner(partnerId);
+      allow list: if isAdmin();
       allow create: if isOwner(partnerId) && request.resource.data.userId == partnerId;
       allow update: if isExistingOwner(partnerId) && request.resource.data.userId == partnerId;
-      allow list, delete: if false;
+      allow delete: if false;
     }
 
     /**
@@ -228,4 +229,5 @@ service firebase.storage {
     }
   }
 }
+
     
