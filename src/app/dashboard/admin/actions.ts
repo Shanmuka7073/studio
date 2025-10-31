@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { getApps, initializeApp, getApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
+import groceryData from '@/lib/grocery-data.json';
 
 
 // Helper function for robust server-side Firebase admin initialization
@@ -111,25 +112,19 @@ export async function saveProductPrices(productName: string, variants: ProductVa
 
 export async function getUniqueProductNames(): Promise<string[]> {
     try {
-        const { firestore } = getAdminServices();
-        const productsSnapshot = await firestore.collectionGroup('products').get();
-
-        if (productsSnapshot.empty) {
-            return [];
-        }
-
         const nameSet = new Set<string>();
-        productsSnapshot.forEach(doc => {
-            const product = doc.data() as Product;
-            if (product.name) {
-                nameSet.add(product.name);
+        groceryData.categories.forEach(category => {
+            if (Array.isArray(category.items)) {
+                category.items.forEach(item => {
+                    nameSet.add(item);
+                });
             }
         });
         
-        return Array.from(nameSet);
+        return Array.from(nameSet).sort();
 
     } catch (error) {
-        console.error(`Failed to fetch unique product names:`, error);
+        console.error(`Failed to fetch unique product names from JSON file:`, error);
         return [];
     }
 }
