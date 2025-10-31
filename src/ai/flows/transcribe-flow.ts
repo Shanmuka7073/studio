@@ -1,0 +1,44 @@
+'use server';
+/**
+ * @fileOverview A simple flow to transcribe an audio file.
+ *
+ * - transcribeAudio - Takes an audio data URI and returns the transcribed text.
+ */
+
+import { ai } from '@/ai/genkit';
+import { z } from 'genkit';
+import { googleAI } from '@genkit-ai/google-genai';
+
+const TranscribeInputSchema = z.string().describe(
+  "An audio file as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
+);
+
+const TranscribeOutputSchema = z.string().describe("The transcribed text from the audio.");
+
+export async function transcribeAudio(audioDataUri: string): Promise<string> {
+    const result = await transcribeFlow(audioDataUri);
+    return result;
+}
+
+const transcribeFlow = ai.defineFlow(
+    {
+        name: 'transcribeFlow',
+        inputSchema: TranscribeInputSchema,
+        outputSchema: TranscribeOutputSchema,
+    },
+    async (audioDataUri) => {
+        try {
+            const { text } = await ai.generate({
+                model: googleAI.model('gemini-1.5-flash'),
+                prompt: [
+                    { text: 'Transcribe the following audio recording of a shopping list. The user may speak in a mix of English and other languages like Telugu or Hindi. Transcribe it as accurately as possible.' },
+                    { media: { url: audioDataUri } },
+                ],
+            });
+            return text;
+        } catch (e) {
+            console.error("Transcription failed in flow:", e);
+            throw new Error("Failed to transcribe audio.");
+        }
+    }
+);

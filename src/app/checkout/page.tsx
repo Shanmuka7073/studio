@@ -25,21 +25,22 @@ import { useTransition, useState, useRef, useCallback, useEffect } from 'react';
 import { useFirebase, errorEmitter } from '@/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { Mic, StopCircle, CheckCircle, MapPin } from 'lucide-react';
+import { Mic, StopCircle, CheckCircle, MapPin, Loader2, Bot } from 'lucide-react';
 import Link from 'next/link';
 import { Textarea } from '@/components/ui/textarea';
+import { transcribeAudio } from '@/ai/flows/transcribe-flow';
+import { ShoppingListItem, understandShoppingList } from '@/ai/flows/nlu-flow';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 const checkoutSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   phone: z.string().min(10, 'Please enter a valid phone number'),
-  notes: z.string().optional(),
 });
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
 
 const DELIVERY_FEE = 30;
 
-// A component to render each summary item, now receiving image data directly
 function OrderSummaryItem({ item, image }) {
     const { product, variant, quantity } = item;
 
@@ -67,6 +68,9 @@ export default function CheckoutPage() {
 
   const [isRecording, setIsRecording] = useState(false);
   const [recordedAudioUri, setRecordedAudioUri] = useState<string | null>(null);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [structuredList, setStructuredList] = useState<ShoppingListItem[]>([]);
+
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -102,6 +106,7 @@ export default function CheckoutPage() {
       .then(stream => {
         setIsRecording(true);
         setRecordedAudioUri(null);
+        setStructuredList([]);
 
         const recorder = new MediaRecorder(stream);
         mediaRecorderRef.current = recorder;
@@ -132,12 +137,42 @@ export default function CheckoutPage() {
       });
   };
 
+  const handleTranscribe = async () => {
+    if (!recordedAudioUri) return;
+    setIsTranscribing(true);
+    setStructuredList([]);
+    try {
+        const rawText = await transcribeAudio(recordedAudioUri);
+        if (!rawText) {
+            throw new Error("Transcription returned empty.");
+        }
+        
+        const shoppingListResponse = await understandShoppingList(rawText);
+        if (shoppingListResponse && shoppingListResponse.items) {
+             setStructuredList(shoppingListResponse.items);
+             toast({ title: "List Understood!", description: "Your shopping list has been prepared." });
+        } else {
+             throw new Error("Could not understand the shopping list.");
+        }
+
+    } catch (error) {
+        console.error("Transcription or NLU error:", error);
+        toast({
+            variant: 'destructive',
+            title: 'Processing Failed',
+            description: 'Could not understand the items in your recording. Please try again.'
+        });
+    } finally {
+        setIsTranscribing(false);
+    }
+  };
+
+
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
     defaultValues: {
       name: '',
       phone: '',
-      notes: '',
     },
   });
 
@@ -170,7 +205,7 @@ export default function CheckoutPage() {
         return;
     }
 
-    const isVoiceOrder = cartItems.length === 0 && !!recordedAudioUri;
+    const isVoiceOrder = cartItems.length === 0 && (!!recordedAudioUri || structuredList.length > 0);
     const storeId = cartItems[0]?.product.storeId;
     
     if (cartItems.length === 0 && !isVoiceOrder) {
@@ -198,7 +233,7 @@ export default function CheckoutPage() {
             orderDate: serverTimestamp(),
             status: 'Pending' as 'Pending',
             totalAmount,
-            translatedList: data.notes || '',
+            translatedList: structuredList.map(item => `${item.productName} - ${item.quantity}`).join('\n'),
         };
 
         if (isVoiceOrder) {
@@ -219,6 +254,7 @@ export default function CheckoutPage() {
         addDoc(colRef, orderData).then(() => {
             clearCart();
             setRecordedAudioUri(null);
+            setStructuredList([]);
             setDeliveryCoords(null);
             form.reset();
 
@@ -239,7 +275,7 @@ export default function CheckoutPage() {
     });
   };
 
-  if (cartItems.length === 0 && !recordedAudioUri) {
+  if (cartItems.length === 0 && !recordedAudioUri && structuredList.length === 0) {
      return (
         <div className="container mx-auto py-24 px-4 md:px-6">
             <div className="grid md:grid-cols-2 gap-12 items-center">
@@ -336,24 +372,7 @@ export default function CheckoutPage() {
                       </FormItem>
                     )}
                   />
-                  {cartItems.length === 0 && (
-                    <FormField
-                      control={form.control}
-                      name="notes"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Special Instructions or Shopping List</FormLabel>
-                          <FormControl>
-                            <Textarea placeholder="e.g. 1kg chicken, half kg skinless..." {...field} rows={5} />
-                          </FormControl>
-                          <FormDescription>
-                            Add any notes for the shopkeeper, or type your shopping list here.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
+                  
                   <Button type="submit" disabled={isPlacingOrder} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
                     {isPlacingOrder ? 'Placing Order...' : 'Place Order'}
                   </Button>
@@ -384,10 +403,39 @@ export default function CheckoutPage() {
                         </div>
                     </>
                  )}
-                 {cartItems.length === 0 && recordedAudioUri && (
+                 {(recordedAudioUri || structuredList.length > 0) && cartItems.length === 0 && (
                     <div className="space-y-4">
-                        <p className="text-muted-foreground text-sm">Your order will be fulfilled based on your voice memo and any typed notes.</p>
-                        <audio src={recordedAudioUri} controls className="w-full" />
+                        <p className="text-muted-foreground text-sm">Your order will be fulfilled based on your voice memo and the items understood by our AI.</p>
+                        {recordedAudioUri && <audio src={recordedAudioUri} controls className="w-full" />}
+                        
+                        {isTranscribing ? (
+                           <div className="flex items-center justify-center text-muted-foreground">
+                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                             <span>Understanding your list...</span>
+                           </div>
+                        ) : structuredList.length > 0 && (
+                           <Card className="bg-muted/50">
+                            <CardHeader><CardTitle className="text-base">Understood Items</CardTitle></CardHeader>
+                            <CardContent>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Item</TableHead>
+                                            <TableHead>Quantity</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {structuredList.map((item, index) => (
+                                            <TableRow key={index}>
+                                                <TableCell>{item.productName}</TableCell>
+                                                <TableCell>{item.quantity}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </CardContent>
+                           </Card>
+                        )}
                         <div className="flex justify-between items-center">
                             <p className="font-medium">Delivery Fee</p>
                             <p>₹{DELIVERY_FEE.toFixed(2)}</p>
@@ -415,8 +463,15 @@ export default function CheckoutPage() {
                     {isRecording ? 'Stop Recording' : (recordedAudioUri ? 'Re-record List' : 'Record List')}
                 </Button>
                 
+                 {recordedAudioUri && !isTranscribing && (
+                    <Button onClick={handleTranscribe} size="lg" className="w-48">
+                        <Bot className="mr-2 h-5 w-5" />
+                        Understand List
+                    </Button>
+                )}
+
                 <p className="text-sm text-muted-foreground text-center">
-                    {recordedAudioUri ? "You can re-record if needed." : "You can add special instructions or your full shopping list via voice."}
+                    {recordedAudioUri ? "Click 'Understand List' to process your recording." : "You can add special instructions or your full shopping list via voice."}
                 </p>
              </CardContent>
            </Card>

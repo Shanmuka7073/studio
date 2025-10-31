@@ -1,9 +1,9 @@
-
 'use server';
 /**
- * @fileOverview A Natural Language Understanding (NLU) flow to interpret user commands.
+ * @fileOverview A Natural Language Understanding (NLU) flow to interpret user commands and shopping lists.
  *
  * - interpretCommand - Takes raw text and interprets it into a structured command.
+ * - understandShoppingList - Takes raw text and extracts a structured shopping list.
  */
 
 import { ai } from '@/ai/genkit';
@@ -11,6 +11,7 @@ import { z } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 
 
+// Schema for general command interpretation
 const commandSchema = z.object({
   text: z.string().describe('The raw text spoken by the user.'),
 });
@@ -40,10 +41,29 @@ const interpretedCommandSchema = z.object({
 
 export type InterpretedCommand = z.infer<typeof interpretedCommandSchema>;
 
+// Schema for structured shopping list
+const ShoppingListItemSchema = z.object({
+    productName: z.string().describe("The name of the grocery item."),
+    quantity: z.string().describe("The quantity, including units (e.g., '1kg', '500gm', '2 packets')."),
+});
+export type ShoppingListItem = z.infer<typeof ShoppingListItemSchema>;
+
+const ShoppingListSchema = z.object({
+    items: z.array(ShoppingListItemSchema).describe("An array of structured grocery items."),
+});
+export type ShoppingList = z.infer<typeof ShoppingListSchema>;
+
+
 export async function interpretCommand(
   text: string
 ): Promise<InterpretedCommand> {
   return interpretCommandFlow({ text });
+}
+
+export async function understandShoppingList(
+  text: string
+): Promise<ShoppingList | null> {
+    return shoppingListFlow({ text });
 }
 
 const nluPrompt = ai.definePrompt({
@@ -93,6 +113,34 @@ const nluPrompt = ai.definePrompt({
   }
 });
 
+
+const shoppingListPrompt = ai.definePrompt({
+    name: 'shoppingListPrompt',
+    input: { schema: commandSchema },
+    output: { schema: ShoppingListSchema },
+    model: googleAI.model('gemini-1.5-flash'),
+    prompt: `You are an expert grocery list parser. Your task is to take a raw text string, which is a transcription of a user's voice, and convert it into a structured list of items with their quantities.
+
+    **Instructions:**
+    1.  Identify each distinct grocery item.
+    2.  Extract the quantity and units for each item (e.g., '1 kg', '500 grams', '2 packets', 'a dozen').
+    3.  If no quantity is mentioned, assume a default and reasonable quantity (e.g., '1 unit' or '500gm').
+    4.  Format the output as a JSON object containing an 'items' array, where each object has 'productName' and 'quantity'.
+
+    **Examples:**
+    - "I need 1 kilo of onions, half a kilo of potatoes, and some milk" -> { "items": [{ "productName": "Onions", "quantity": "1 kg" }, { "productName": "Potatoes", "quantity": "500gm" }, { "productName": "Milk", "quantity": "1 packet" }] }
+    - "Get me two packets of Maggi noodles, a dozen eggs, and 1kg of chicken breast" -> { "items": [{ "productName": "Maggi Noodles", "quantity": "2 packets" }, { "productName": "Eggs", "quantity": "1 dozen" }, { "productName": "Chicken Breast", "quantity": "1kg" }] }
+    - "tomatoes, spinach, and one block of paneer" -> { "items": [{ "productName": "Tomatoes", "quantity": "500gm" }, { "productName": "Spinach", "quantity": "1 bunch" }, { "productName": "Paneer", "quantity": "1 block" }] }
+
+    **Shopping List to process:**
+    "{{{text}}}"
+    `,
+    config: {
+        temperature: 0.2
+    }
+});
+
+
 const interpretCommandFlow = ai.defineFlow(
   {
     name: 'interpretCommandFlow',
@@ -109,5 +157,23 @@ const interpretCommandFlow = ai.defineFlow(
       };
     }
     return { ...output, originalText: text };
+  }
+);
+
+
+const shoppingListFlow = ai.defineFlow(
+  {
+    name: 'shoppingListFlow',
+    inputSchema: commandSchema,
+    outputSchema: ShoppingListSchema.nullable(),
+  },
+  async ({ text }) => {
+    try {
+        const { output } = await shoppingListPrompt({ text });
+        return output;
+    } catch(e) {
+        console.error("Failed to understand shopping list:", e);
+        return null;
+    }
   }
 );
