@@ -546,7 +546,9 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
             <Card className="bg-muted/50 p-4">
                 <CardHeader className="p-2">
                     <CardTitle className="text-lg">Price Variants</CardTitle>
-                    {!isAdmin && <CardDescription className="text-xs">You cannot edit prices. They are inherited from the master catalog.</CardDescription>}
+                    <CardDescription className="text-xs">
+                        {isAdmin ? "Set the official price for this product for all stores." : "Prices are inherited from the master catalog and cannot be edited."}
+                    </CardDescription>
                 </CardHeader>
                 <CardContent className="p-2 space-y-4">
                     {fields.map((field, index) => (
@@ -1149,10 +1151,9 @@ export default function MyStorePage() {
   const myStore = ownerStores?.[0];
 
   const adminStoreQuery = useMemoFirebase(() => {
-      if (!firestore || !isAdmin) return null;
-      // The admin store might be created by an admin, so we find it by its canonical name
+      if (!firestore) return null; // Always run this query to find the admin store
       return query(collection(firestore, 'stores'), where('name', '==', 'LocalBasket'));
-  }, [firestore, isAdmin]);
+  }, [firestore]);
 
   const { data: adminStores, isLoading: isAdminStoreLoading } = useCollection<Store>(adminStoreQuery);
   const adminStore = adminStores?.[0];
@@ -1169,10 +1170,27 @@ export default function MyStorePage() {
     return <div className="container mx-auto py-12 px-4 md:px-6">Loading your store...</div>
   }
   
-  const storeToManage = isAdmin ? adminStore : myStore;
+  let content;
+  if (isAdmin) {
+    // If admin and the master store exists, show management view.
+    if (adminStore) {
+        content = <ManageStoreView store={adminStore} isAdmin={true} />;
+    } else {
+        // If admin and master store does NOT exist, show create form.
+        content = <CreateStoreForm user={user} isAdmin={true} />;
+    }
+  } else {
+    // If regular user and their store exists, show management view.
+    if (myStore) {
+        content = <ManageStoreView store={myStore} isAdmin={false} adminStoreId={adminStore?.id} />;
+    } else {
+        // If regular user and their store does NOT exist, show create form.
+        content = <CreateStoreForm user={user} isAdmin={false} />;
+    }
+  }
 
   const pageTitle = isAdmin
-    ? (adminStore ? `Master Catalog: ${adminStore.name}`: 'Create Master Store')
+    ? (adminStore ? `Master Catalog: ${adminStore.name}` : 'Create Master Store')
     : (myStore ? `Dashboard: ${myStore.name}` : 'Create Your Store');
 
   return (
@@ -1180,12 +1198,7 @@ export default function MyStorePage() {
       <h1 className="text-4xl font-bold font-headline mb-8">
         {pageTitle}
       </h1>
-
-      {storeToManage ? (
-        <ManageStoreView store={storeToManage} isAdmin={isAdmin} adminStoreId={adminStore?.id} />
-      ) : (
-        <CreateStoreForm user={user} isAdmin={isAdmin} />
-      )}
+      {content}
     </div>
   );
 }
