@@ -31,6 +31,10 @@
           "type": "string",
           "description": "ID for the store's placeholder image."
         },
+        "imageUrl": {
+            "type": "string",
+            "description": "URL for the user-uploaded store image."
+        },
         "latitude": {
           "type": "number",
           "description": "The latitude of the store's location."

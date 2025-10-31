@@ -1,3 +1,4 @@
+
 import type { Store, Product } from './types';
 // Do not import placeholderData directly anymore to avoid caching issues.
 import {
@@ -85,4 +86,9 @@ export async function getProduct(
 // --- Placeholder image functions ---
 
 export const getProductImage = async (imageId: string) => await getImage(imageId);
-export const getStoreImage = async (imageId: string) => await getImage(imageId);
+export const getStoreImage = async (store: Store) => {
+    if (store.imageUrl) {
+        return { imageUrl: store.imageUrl, imageHint: 'store image' };
+    }
+    return await getImage(store.imageId);
+};

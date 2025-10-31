@@ -9,21 +9,23 @@ import type { Store } from '@/lib/types';
 import { getStoreImage } from '@/lib/data';
 import { ArrowRight, MapPin } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useFirebase } from '@/firebase';
 
 interface StoreCardProps {
   store: Store;
 }
 
 export default function StoreCard({ store }: StoreCardProps) {
+    const { firestore } = useFirebase();
     const [image, setImage] = useState({ imageUrl: 'https://placehold.co/400x300/E2E8F0/64748B?text=Loading...', imageHint: 'loading' });
 
     useEffect(() => {
         const fetchImage = async () => {
-            const fetchedImage = await getStoreImage(store.imageId);
+            const fetchedImage = await getStoreImage(store);
             setImage(fetchedImage);
         }
         fetchImage();
-    }, [store.imageId]);
+    }, [store]);
 
   return (
     <Card className="flex flex-col h-full overflow-hidden transition-all hover:shadow-lg">

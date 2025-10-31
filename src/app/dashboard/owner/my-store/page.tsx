@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useTransition, useEffect, useMemo } from 'react';
+import { useState, useTransition, useEffect, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -27,7 +27,9 @@ import { useToast } from '@/hooks/use-toast';
 import type { Store, Product } from '@/lib/types';
 import { useFirebase, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, query, where, addDoc, writeBatch, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import {
   Table,
   TableBody,
@@ -51,7 +53,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Checkbox } from '@/components/ui/checkbox';
 import groceryData from '@/lib/grocery-data.json';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Share2, MapPin, Trash2, AlertCircle } from 'lucide-react';
+import { Share2, MapPin, Trash2, AlertCircle, Upload, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getUniqueProductNames } from '@/app/dashboard/admin/actions';
 
@@ -91,6 +93,101 @@ const createSlug = (text: string) => {
       .replace(/^-+/, '') // Trim - from start of text
       .replace(/-+$/, ''); // Trim - from end of text
   };
+
+function StoreImageUploader({ store }: { store: Store }) {
+    const { firestore } = useFirebase();
+    const { toast } = useToast();
+    const [isUploading, startUploadTransition] = useTransition();
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        if (event.target.files && event.target.files[0]) {
+            setSelectedFile(event.target.files[0]);
+        }
+    };
+
+    const handleUpload = () => {
+        if (!selectedFile || !firestore) return;
+
+        startUploadTransition(async () => {
+            const storage = getStorage();
+            // Create a storage reference
+            const storageRef = ref(storage, `store-images/${store.id}/${selectedFile.name}`);
+
+            try {
+                // Upload the file
+                const snapshot = await uploadBytes(storageRef, selectedFile);
+                // Get the download URL
+                const downloadURL = await getDownloadURL(snapshot.ref);
+
+                // Update the store document in Firestore
+                const storeRef = doc(firestore, 'stores', store.id);
+                await updateDoc(storeRef, {
+                    imageUrl: downloadURL,
+                });
+
+                toast({
+                    title: "Image Uploaded!",
+                    description: "Your store image has been updated successfully.",
+                });
+                setSelectedFile(null); // Clear selection
+            } catch (error) {
+                console.error("Image upload failed:", error);
+                toast({
+                    variant: 'destructive',
+                    title: "Upload Failed",
+                    description: "There was an error uploading your image. Please check permissions and try again.",
+                });
+            }
+        });
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Store Image</CardTitle>
+                <CardDescription>Upload a picture to represent your storefront.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                 <div className="w-full aspect-video relative rounded-md overflow-hidden border">
+                    {store.imageUrl ? (
+                        <Image src={store.imageUrl} alt={store.name} fill className="object-cover" />
+                    ) : (
+                         <div className="flex flex-col items-center justify-center h-full bg-muted/50 text-muted-foreground">
+                            <ImageIcon className="h-10 w-10 mb-2" />
+                            <p className="text-sm">No image uploaded</p>
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex items-center gap-4">
+                    <Input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        className="hidden"
+                    />
+                    <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="flex-1">
+                       {selectedFile ? 'Change Image' : 'Select Image'}
+                    </Button>
+                    {selectedFile && (
+                         <Button onClick={handleUpload} disabled={isUploading} className="flex-1">
+                            {isUploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {isUploading ? "Uploading..." : "Upload & Save"}
+                        </Button>
+                    )}
+                </div>
+                {selectedFile && (
+                    <p className="text-sm text-muted-foreground">
+                        Selected file: <span className="font-medium">{selectedFile.name}</span>
+                    </p>
+                )}
+            </CardContent>
+        </Card>
+    )
+}
 
 function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPrices: Record<string, number> }) {
   const { toast } = useToast();
@@ -643,6 +740,7 @@ function ManageStoreView({ store, adminPrices }: { store: Store; adminPrices: Re
       <div className="space-y-8">
         {needsLocationUpdate && <UpdateLocationForm store={store} onUpdate={() => {}} />}
         <div className="grid md:grid-cols-2 gap-8">
+            <StoreImageUploader store={store} />
             <Card>
                 <CardHeader>
                     <CardTitle>Manage {store.name}</CardTitle>
@@ -654,54 +752,54 @@ function ManageStoreView({ store, adminPrices }: { store: Store; adminPrices: Re
                    <AddProductForm storeId={store.id} />
                 </CardContent>
             </Card>
-             <Card>
-                <CardHeader>
-                    <CardTitle>Your Products</CardTitle>
-                </CardHeader>
-                <CardContent>
-                   {isLoading ? (
-                     <p>Loading products...</p>
-                   ) : products && products.length > 0 ? (
-                     <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Name</TableHead>
-                                <TableHead>Price</TableHead>
-                                <TableHead>Category</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {products.map(product => (
-                                <TableRow key={product.id}>
-                                    <TableCell>{product.name}</TableCell>
-                                    <TableCell>₹{product.price.toFixed(2)}</TableCell>
-                                    <TableCell>{product.category}</TableCell>
-                                    <TableCell className="text-right">
-                                        <Button 
-                                            variant="ghost" 
-                                            size="icon" 
-                                            onClick={() => handleDeleteProduct(product.id, product.name)}
-                                            disabled={isDeleting}
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                            <span className="sr-only">Delete {product.name}</span>
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                     </Table>
-                   ) : (
-                    <p className="text-muted-foreground">You haven't added any products yet.</p>
-                   )}
-                </CardContent>
-            </Card>
         </div>
          <div className="grid md:grid-cols-2 gap-8">
             <ProductChecklist storeId={store.id} adminPrices={adminPrices} />
             <PromoteStore store={store} />
         </div>
+        <Card>
+            <CardHeader>
+                <CardTitle>Your Products</CardTitle>
+            </CardHeader>
+            <CardContent>
+                {isLoading ? (
+                    <p>Loading products...</p>
+                ) : products && products.length > 0 ? (
+                    <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Price</TableHead>
+                            <TableHead>Category</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {products.map(product => (
+                            <TableRow key={product.id}>
+                                <TableCell>{product.name}</TableCell>
+                                <TableCell>₹{product.price.toFixed(2)}</TableCell>
+                                <TableCell>{product.category}</TableCell>
+                                <TableCell className="text-right">
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        onClick={() => handleDeleteProduct(product.id, product.name)}
+                                        disabled={isDeleting}
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                        <span className="sr-only">Delete {product.name}</span>
+                                    </Button>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                    </Table>
+                ) : (
+                <p className="text-muted-foreground">You haven't added any products yet.</p>
+                )}
+            </CardContent>
+        </Card>
         <DangerZone store={store} />
       </div>
     )

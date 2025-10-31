@@ -168,7 +168,7 @@ export default function StoreDetailPage() {
         const storeData = await getStore(firestore, id);
         if (storeData) {
           setStore(storeData as Store);
-          const image = await getStoreImage(storeData.imageId);
+          const image = await getStoreImage(storeData);
           setStoreImage(image);
         } else {
           notFound();

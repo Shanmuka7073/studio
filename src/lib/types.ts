@@ -17,6 +17,7 @@ export type Store = {
   description: string;
   address: string;
   imageId: string;
+  imageUrl?: string;
   ownerId: string;
   latitude: number;
   longitude: number;
