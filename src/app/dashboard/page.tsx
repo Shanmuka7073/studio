@@ -2,7 +2,7 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowRight, ShoppingCart, Store, Truck } from 'lucide-react';
+import { ArrowRight, ShoppingCart, Store, Truck, Mic } from 'lucide-react';
 import Link from 'next/link';
 
 const roleCards = [
@@ -11,6 +11,12 @@ const roleCards = [
         description: 'Browse local stores and find fresh groceries near you.',
         href: '/stores',
         icon: ShoppingCart,
+    },
+    {
+        title: 'Voice Order',
+        description: 'Record your shopping list and have a local shopkeeper fulfill it.',
+        href: '/checkout',
+        icon: Mic,
     },
     {
         title: 'Store Owner',
@@ -33,7 +39,7 @@ export default function DashboardPage() {
                 <h1 className="text-4xl font-bold font-headline">Your Dashboard</h1>
                 <p className="text-lg text-muted-foreground mt-2">Select your role to access your tools and information.</p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
                 {roleCards.map((card) => (
                      <Link href={card.href} key={card.title} className="block hover:shadow-xl transition-shadow rounded-lg">
                         <Card className="h-full flex flex-col">
