@@ -13,7 +13,6 @@ import React, {
 import { useRouter, usePathname } from 'next/navigation';
 import { textToSpeech } from '@/ai/flows/tts-flow';
 import { interpretCommand, InterpretedCommand } from '@/ai/flows/nlu-flow';
-import { transcribeAndTranslate } from '@/ai/flows/transcribe-translate-flow';
 import { getRecipeIngredients } from '@/ai/flows/recipe-ingredients-flow';
 import { useFirebase } from '@/firebase';
 import { getDocs, collection, query, where, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -111,24 +110,12 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // This function is no longer connected to a working AI flow
+  // but is kept to support the recipe ingredients feature.
   const handleCreateVoiceOrder = async (audioDataUri: string) => {
       setStatus('thinking');
-      try {
-        const result = await transcribeAndTranslate(audioDataUri);
-        if (result) {
-          setVoiceOrderState({
-            audioDataUri,
-            translatedList: result.bilingualList,
-            isConfirming: true,
-          });
-          await speak('Here is the shopping list I understood. Please confirm to place the order.');
-        } else {
-          await speak("Sorry, I couldn't process the audio. Please try recording again.");
-        }
-      } catch (error) {
-        console.error('Transcription/Translation Error:', error);
-        await speak('There was an error processing your voice memo. Please try again.');
-      }
+      await speak("This feature is being updated. Please use the checkout page to record your shopping list for now.");
+      setStatus('idle');
   }
 
   const handleCommand = useCallback(async (command: InterpretedCommand) => {
@@ -213,7 +200,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
 
           if (foundProduct) {
             setPendingAction({ intent: 'addProductToCart', product: foundProduct });
-            await speak(`I found ${foundProduct.name} for ₹${foundProduct.price.toFixed(2)}. Should I add it to your cart?`);
+            await speak(`I found ${foundProduct.name}. Should I add it to your cart?`);
           } else {
             await speak(`I couldn't find ${productName} in this store.`);
           }
@@ -504,3 +491,5 @@ export function useAssistant() {
   }
   return context;
 }
+
+    
