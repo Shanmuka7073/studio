@@ -8,7 +8,6 @@ import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
 import { CartProvider } from '@/lib/cart';
 import { FirebaseClientProvider } from '@/firebase';
-import { AssistantProvider } from '@/components/assistant/assistant-provider';
 import { NotificationPermissionManager } from '@/components/layout/notification-permission-manager';
 
 
@@ -42,7 +41,6 @@ export default function RootLayout({
       >
         <FirebaseClientProvider>
           <CartProvider>
-            <AssistantProvider>
               <div className="relative flex min-h-dvh flex-col bg-background">
                 <Header />
                 <main className="flex-1 pb-10">{children}</main>
@@ -50,7 +48,6 @@ export default function RootLayout({
                 <Footer />
               </div>
               <Toaster />
-            </AssistantProvider>
           </CartProvider>
         </FirebaseClientProvider>
       </body>

@@ -20,17 +20,16 @@ import {
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
-import { getProductImage, getProductPrice } from '@/lib/data';
+import { getProductImage } from '@/lib/data';
 import { useTransition, useState, useRef, useCallback, useEffect } from 'react';
 import { useFirebase, errorEmitter } from '@/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Mic, StopCircle, CheckCircle, MapPin, Loader2, Bot } from 'lucide-react';
 import Link from 'next/link';
 import { Textarea } from '@/components/ui/textarea';
-import { ShoppingListItem, understandShoppingList } from '@/ai/flows/nlu-flow';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import type { ProductPrice } from '@/lib/types';
+import type { ProductPrice, ProductVariant } from '@/lib/types';
 
 const checkoutSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -40,8 +39,11 @@ const checkoutSchema = z.object({
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
 
-type StructuredListItemWithPrice = ShoppingListItem & {
+type StructuredListItem = {
+    productName: string;
+    quantity: string;
     price: number | null;
+    variant: ProductVariant;
 };
 
 const DELIVERY_FEE = 30;
@@ -63,6 +65,78 @@ function OrderSummaryItem({ item, image }) {
     );
 }
 
+// Function to parse the text and find products by directly looking up from the master list
+async function parseShoppingListFromText(text: string, db: any): Promise<StructuredListItem[]> {
+    if (!text || !db) return [];
+
+    const productPricesRef = collection(db, 'productPrices');
+    const productSnapshot = await getDocs(productPricesRef);
+    const masterProductList = productSnapshot.docs.map(doc => doc.data() as ProductPrice);
+
+    const lines = text.toLowerCase().split('\n').filter(line => line.trim() !== '');
+    const foundItems: StructuredListItem[] = [];
+
+    for (const line of lines) {
+        const words = line.split(/\s+/);
+        // Look for product names that can be multi-word
+        for (let i = 0; i < words.length; i++) {
+            for (let j = words.length; j > i; j--) {
+                const potentialProductName = words.slice(i, j).join(' ');
+                
+                const matchedProduct = masterProductList.find(p => p.productName.toLowerCase() === potentialProductName);
+
+                if (matchedProduct) {
+                    // Found a product, now look for quantity and variant
+                    const precedingWords = words.slice(0, i);
+                    let quantityStr = '1';
+                    
+                    // Simple heuristic: find the last number in the preceding words
+                    for(let k = precedingWords.length - 1; k >= 0; k--) {
+                        if(!isNaN(parseInt(precedingWords[k]))) {
+                            quantityStr = precedingWords[k];
+                            break;
+                        }
+                    }
+
+                    // Simple heuristic for weight: check word after quantity or common weights
+                    let foundVariant: ProductVariant | undefined = undefined;
+
+                    // Try to find a variant that matches a pattern like "1kg", "500gm"
+                    for (const variant of matchedProduct.variants) {
+                        const variantWeight = variant.weight.toLowerCase().replace(/\s/g, '');
+                         if (line.includes(variantWeight)) {
+                            foundVariant = variant;
+                            break;
+                        }
+                    }
+                    
+                    // If no specific weight found, default to the first variant if only one exists
+                    if (!foundVariant && matchedProduct.variants.length > 0) {
+                         foundVariant = matchedProduct.variants[0];
+                    }
+
+                    if (foundVariant) {
+                         const alreadyAdded = foundItems.some(item => item.variant.sku === foundVariant!.sku);
+                         if (!alreadyAdded) {
+                            foundItems.push({
+                                productName: matchedProduct.productName,
+                                quantity: foundVariant.weight,
+                                price: foundVariant.price,
+                                variant: foundVariant,
+                            });
+                         }
+                    }
+                    // Move to the next line after finding a product
+                    i = words.length; 
+                    break;
+                }
+            }
+        }
+    }
+
+    return foundItems;
+}
+
 
 export default function CheckoutPage() {
   const { cartItems, cartTotal, clearCart } = useCart();
@@ -73,7 +147,7 @@ export default function CheckoutPage() {
 
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [structuredList, setStructuredList] = useState<StructuredListItemWithPrice[]>([]);
+  const [structuredList, setStructuredList] = useState<StructuredListItem[]>([]);
   
   const speechRecognitionRef = useRef<SpeechRecognition | null>(null);
 
@@ -91,6 +165,7 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     const fetchImages = async () => {
+        if (cartItems.length === 0) return;
         const imagePromises = cartItems.map(item => getProductImage(item.product.imageId));
         const resolvedImages = await Promise.all(imagePromises);
         const imageMap = cartItems.reduce((acc, item, index) => {
@@ -119,17 +194,14 @@ export default function CheckoutPage() {
         };
 
         recognition.onresult = (event) => {
-            let interim_transcript = '';
             let final_transcript = '';
-
             for (let i = event.resultIndex; i < event.results.length; ++i) {
                 if (event.results[i].isFinal) {
-                    final_transcript += event.results[i][0].transcript;
-                } else {
-                    interim_transcript += event.results[i][0].transcript;
+                    final_transcript += event.results[i][0].transcript + '\n'; // Use newline as a separator
                 }
             }
-            form.setValue('shoppingList', final_transcript + interim_transcript);
+             // Use a more robust update to prevent garbled text
+            form.setValue('shoppingList', form.getValues('shoppingList') + final_transcript);
         };
 
         recognition.onerror = (event) => {
@@ -153,6 +225,8 @@ export default function CheckoutPage() {
     if (isListening) {
         speechRecognitionRef.current?.stop();
     } else {
+        form.setValue('shoppingList', ''); // Clear previous list
+        setStructuredList([]);
         speechRecognitionRef.current?.start();
     }
   };
@@ -168,36 +242,20 @@ export default function CheckoutPage() {
     setIsProcessing(true);
     setStructuredList([]);
     try {
-        const shoppingListResponse = await understandShoppingList(transcribedText);
+        const items = await parseShoppingListFromText(transcribedText, firestore);
         
-        if (shoppingListResponse && shoppingListResponse.items) {
-            const itemsWithPrices: StructuredListItemWithPrice[] = await Promise.all(
-                shoppingListResponse.items.map(async (item) => {
-                    const priceData = await getProductPrice(firestore, item.productName);
-                    
-                    if (priceData && priceData.variants) {
-                        // Find the variant that matches the parsed quantity
-                        const matchingVariant = priceData.variants.find(v => v.weight.toLowerCase() === item.quantity.toLowerCase());
-                        return {
-                            ...item,
-                            price: matchingVariant ? matchingVariant.price : null,
-                        };
-                    }
-                    return { ...item, price: null };
-                })
-            );
-
-            setStructuredList(itemsWithPrices);
-            toast({ title: "List Understood!", description: "I've prepared your shopping list with prices." });
+        if (items.length > 0) {
+            setStructuredList(items);
+            toast({ title: "List Understood!", description: `Found ${items.length} item(s) from your list.` });
         } else {
-            throw new Error("Could not understand any items in the shopping list.");
+            throw new Error("Could not find any matching products in the master catalog based on your list.");
         }
     } catch (error) {
-        console.error("NLU error:", error);
+        console.error("List parsing error:", error);
         toast({
             variant: 'destructive',
             title: 'Processing Failed',
-            description: `Could not understand the items in your list. Error: ${(error as Error).message}`
+            description: (error as Error).message || 'Could not understand the items in your list.'
         });
     } finally {
         setIsProcessing(false);
@@ -234,7 +292,7 @@ export default function CheckoutPage() {
         return;
     }
 
-    const isVoiceOrder = cartItems.length === 0 && (!!data.shoppingList || structuredList.length > 0);
+    const isVoiceOrder = cartItems.length === 0 && structuredList.length > 0;
     const storeId = cartItems[0]?.product.storeId;
     
     if (cartItems.length === 0 && !isVoiceOrder) {
@@ -267,12 +325,11 @@ export default function CheckoutPage() {
             orderData.translatedList = data.shoppingList;
             orderData.items = structuredList.map(item => ({
                 productName: item.productName,
-                variantWeight: item.quantity,
+                variantWeight: item.variant.weight,
                 price: item.price || 0,
-                // These are placeholders for a voice order
-                productId: 'voice-order-item',
-                variantSku: 'voice-order-item',
-                quantity: 1, // Assume quantity of 1 for each line item
+                productId: item.variant.sku, // using sku as a reference
+                variantSku: item.variant.sku,
+                quantity: 1, // Assume quantity of 1 for each line item in voice order
             }));
         } else {
             orderData.storeId = storeId;
@@ -310,7 +367,9 @@ export default function CheckoutPage() {
     });
   };
 
-  if (cartItems.length === 0 && !form.getValues('shoppingList') && structuredList.length === 0) {
+  const hasContent = cartItems.length > 0 || !!form.watch('shoppingList') || structuredList.length > 0;
+
+  if (!hasContent) {
      return (
         <div className="container mx-auto py-24 px-4 md:px-6">
             <div className="grid md:grid-cols-2 gap-12 items-center">
@@ -435,7 +494,7 @@ export default function CheckoutPage() {
                                 </div>
                             </>
                         )}
-                        {(form.getValues('shoppingList') || structuredList.length > 0) && cartItems.length === 0 && (
+                        {(!!form.watch('shoppingList') || structuredList.length > 0) && cartItems.length === 0 && (
                             <div className="space-y-4">
                                 <FormField
                                     control={form.control}
@@ -494,10 +553,12 @@ export default function CheckoutPage() {
                                         </Button>
                                     )
                                 )}
-                                <div className="flex justify-between items-center">
-                                    <p className="font-medium">Delivery Fee</p>
-                                    <p>₹{DELIVERY_FEE.toFixed(2)}</p>
-                                </div>
+                                {structuredList.length > 0 && (
+                                    <div className="flex justify-between items-center border-t pt-4">
+                                        <p className="font-medium">Delivery Fee</p>
+                                        <p>₹{DELIVERY_FEE.toFixed(2)}</p>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </CardContent>
