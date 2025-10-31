@@ -35,21 +35,19 @@ export default function AdminDashboardPage() {
     const storesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'stores'), where('isClosed', '!=', true)) : null, [firestore]);
     const partnersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'deliveryPartners') : null, [firestore]);
     const deliveredOrdersQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'orders'), where('status', '==', 'Delivered')) : null, [firestore]);
-    const deliveredVoiceOrdersQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'voice-orders'), where('status', '==', 'Delivered')) : null, [firestore]);
 
     const { data: stores, isLoading: storesLoading } = useCollection(storesQuery);
     const { data: partners, isLoading: partnersLoading } = useCollection(partnersQuery);
     const { data: deliveredOrders, isLoading: ordersLoading } = useCollection<Order>(deliveredOrdersQuery);
-    const { data: deliveredVoiceOrders, isLoading: voiceOrdersLoading } = useCollection<Order>(deliveredVoiceOrdersQuery);
 
     const stats = useMemo(() => ({
         totalUsers: 0, // This is disabled
         totalStores: stores?.length ?? 0,
         totalDeliveryPartners: partners?.length ?? 0,
-        totalOrdersDelivered: (deliveredOrders?.length ?? 0) + (deliveredVoiceOrders?.length ?? 0),
-    }), [stores, partners, deliveredOrders, deliveredVoiceOrders]);
+        totalOrdersDelivered: deliveredOrders?.length ?? 0,
+    }), [stores, partners, deliveredOrders]);
 
-    const statsLoading = isUserLoading || storesLoading || partnersLoading || ordersLoading || voiceOrdersLoading;
+    const statsLoading = isUserLoading || storesLoading || partnersLoading || ordersLoading;
 
     if (!isUserLoading && (!user || user.email !== ADMIN_EMAIL)) {
         router.replace('/dashboard');
