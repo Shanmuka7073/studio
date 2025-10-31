@@ -343,28 +343,27 @@ function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPric
     startTransition(async () => {
         const batch = writeBatch(firestore);
         
-        const processingPromises = productsToAdd.map(async ([name, { price }]) => {
-            const imageInfo = await generateSingleImage(name);
-            
-            const newProductRef = doc(collection(firestore, 'stores', storeId, 'products'));
-            const category = groceryData.categories.find(c => Array.isArray(c.items) && c.items.includes(name))?.categoryName || 'Miscellaneous';
-            
-            const productData = {
-                name,
-                price: parseFloat(price),
-                description: '',
-                storeId: storeId,
-                imageId: imageInfo?.id || `prod-${createSlug(name)}`,
-                imageUrl: imageInfo?.imageUrl || '',
-                imageHint: imageInfo?.imageHint || '',
-                category: category,
-            };
-            
-            batch.set(newProductRef, productData);
-        });
-
         try {
-            await Promise.all(processingPromises);
+            for (const [name, { price }] of productsToAdd) {
+                const imageInfo = await generateSingleImage(name);
+                
+                const newProductRef = doc(collection(firestore, 'stores', storeId, 'products'));
+                const category = groceryData.categories.find(c => Array.isArray(c.items) && c.items.includes(name))?.categoryName || 'Miscellaneous';
+                
+                const productData = {
+                    name,
+                    price: parseFloat(price),
+                    description: '',
+                    storeId: storeId,
+                    imageId: imageInfo?.id || `prod-${createSlug(name)}`,
+                    imageUrl: imageInfo?.imageUrl || '',
+                    imageHint: imageInfo?.imageHint || '',
+                    category: category,
+                };
+                
+                batch.set(newProductRef, productData);
+            }
+
             await batch.commit();
 
             toast({
