@@ -43,11 +43,11 @@ service cloud.firestore {
     }
     
     /**
-     * @description Checks if the authenticated user has an admin role via custom claims.
+     * @description Checks if the authenticated user is the admin by checking their email.
      * @returns {boolean} - True if the user is an admin, false otherwise.
      */
      function isAdmin() {
-        return isSignedIn() && request.auth.token.admin == true;
+        return isSignedIn() && request.auth.email == 'admin@gmail.com';
      }
 
     /**
