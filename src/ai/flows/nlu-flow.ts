@@ -50,7 +50,7 @@ const nluPrompt = ai.definePrompt({
   name: 'nluPrompt',
   input: { schema: commandSchema },
   output: { schema: interpretedCommandSchema },
-  model: googleAI.model('gemini-1.5-flash-latest'),
+  model: googleAI.model('gemini-1.5-flash'),
   prompt: `You are an NLU engine for a grocery shopping app. Your task is to interpret the user's spoken command and extract the intent and relevant entities.
 
     The user is interacting with the app via voice.

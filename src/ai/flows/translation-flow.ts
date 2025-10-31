@@ -32,7 +32,7 @@ const translationPrompt = ai.definePrompt({
     name: 'translationPrompt',
     input: { schema: TranslationInputSchema },
     output: { schema: TranslationOutputSchema },
-    model: googleAI.model('gemini-1.5-flash-latest'),
+    model: googleAI.model('gemini-1.5-flash'),
     prompt: `You are a translation expert specializing in English to Telugu for grocery items.
     
     Translate the following list of product names into Telugu. Provide the output in the specified JSON format.

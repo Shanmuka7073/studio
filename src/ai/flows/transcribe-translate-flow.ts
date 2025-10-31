@@ -45,7 +45,7 @@ const transcribeAndTranslateFlow = ai.defineFlow(
   async ({ audioDataUri }) => {
     // 1. Transcribe the audio
     const { text: transcription } = await ai.generate({
-        model: googleAI.model('gemini-1.5-flash-latest'),
+        model: googleAI.model('gemini-1.5-flash'),
         prompt: [{ media: { url: audioDataUri } }, { text: 'Transcribe this audio. It is a person listing grocery items.' }],
     });
 
@@ -70,7 +70,7 @@ const transcribeAndTranslateFlow = ai.defineFlow(
 
 
     const { text: bilingualList } = await ai.generate({
-      model: googleAI.model('gemini-1.5-flash-latest'),
+      model: googleAI.model('gemini-1.5-flash'),
       prompt: listGenPrompt,
       config: { temperature: 0.1 },
     });

@@ -31,7 +31,7 @@ const recipePrompt = ai.definePrompt({
   name: 'recipePrompt',
   input: { schema: RecipeInputSchema },
   output: { schema: RecipeOutputSchema },
-  model: googleAI.model('gemini-1.5-flash-latest'),
+  model: googleAI.model('gemini-1.5-flash'),
   prompt: `You are a helpful recipe assistant. The user wants to cook a dish and needs the ingredients.
     
     Dish: {{{dishName}}}
@@ -81,5 +81,3 @@ const recipeIngredientsFlow = ai.defineFlow(
     }
   }
 );
-
-    
