@@ -370,50 +370,9 @@ export default function CheckoutPage() {
     });
   };
 
-  const hasContent = cartItems.length > 0 || !!form.watch('shoppingList') || structuredList.length > 0;
-
-  if (!hasContent) {
-     return (
-        <div className="container mx-auto py-24 px-4 md:px-6">
-            <div className="grid md:grid-cols-2 gap-12 items-center">
-                 <div>
-                    <Card>
-                        <CardHeader><CardTitle>Add Items to Checkout</CardTitle></CardHeader>
-                        <CardContent className="text-center py-12">
-                             <p className="text-muted-foreground mb-8">Your cart is empty. Add items from a store to get started.</p>
-                             <Button asChild variant="outline">
-                                <Link href="/stores">Browse Stores</Link>
-                             </Button>
-                        </CardContent>
-                    </Card>
-                </div>
-                 <div>
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Or Create a Shopping List by Voice</CardTitle>
-                      <UiCardDescription>No need to browse. Just tell us what you need, and a local shopkeeper will handle it.</UiCardDescription>
-                    </CardHeader>
-                    <CardContent className="flex flex-col items-center justify-center space-y-4 py-12">
-                        <Button
-                            onClick={handleToggleListening}
-                            variant={isListening ? 'destructive' : 'default'}
-                            size="lg"
-                            className="w-48"
-                          >
-                            {isListening ? <StopCircle className="mr-2 h-5 w-5" /> : <Mic className="mr-2 h-5 w-5" />}
-                            {isListening ? 'Stop Listening' : 'Record List'}
-                        </Button>
-                        <p className="text-sm text-muted-foreground text-center">Click to record your shopping list. The text will appear on the next page.</p>
-                     </CardContent>
-                  </Card>
-                 </div>
-            </div>
-        </div>
-    )
-  }
-
+  const hasItemsInCart = cartItems.length > 0;
   const voiceOrderSubtotal = structuredList.reduce((acc, item) => acc + (item.price || 0), 0);
-  const finalTotal = cartItems.length > 0 ? cartTotal + DELIVERY_FEE : voiceOrderSubtotal + DELIVERY_FEE;
+  const finalTotal = hasItemsInCart ? cartTotal + DELIVERY_FEE : voiceOrderSubtotal + DELIVERY_FEE;
 
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
@@ -481,12 +440,12 @@ export default function CheckoutPage() {
                     <CardTitle>Order Summary</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        {cartItems.map((item) => {
-                            const image = images[item.variant.sku] || { imageUrl: 'https://placehold.co/48x48/E2E8F0/64748B?text=...', imageHint: 'loading' };
-                            return <OrderSummaryItem key={item.variant.sku} item={item} image={image} />
-                        })}
-                        {cartItems.length > 0 && (
+                        {hasItemsInCart ? (
                             <>
+                                {cartItems.map((item) => {
+                                    const image = images[item.variant.sku] || { imageUrl: 'https://placehold.co/48x48/E2E8F0/64748B?text=...', imageHint: 'loading' };
+                                    return <OrderSummaryItem key={item.variant.sku} item={item} image={image} />
+                                })}
                                 <div className="flex justify-between items-center border-t pt-4">
                                     <p className="font-medium">Subtotal</p>
                                     <p>₹{cartTotal.toFixed(2)}</p>
@@ -496,15 +455,36 @@ export default function CheckoutPage() {
                                     <p>₹{DELIVERY_FEE.toFixed(2)}</p>
                                 </div>
                             </>
-                        )}
-                        {(!!form.watch('shoppingList') || structuredList.length > 0) && cartItems.length === 0 && (
+                        ) : (
                             <div className="space-y-4">
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>Create a Shopping List by Voice</CardTitle>
+                                        <UiCardDescription>No need to browse. Just tell us what you need, and a local shopkeeper will handle it.</UiCardDescription>
+                                    </CardHeader>
+                                    <CardContent className="flex flex-col items-center justify-center space-y-4">
+                                        <Button
+                                            type="button"
+                                            onClick={handleToggleListening}
+                                            variant={isListening ? 'destructive' : 'default'}
+                                            size="lg"
+                                            className="w-48"
+                                        >
+                                            {isListening ? <StopCircle className="mr-2 h-5 w-5" /> : <Mic className="mr-2 h-5 w-5" />}
+                                            {isListening ? 'Stop Listening' : 'Record List'}
+                                        </Button>
+                                        <p className="text-sm text-muted-foreground text-center">
+                                            {isListening ? "I'm listening..." : "Click to record your shopping list."}
+                                        </p>
+                                    </CardContent>
+                                </Card>
+
                                 <FormField
                                     control={form.control}
                                     name="shoppingList"
                                     render={({ field }) => (
                                         <FormItem>
-                                        <FormLabel>Your Shopping List</FormLabel>
+                                        <FormLabel>Your Transcribed List</FormLabel>
                                         <FormControl>
                                             <Textarea placeholder="Your transcribed list will appear here." {...field} rows={4}/>
                                         </FormControl>
@@ -514,40 +494,40 @@ export default function CheckoutPage() {
                                 />
                                 
                                 {isProcessing ? (
-                                <div className="flex items-center justify-center text-muted-foreground">
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    <span>Understanding your list...</span>
-                                </div>
+                                    <div className="flex items-center justify-center text-muted-foreground">
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        <span>Understanding your list...</span>
+                                    </div>
                                 ) : structuredList.length > 0 ? (
-                                <Card className="bg-muted/50">
-                                    <CardHeader><CardTitle className="text-base">Understood Items</CardTitle></CardHeader>
-                                    <CardContent>
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead>Item</TableHead>
-                                                    <TableHead>Quantity</TableHead>
-                                                    <TableHead className="text-right">Price</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {structuredList.map((item, index) => (
-                                                    <TableRow key={index}>
-                                                        <TableCell>{item.productName}</TableCell>
-                                                        <TableCell>{item.quantity}</TableCell>
-                                                        <TableCell className="text-right">{item.price ? `₹${item.price.toFixed(2)}` : 'N/A'}</TableCell>
+                                    <Card className="bg-muted/50">
+                                        <CardHeader><CardTitle className="text-base">Understood Items</CardTitle></CardHeader>
+                                        <CardContent>
+                                            <Table>
+                                                <TableHeader>
+                                                    <TableRow>
+                                                        <TableHead>Item</TableHead>
+                                                        <TableHead>Quantity</TableHead>
+                                                        <TableHead className="text-right">Price</TableHead>
                                                     </TableRow>
-                                                ))}
-                                            </TableBody>
-                                             <TableFooter>
-                                                <TableRow>
-                                                    <TableCell colSpan={2} className="text-right">Subtotal</TableCell>
-                                                    <TableCell className="text-right font-bold">₹{voiceOrderSubtotal.toFixed(2)}</TableCell>
-                                                </TableRow>
-                                             </TableFooter>
-                                        </Table>
-                                    </CardContent>
-                                </Card>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {structuredList.map((item, index) => (
+                                                        <TableRow key={index}>
+                                                            <TableCell>{item.productName}</TableCell>
+                                                            <TableCell>{item.quantity}</TableCell>
+                                                            <TableCell className="text-right">{item.price ? `₹${item.price.toFixed(2)}` : 'N/A'}</TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                                <TableFooter>
+                                                    <TableRow>
+                                                        <TableCell colSpan={2} className="text-right">Subtotal</TableCell>
+                                                        <TableCell className="text-right font-bold">₹{voiceOrderSubtotal.toFixed(2)}</TableCell>
+                                                    </TableRow>
+                                                </TableFooter>
+                                            </Table>
+                                        </CardContent>
+                                    </Card>
                                 ) : (
                                      form.getValues('shoppingList') && !isProcessing && (
                                         <Button type="button" onClick={handleUnderstandList} className="w-full">
@@ -569,26 +549,6 @@ export default function CheckoutPage() {
                         <span>Total</span>
                         <span>₹{finalTotal.toFixed(2)}</span>
                     </CardFooter>
-                </Card>
-                <Card className="mt-8">
-                    <CardHeader>
-                        <CardTitle>Voice Shopping List</CardTitle>
-                    </CardHeader>
-                    <CardContent className="flex flex-col items-center justify-center space-y-4">
-                        <Button
-                            type="button"
-                            onClick={handleToggleListening}
-                            variant={isListening ? 'destructive' : 'outline'}
-                            size="lg"
-                            className="w-48"
-                        >
-                            {isListening ? <StopCircle className="mr-2 h-5 w-5" /> : <Mic className="mr-2 h-5 w-5" />}
-                            {isListening ? 'Stop Listening' : 'Record List'}
-                        </Button>
-                        <p className="text-sm text-muted-foreground text-center">
-                            {isListening ? "I'm listening..." : "Click 'Record List' and start speaking."}
-                        </p>
-                    </CardContent>
                 </Card>
                 </div>
             </form>
