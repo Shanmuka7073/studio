@@ -27,7 +27,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { Store, Product } from '@/lib/types';
 import { useFirebase, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, query, where, addDoc, writeBatch, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
@@ -56,6 +56,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Share2, MapPin, Trash2, AlertCircle, Upload, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getUniqueProductNames } from '@/app/dashboard/admin/actions';
+import { Progress } from '@/components/ui/progress';
+
 
 const storeSchema = z.object({
   name: z.string().min(3, 'Store name must be at least 3 characters'),
@@ -97,7 +99,8 @@ const createSlug = (text: string) => {
 function StoreImageUploader({ store }: { store: Store }) {
     const { firestore } = useFirebase();
     const { toast } = useToast();
-    const [isUploading, startUploadTransition] = useTransition();
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -110,37 +113,44 @@ function StoreImageUploader({ store }: { store: Store }) {
     const handleUpload = () => {
         if (!selectedFile || !firestore) return;
 
-        startUploadTransition(async () => {
-            const storage = getStorage();
-            // Create a storage reference
-            const storageRef = ref(storage, `store-images/${store.id}/${selectedFile.name}`);
+        setIsUploading(true);
+        setUploadProgress(0);
 
-            try {
-                // Upload the file
-                const snapshot = await uploadBytes(storageRef, selectedFile);
-                // Get the download URL
-                const downloadURL = await getDownloadURL(snapshot.ref);
+        const storage = getStorage();
+        const storageRef = ref(storage, `store-images/${store.id}/${selectedFile.name}`);
+        const uploadTask = uploadBytesResumable(storageRef, selectedFile);
 
-                // Update the store document in Firestore
-                const storeRef = doc(firestore, 'stores', store.id);
-                await updateDoc(storeRef, {
-                    imageUrl: downloadURL,
-                });
-
-                toast({
-                    title: "Image Uploaded!",
-                    description: "Your store image has been updated successfully.",
-                });
-                setSelectedFile(null); // Clear selection
-            } catch (error) {
+        uploadTask.on('state_changed',
+            (snapshot) => {
+                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                setUploadProgress(progress);
+            },
+            (error) => {
                 console.error("Image upload failed:", error);
                 toast({
                     variant: 'destructive',
                     title: "Upload Failed",
                     description: "There was an error uploading your image. Please check permissions and try again.",
                 });
+                setIsUploading(false);
+                setUploadProgress(0);
+            },
+            () => {
+                getDownloadURL(uploadTask.snapshot.ref).then(async (downloadURL) => {
+                    const storeRef = doc(firestore, 'stores', store.id);
+                    await updateDoc(storeRef, {
+                        imageUrl: downloadURL,
+                    });
+
+                    toast({
+                        title: "Image Uploaded!",
+                        description: "Your store image has been updated successfully.",
+                    });
+                    setSelectedFile(null);
+                    setIsUploading(false);
+                });
             }
-        });
+        );
     };
 
     return (
@@ -169,17 +179,23 @@ function StoreImageUploader({ store }: { store: Store }) {
                         onChange={handleFileChange}
                         className="hidden"
                     />
-                    <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="flex-1">
+                    <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="flex-1" disabled={isUploading}>
                        {selectedFile ? 'Change Image' : 'Select Image'}
                     </Button>
-                    {selectedFile && (
-                         <Button onClick={handleUpload} disabled={isUploading} className="flex-1">
-                            {isUploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {isUploading ? "Uploading..." : "Upload & Save"}
+                    {selectedFile && !isUploading && (
+                         <Button onClick={handleUpload} className="flex-1">
+                            <Upload className="mr-2 h-4 w-4" />
+                            Upload & Save
                         </Button>
                     )}
                 </div>
-                {selectedFile && (
+                {isUploading && (
+                    <div className="space-y-2">
+                        <Progress value={uploadProgress} />
+                        <p className="text-xs text-center text-muted-foreground">Uploading... {Math.round(uploadProgress)}%</p>
+                    </div>
+                )}
+                {selectedFile && !isUploading && (
                     <p className="text-sm text-muted-foreground">
                         Selected file: <span className="font-medium">{selectedFile.name}</span>
                     </p>
