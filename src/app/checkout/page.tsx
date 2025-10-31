@@ -20,7 +20,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
-import { getProductImage } from '@/lib/data';
+import { getProductImage, getProductPrice } from '@/lib/data';
 import { useTransition, useState, useRef, useCallback, useEffect } from 'react';
 import { useFirebase, errorEmitter } from '@/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -29,7 +29,8 @@ import { Mic, StopCircle, CheckCircle, MapPin, Loader2, Bot } from 'lucide-react
 import Link from 'next/link';
 import { Textarea } from '@/components/ui/textarea';
 import { ShoppingListItem, understandShoppingList } from '@/ai/flows/nlu-flow';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
+import type { ProductPrice } from '@/lib/types';
 
 const checkoutSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -38,6 +39,10 @@ const checkoutSchema = z.object({
 });
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
+
+type StructuredListItemWithPrice = ShoppingListItem & {
+    price: number | null;
+};
 
 const DELIVERY_FEE = 30;
 
@@ -68,7 +73,7 @@ export default function CheckoutPage() {
 
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [structuredList, setStructuredList] = useState<ShoppingListItem[]>([]);
+  const [structuredList, setStructuredList] = useState<StructuredListItemWithPrice[]>([]);
   
   const speechRecognitionRef = useRef<SpeechRecognition | null>(null);
 
@@ -114,8 +119,8 @@ export default function CheckoutPage() {
         };
 
         recognition.onresult = (event) => {
-            let final_transcript = '';
             let interim_transcript = '';
+            let final_transcript = '';
 
             for (let i = event.resultIndex; i < event.results.length; ++i) {
                 if (event.results[i].isFinal) {
@@ -152,7 +157,8 @@ export default function CheckoutPage() {
     }
   };
 
-  const handleUnderstandList = async () => {
+ const handleUnderstandList = async () => {
+    if (!firestore) return;
     const transcribedText = form.getValues('shoppingList');
     if (!transcribedText) {
         toast({ variant: 'destructive', title: 'No list to understand', description: 'Please record or type your shopping list first.' });
@@ -163,11 +169,28 @@ export default function CheckoutPage() {
     setStructuredList([]);
     try {
         const shoppingListResponse = await understandShoppingList(transcribedText);
+        
         if (shoppingListResponse && shoppingListResponse.items) {
-             setStructuredList(shoppingListResponse.items);
-             toast({ title: "List Understood!", description: "Your shopping list has been prepared." });
+            const itemsWithPrices: StructuredListItemWithPrice[] = await Promise.all(
+                shoppingListResponse.items.map(async (item) => {
+                    const priceData = await getProductPrice(firestore, item.productName);
+                    
+                    if (priceData && priceData.variants) {
+                        // Find the variant that matches the parsed quantity
+                        const matchingVariant = priceData.variants.find(v => v.weight.toLowerCase() === item.quantity.toLowerCase());
+                        return {
+                            ...item,
+                            price: matchingVariant ? matchingVariant.price : null,
+                        };
+                    }
+                    return { ...item, price: null };
+                })
+            );
+
+            setStructuredList(itemsWithPrices);
+            toast({ title: "List Understood!", description: "I've prepared your shopping list with prices." });
         } else {
-             throw new Error("Could not understand the shopping list.");
+            throw new Error("Could not understand any items in the shopping list.");
         }
     } catch (error) {
         console.error("NLU error:", error);
@@ -224,7 +247,8 @@ export default function CheckoutPage() {
     }
 
     startPlaceOrderTransition(async () => {
-        const totalAmount = isVoiceOrder ? DELIVERY_FEE : cartTotal + DELIVERY_FEE;
+        const voiceOrderSubtotal = structuredList.reduce((acc, item) => acc + (item.price || 0), 0);
+        const totalAmount = isVoiceOrder ? voiceOrderSubtotal + DELIVERY_FEE : cartTotal + DELIVERY_FEE;
         
         let orderData: any = {
             userId: user.uid,
@@ -240,7 +264,16 @@ export default function CheckoutPage() {
         };
 
         if (isVoiceOrder) {
-            orderData.translatedList = data.shoppingList; // Save the raw transcribed text
+            orderData.translatedList = data.shoppingList;
+            orderData.items = structuredList.map(item => ({
+                productName: item.productName,
+                variantWeight: item.quantity,
+                price: item.price || 0,
+                // These are placeholders for a voice order
+                productId: 'voice-order-item',
+                variantSku: 'voice-order-item',
+                quantity: 1, // Assume quantity of 1 for each line item
+            }));
         } else {
             orderData.storeId = storeId;
             orderData.items = cartItems.map(item => ({
@@ -317,7 +350,8 @@ export default function CheckoutPage() {
     )
   }
 
-  const finalTotal = cartItems.length > 0 ? cartTotal + DELIVERY_FEE : DELIVERY_FEE;
+  const voiceOrderSubtotal = structuredList.reduce((acc, item) => acc + (item.price || 0), 0);
+  const finalTotal = cartItems.length > 0 ? cartTotal + DELIVERY_FEE : voiceOrderSubtotal + DELIVERY_FEE;
 
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
@@ -410,7 +444,7 @@ export default function CheckoutPage() {
                                         <FormItem>
                                         <FormLabel>Your Shopping List</FormLabel>
                                         <FormControl>
-                                            <Textarea placeholder="Your transcribed list will appear here." {...field} rows={6}/>
+                                            <Textarea placeholder="Your transcribed list will appear here." {...field} rows={4}/>
                                         </FormControl>
                                         <FormMessage />
                                         </FormItem>
@@ -431,6 +465,7 @@ export default function CheckoutPage() {
                                                 <TableRow>
                                                     <TableHead>Item</TableHead>
                                                     <TableHead>Quantity</TableHead>
+                                                    <TableHead className="text-right">Price</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
@@ -438,9 +473,16 @@ export default function CheckoutPage() {
                                                     <TableRow key={index}>
                                                         <TableCell>{item.productName}</TableCell>
                                                         <TableCell>{item.quantity}</TableCell>
+                                                        <TableCell className="text-right">{item.price ? `₹${item.price.toFixed(2)}` : 'N/A'}</TableCell>
                                                     </TableRow>
                                                 ))}
                                             </TableBody>
+                                             <TableFooter>
+                                                <TableRow>
+                                                    <TableCell colSpan={2} className="text-right">Subtotal</TableCell>
+                                                    <TableCell className="text-right font-bold">₹{voiceOrderSubtotal.toFixed(2)}</TableCell>
+                                                </TableRow>
+                                             </TableFooter>
                                         </Table>
                                     </CardContent>
                                 </Card>

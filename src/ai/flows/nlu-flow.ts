@@ -42,8 +42,8 @@ export type InterpretedCommand = z.infer<typeof interpretedCommandSchema>;
 
 // Schema for structured shopping list
 const ShoppingListItemSchema = z.object({
-    productName: z.string().describe("The name of the grocery item."),
-    quantity: z.string().describe("The quantity, including units (e.g., '1kg', '500gm', '2 packets')."),
+    productName: z.string().describe("The name of the grocery item. Be as specific as possible (e.g., 'chicken skinless' should be 'Chicken Skinless' not just 'Chicken')."),
+    quantity: z.string().describe("The quantity, including units (e.g., '1kg', '500gm', '2 packets'). This should match one of the canonical weights if possible (e.g., '1/2 kg' becomes '500gm')."),
 });
 export type ShoppingListItem = z.infer<typeof ShoppingListItemSchema>;
 
@@ -62,7 +62,8 @@ export async function interpretCommand(
 export async function understandShoppingList(
   text: string
 ): Promise<ShoppingList | null> {
-    return shoppingListFlow({ text });
+    const { output } = await shoppingListFlow({ text });
+    return output;
 }
 
 const nluPrompt = ai.definePrompt({
@@ -121,15 +122,16 @@ const shoppingListPrompt = ai.definePrompt({
     prompt: `You are an expert grocery list parser. Your task is to take a raw text string, which is a transcription of a user's voice, and convert it into a structured list of items with their quantities.
 
     **Instructions:**
-    1.  Identify each distinct grocery item.
-    2.  Extract the quantity and units for each item (e.g., '1 kg', '500 grams', '2 packets', 'a dozen').
-    3.  If no quantity is mentioned, assume a default and reasonable quantity (e.g., '1 unit' or '500gm').
-    4.  Format the output as a JSON object containing an 'items' array, where each object has 'productName' and 'quantity'.
+    1.  Identify each distinct grocery item. Be specific. If the user says "chicken skinless", the productName should be "Chicken Skinless".
+    2.  Extract the quantity and units for each item.
+    3.  Normalize quantities where possible: '1/2 kg' or 'half a kilo' should become '500gm'. '1 kilo' should become '1kg'. '3 kgs' becomes '3kg'.
+    4.  If no quantity is mentioned for an item that typically has one (like vegetables), assume a default like '500gm'. If it's a packaged item like 'milk', assume '1 packet'.
+    5.  Format the output as a JSON object containing an 'items' array, where each object has 'productName' and 'quantity'.
 
     **Examples:**
-    - "I need 1 kilo of onions, half a kilo of potatoes, and some milk" -> { "items": [{ "productName": "Onions", "quantity": "1 kg" }, { "productName": "Potatoes", "quantity": "500gm" }, { "productName": "Milk", "quantity": "1 packet" }] }
+    - "I need 1 kilo of onions, half a kilo of potatoes, and some milk" -> { "items": [{ "productName": "Onions", "quantity": "1kg" }, { "productName": "Potatoes", "quantity": "500gm" }, { "productName": "Milk", "quantity": "1 packet" }] }
     - "Get me two packets of Maggi noodles, a dozen eggs, and 1kg of chicken breast" -> { "items": [{ "productName": "Maggi Noodles", "quantity": "2 packets" }, { "productName": "Eggs", "quantity": "1 dozen" }, { "productName": "Chicken Breast", "quantity": "1kg" }] }
-    - "tomatoes, spinach, and one block of paneer" -> { "items": [{ "productName": "Tomatoes", "quantity": "500gm" }, { "productName": "Spinach", "quantity": "1 bunch" }, { "productName": "Paneer", "quantity": "1 block" }] }
+    - "1 kg chicken 1/2 kg chicken skinless 3 kgs mutton" -> { "items": [{"productName": "Chicken", "quantity": "1kg"}, {"productName": "Chicken Skinless", "quantity": "500gm"}, {"productName": "Mutton", "quantity": "3kg"}] }
 
     **Shopping List to process:**
     "{{{text}}}"
