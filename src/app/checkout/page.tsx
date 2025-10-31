@@ -317,175 +317,173 @@ export default function CheckoutPage() {
 
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
-      <h1 className="text-4xl font-bold mb-8 font-headline">Checkout</h1>
-      <div className="grid md:grid-cols-2 gap-12">
-        <div>
-          <Card>
-            <CardHeader>
-              <CardTitle>Delivery Information</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Full Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="John Doe" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                   <div className="space-y-2">
-                        <FormLabel>Delivery Location</FormLabel>
-                         <FormDescription>
-                            Your precise delivery location will be based on your captured GPS coordinates.
-                         </FormDescription>
-                        <div className="flex items-center gap-4 pt-2">
-                            <Button type="button" variant="outline" onClick={handleGetLocation} className="flex-1">
-                                <MapPin className="mr-2 h-4 w-4" /> Get Current Location
-                            </Button>
-                            {deliveryCoords && (
-                                <div className="flex items-center text-green-600">
-                                    <CheckCircle className="mr-2 h-5 w-5" />
-                                    <span>Location captured!</span>
-                                </div>
-                            )}
-                        </div>
-                   </div>
-                   <FormField
-                    control={form.control}
-                    name="phone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Phone Number</FormLabel>
-                        <FormControl>
-                          <Input placeholder="(555) 123-4567" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <Button type="submit" disabled={isPlacingOrder} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-                    {isPlacingOrder ? 'Placing Order...' : 'Place Order'}
-                  </Button>
-                </form>
-              </Form>
-            </CardContent>
-          </Card>
-        </div>
-        <div>
-          <Card>
-            <CardHeader>
-              <CardTitle>Order Summary</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                {cartItems.map((item) => {
-                    const image = images[item.variant.sku] || { imageUrl: 'https://placehold.co/48x48/E2E8F0/64748B?text=...', imageHint: 'loading' };
-                    return <OrderSummaryItem key={item.variant.sku} item={item} image={image} />
-                })}
-                 {cartItems.length > 0 && (
-                    <>
-                        <div className="flex justify-between items-center border-t pt-4">
-                            <p className="font-medium">Subtotal</p>
-                            <p>₹{cartTotal.toFixed(2)}</p>
-                        </div>
-                        <div className="flex justify-between items-center">
-                            <p className="font-medium">Delivery Fee</p>
-                            <p>₹{DELIVERY_FEE.toFixed(2)}</p>
-                        </div>
-                    </>
-                 )}
-                 {(form.getValues('shoppingList') || structuredList.length > 0) && cartItems.length === 0 && (
-                    <div className="space-y-4">
+        <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="grid md:grid-cols-2 gap-12">
+                <div>
+                <Card>
+                    <CardHeader>
+                    <CardTitle>Delivery Information</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
                         <FormField
                             control={form.control}
-                            name="shoppingList"
+                            name="name"
                             render={({ field }) => (
-                                <FormItem>
-                                <FormLabel>Your Shopping List</FormLabel>
+                            <FormItem>
+                                <FormLabel>Full Name</FormLabel>
                                 <FormControl>
-                                    <Textarea placeholder="Your transcribed list will appear here." {...field} rows={6}/>
+                                <Input placeholder="John Doe" {...field} />
                                 </FormControl>
                                 <FormMessage />
-                                </FormItem>
+                            </FormItem>
+                            )}
+                        />
+                        <div className="space-y-2">
+                            <FormLabel>Delivery Location</FormLabel>
+                            <FormDescription>
+                                Your precise delivery location will be based on your captured GPS coordinates.
+                            </FormDescription>
+                            <div className="flex items-center gap-4 pt-2">
+                                <Button type="button" variant="outline" onClick={handleGetLocation} className="flex-1">
+                                    <MapPin className="mr-2 h-4 w-4" /> Get Current Location
+                                </Button>
+                                {deliveryCoords && (
+                                    <div className="flex items-center text-green-600">
+                                        <CheckCircle className="mr-2 h-5 w-5" />
+                                        <span>Location captured!</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <FormField
+                            control={form.control}
+                            name="phone"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Phone Number</FormLabel>
+                                <FormControl>
+                                <Input placeholder="(555) 123-4567" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
                             )}
                         />
                         
-                        {isProcessing ? (
-                           <div className="flex items-center justify-center text-muted-foreground">
-                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                             <span>Understanding your list...</span>
-                           </div>
-                        ) : structuredList.length > 0 && (
-                           <Card className="bg-muted/50">
-                            <CardHeader><CardTitle className="text-base">Understood Items</CardTitle></CardHeader>
-                            <CardContent>
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Item</TableHead>
-                                            <TableHead>Quantity</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {structuredList.map((item, index) => (
-                                            <TableRow key={index}>
-                                                <TableCell>{item.productName}</TableCell>
-                                                <TableCell>{item.quantity}</TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </CardContent>
-                           </Card>
+                        <Button type="submit" disabled={isPlacingOrder} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
+                            {isPlacingOrder ? 'Placing Order...' : 'Place Order'}
+                        </Button>
+                    </CardContent>
+                </Card>
+                </div>
+                <div>
+                <Card>
+                    <CardHeader>
+                    <CardTitle>Order Summary</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        {cartItems.map((item) => {
+                            const image = images[item.variant.sku] || { imageUrl: 'https://placehold.co/48x48/E2E8F0/64748B?text=...', imageHint: 'loading' };
+                            return <OrderSummaryItem key={item.variant.sku} item={item} image={image} />
+                        })}
+                        {cartItems.length > 0 && (
+                            <>
+                                <div className="flex justify-between items-center border-t pt-4">
+                                    <p className="font-medium">Subtotal</p>
+                                    <p>₹{cartTotal.toFixed(2)}</p>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <p className="font-medium">Delivery Fee</p>
+                                    <p>₹{DELIVERY_FEE.toFixed(2)}</p>
+                                </div>
+                            </>
                         )}
-                        <div className="flex justify-between items-center">
-                            <p className="font-medium">Delivery Fee</p>
-                            <p>₹{DELIVERY_FEE.toFixed(2)}</p>
-                        </div>
-                    </div>
-                )}
-            </CardContent>
-            <CardFooter className="flex justify-between font-bold text-lg">
-                <span>Total</span>
-                <span>₹{finalTotal.toFixed(2)}</span>
-            </CardFooter>
-          </Card>
-           <Card className="mt-8">
-            <CardHeader>
-                <CardTitle>Voice Shopping List</CardTitle>
-            </CardHeader>
-             <CardContent className="flex flex-col items-center justify-center space-y-4">
-                <Button
-                    onClick={handleToggleListening}
-                    variant={isListening ? 'destructive' : 'outline'}
-                    size="lg"
-                    className="w-48"
-                  >
-                    {isListening ? <StopCircle className="mr-2 h-5 w-5" /> : <Mic className="mr-2 h-5 w-5" />}
-                    {isListening ? 'Stop Listening' : 'Record List'}
-                </Button>
-                
-                 {form.getValues('shoppingList') && !isProcessing && (
-                    <Button onClick={handleUnderstandList} size="lg" className="w-48">
-                        <Bot className="mr-2 h-5 w-5" />
-                        Understand List
-                    </Button>
-                )}
+                        {(form.getValues('shoppingList') || structuredList.length > 0) && cartItems.length === 0 && (
+                            <div className="space-y-4">
+                                <FormField
+                                    control={form.control}
+                                    name="shoppingList"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                        <FormLabel>Your Shopping List</FormLabel>
+                                        <FormControl>
+                                            <Textarea placeholder="Your transcribed list will appear here." {...field} rows={6}/>
+                                        </FormControl>
+                                        <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                
+                                {isProcessing ? (
+                                <div className="flex items-center justify-center text-muted-foreground">
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    <span>Understanding your list...</span>
+                                </div>
+                                ) : structuredList.length > 0 && (
+                                <Card className="bg-muted/50">
+                                    <CardHeader><CardTitle className="text-base">Understood Items</CardTitle></CardHeader>
+                                    <CardContent>
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Item</TableHead>
+                                                    <TableHead>Quantity</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {structuredList.map((item, index) => (
+                                                    <TableRow key={index}>
+                                                        <TableCell>{item.productName}</TableCell>
+                                                        <TableCell>{item.quantity}</TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </CardContent>
+                                </Card>
+                                )}
+                                <div className="flex justify-between items-center">
+                                    <p className="font-medium">Delivery Fee</p>
+                                    <p>₹{DELIVERY_FEE.toFixed(2)}</p>
+                                </div>
+                            </div>
+                        )}
+                    </CardContent>
+                    <CardFooter className="flex justify-between font-bold text-lg">
+                        <span>Total</span>
+                        <span>₹{finalTotal.toFixed(2)}</span>
+                    </CardFooter>
+                </Card>
+                <Card className="mt-8">
+                    <CardHeader>
+                        <CardTitle>Voice Shopping List</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex flex-col items-center justify-center space-y-4">
+                        <Button
+                            type="button"
+                            onClick={handleToggleListening}
+                            variant={isListening ? 'destructive' : 'outline'}
+                            size="lg"
+                            className="w-48"
+                        >
+                            {isListening ? <StopCircle className="mr-2 h-5 w-5" /> : <Mic className="mr-2 h-5 w-5" />}
+                            {isListening ? 'Stop Listening' : 'Record List'}
+                        </Button>
+                        
+                        {form.getValues('shoppingList') && !isProcessing && (
+                            <Button type="button" onClick={handleUnderstandList} size="lg" className="w-48">
+                                <Bot className="mr-2 h-5 w-5" />
+                                Understand List
+                            </Button>
+                        )}
 
-                <p className="text-sm text-muted-foreground text-center">
-                    {isListening ? "I'm listening..." : "Click 'Record List' and start speaking."}
-                </p>
-             </CardContent>
-           </Card>
-        </div>
-      </div>
+                        <p className="text-sm text-muted-foreground text-center">
+                            {isListening ? "I'm listening..." : "Click 'Record List' and start speaking."}
+                        </p>
+                    </CardContent>
+                </Card>
+                </div>
+            </form>
+        </Form>
     </div>
   );
 }
