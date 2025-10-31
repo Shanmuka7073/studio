@@ -25,15 +25,14 @@ import { useTransition, useState, useRef, useCallback, useEffect } from 'react';
 import { useFirebase, errorEmitter } from '@/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { Mic, StopCircle, CheckCircle, Loader2, MapPin, AudioLines } from 'lucide-react';
+import { Mic, StopCircle, CheckCircle, MapPin } from 'lucide-react';
 import Link from 'next/link';
 import { Textarea } from '@/components/ui/textarea';
-import { transcribeAudio } from '@/ai/flows/transcribe-flow';
 
 const checkoutSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   phone: z.string().min(10, 'Please enter a valid phone number'),
-  voiceOrderText: z.string().optional(),
+  notes: z.string().optional(),
 });
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
@@ -64,11 +63,9 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isPlacingOrder, startPlaceOrderTransition] = useTransition();
-  const [isTranscribing, startTranscribeTransition] = useTransition();
   const { firestore, user } = useFirebase();
 
   const [isRecording, setIsRecording] = useState(false);
-  const [voiceOrderText, setVoiceOrderText] = useState('');
   const [recordedAudioUri, setRecordedAudioUri] = useState<string | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -105,7 +102,6 @@ export default function CheckoutPage() {
       .then(stream => {
         setIsRecording(true);
         setRecordedAudioUri(null);
-        setVoiceOrderText('');
 
         const recorder = new MediaRecorder(stream);
         mediaRecorderRef.current = recorder;
@@ -122,6 +118,7 @@ export default function CheckoutPage() {
           reader.onloadend = () => {
              if(reader.result) {
                 setRecordedAudioUri(reader.result as string);
+                toast({ title: 'Recording Complete!', description: 'Your voice memo has been saved.' });
              }
           }
           setIsRecording(false);
@@ -134,38 +131,15 @@ export default function CheckoutPage() {
         console.error("Mic error:", err);
       });
   };
-  
-  const handleTranscribe = () => {
-    if (!recordedAudioUri) {
-      toast({ variant: 'destructive', title: 'No Recording', description: 'Please record your shopping list first.'});
-      return;
-    }
-    
-    startTranscribeTransition(async () => {
-        try {
-            const transcript = await transcribeAudio(recordedAudioUri);
-            setVoiceOrderText(transcript);
-            toast({ title: "Transcription Complete!", description: "Your voice memo has been converted to text."});
-        } catch (e) {
-            console.error("Transcription error:", e);
-            toast({ variant: 'destructive', title: 'Transcription Failed', description: 'Could not process the audio. Please try recording again.' });
-        }
-    });
-  };
-
 
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
     defaultValues: {
       name: '',
       phone: '',
-      voiceOrderText: '',
+      notes: '',
     },
   });
-
-  useEffect(() => {
-    form.setValue('voiceOrderText', voiceOrderText);
-  }, [voiceOrderText, form]);
 
    const handleGetLocation = () => {
         if (navigator.geolocation) {
@@ -196,11 +170,11 @@ export default function CheckoutPage() {
         return;
     }
 
-    const isVoiceOrder = cartItems.length === 0 && !!data.voiceOrderText;
+    const isVoiceOrder = cartItems.length === 0 && !!recordedAudioUri;
     const storeId = cartItems[0]?.product.storeId;
     
     if (cartItems.length === 0 && !isVoiceOrder) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Your cart is empty and no voice order is provided. Add items or record a list.' });
+        toast({ variant: 'destructive', title: 'Error', description: 'Your cart is empty and no voice memo is recorded. Add items or record a list.' });
         return;
     }
      if (!storeId && !isVoiceOrder) {
@@ -211,8 +185,7 @@ export default function CheckoutPage() {
     startPlaceOrderTransition(async () => {
         const totalAmount = isVoiceOrder ? DELIVERY_FEE : cartTotal + DELIVERY_FEE;
         
-        const isVoiceOrderWithAudio = cartItems.length === 0 && !!recordedAudioUri;
-        const collectionName = isVoiceOrderWithAudio ? 'voice-orders' : 'orders';
+        const collectionName = isVoiceOrder ? 'voice-orders' : 'orders';
         
         let orderData: any = {
             userId: user.uid,
@@ -225,10 +198,10 @@ export default function CheckoutPage() {
             orderDate: serverTimestamp(),
             status: 'Pending' as 'Pending',
             totalAmount,
+            translatedList: data.notes || '',
         };
 
-        if (isVoiceOrderWithAudio) {
-            orderData.translatedList = data.voiceOrderText;
+        if (isVoiceOrder) {
             orderData.voiceMemoUrl = recordedAudioUri;
         } else {
             orderData.storeId = storeId;
@@ -245,7 +218,6 @@ export default function CheckoutPage() {
         const colRef = collection(firestore, collectionName);
         addDoc(colRef, orderData).then(() => {
             clearCart();
-            setVoiceOrderText('');
             setRecordedAudioUri(null);
             setDeliveryCoords(null);
             form.reset();
@@ -267,7 +239,7 @@ export default function CheckoutPage() {
     });
   };
 
-  if (cartItems.length === 0 && !recordedAudioUri && !voiceOrderText) {
+  if (cartItems.length === 0 && !recordedAudioUri) {
      return (
         <div className="container mx-auto py-24 px-4 md:px-6">
             <div className="grid md:grid-cols-2 gap-12 items-center">
@@ -364,18 +336,18 @@ export default function CheckoutPage() {
                       </FormItem>
                     )}
                   />
-                  {(voiceOrderText || recordedAudioUri) && (
+                  {cartItems.length === 0 && (
                     <FormField
                       control={form.control}
-                      name="voiceOrderText"
+                      name="notes"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Your Transcribed Shopping List</FormLabel>
+                          <FormLabel>Special Instructions or Shopping List</FormLabel>
                           <FormControl>
-                            <Textarea {...field} rows={5} readOnly={!voiceOrderText} placeholder={recordedAudioUri && !voiceOrderText ? "Your recording is ready. Click 'Transcribe' to see the text." : "Your transcribed text will appear here."} />
+                            <Textarea placeholder="e.g. 1kg chicken, half kg skinless..." {...field} rows={5} />
                           </FormControl>
                           <FormDescription>
-                            You can edit the transcribed text here before placing the order.
+                            Add any notes for the shopkeeper, or type your shopping list here.
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
@@ -412,9 +384,10 @@ export default function CheckoutPage() {
                         </div>
                     </>
                  )}
-                 {cartItems.length === 0 && (voiceOrderText || recordedAudioUri) && (
-                    <div>
-                        <p className="text-muted-foreground text-sm text-center py-4">Your order will be fulfilled based on the transcribed text. The final price will be confirmed by the shopkeeper.</p>
+                 {cartItems.length === 0 && recordedAudioUri && (
+                    <div className="space-y-4">
+                        <p className="text-muted-foreground text-sm">Your order will be fulfilled based on your voice memo and any typed notes.</p>
+                        <audio src={recordedAudioUri} controls className="w-full" />
                         <div className="flex justify-between items-center">
                             <p className="font-medium">Delivery Fee</p>
                             <p>₹{DELIVERY_FEE.toFixed(2)}</p>
@@ -442,15 +415,8 @@ export default function CheckoutPage() {
                     {isRecording ? 'Stop Recording' : (recordedAudioUri ? 'Re-record List' : 'Record List')}
                 </Button>
                 
-                {recordedAudioUri && (
-                    <Button onClick={handleTranscribe} size="lg" className="w-48" disabled={isTranscribing}>
-                        {isTranscribing ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <AudioLines className="mr-2 h-5 w-5" />}
-                        {isTranscribing ? 'Transcribing...' : 'Transcribe'}
-                    </Button>
-                )}
-                
                 <p className="text-sm text-muted-foreground text-center">
-                    {recordedAudioUri ? "Click 'Transcribe' to convert your recording to text." : "You can add special instructions or your full shopping list via voice."}
+                    {recordedAudioUri ? "You can re-record if needed." : "You can add special instructions or your full shopping list via voice."}
                 </p>
              </CardContent>
            </Card>
