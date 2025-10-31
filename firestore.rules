@@ -20,7 +20,7 @@
  * - /store-images/{storeId}/{fileName}: User uploaded store images.
  *
  * Key Security Decisions:
- * - User listing is disallowed.
+ * - User listing is disallowed, except for the admin.
  * - Stores are owned by a user, and only the owner can modify them.
  * - Products are managed within the scope of a store, by the store owner.
  * - Orders include the userId and storeId, for simpler authorization.
@@ -75,14 +75,15 @@ service cloud.firestore {
      * @path /users/{userId}
      * @allow (create) - User can create their own profile if the userId matches their auth UID.
      * @allow (get, update, delete) - User can get, update, and delete their own profile.
-     * @deny (list) - Listing users is not allowed.
+     * @allow (list) - Listing users is allowed for admins only.
+     * @deny (list) - Listing users is not allowed for non-admins.
      * @deny (create) - User cannot create a profile for another user.
      * @deny (update, delete) - User cannot update or delete another user's profile.
      * @principle Enforces document ownership and restricts access to a user's own data tree.
      */
     match /users/{userId} {
       allow get: if isOwner(userId);
-      allow list: if false;
+      allow list: if isAdmin();
       allow create: if isOwner(userId) && request.resource.data.id == userId;
       allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
       allow delete: if isExistingOwner(userId);
@@ -93,7 +94,7 @@ service cloud.firestore {
      * @path /stores/{storeId}
      * @allow (create) - User can create a store if they are the owner.
      * @allow (get, update, delete) - Store owner can get, update, and delete their store.
-     * @deny (list) - Listing stores is allowed for all users.
+     * @allow (list) - Listing stores is allowed for all users.
      * @deny (create) - User cannot create a store for another user.
      * @deny (update, delete) - User cannot update or delete another store they don't own.
      * @principle Enforces document ownership for writes.
@@ -110,7 +111,7 @@ service cloud.firestore {
      * @path /stores/{storeId}/products/{productId}
      * @allow (create) - Store owner can create products under their store.
      * @allow (get, update, delete) - Store owner can get, update, and delete products under their store.
-     * @deny (list) - Listing products is allowed for all users.
+     * @allow (list) - Listing products is allowed for all users.
      * @deny (create) - User cannot create a product for another store.
      * @deny (update, delete) - User cannot update or delete products in stores they don't own.
      * @principle Enforces document ownership for writes within a store's context.
@@ -127,7 +128,7 @@ service cloud.firestore {
      * @path /stores/{storeId}/packages/{packageId}
      * @allow (create) - Store owner can create packages under their store.
      * @allow (get, update, delete) - Store owner can get, update, and delete packages under their store.
-     * @deny (list) - Listing packages is allowed for all users.
+     * @allow (list) - Listing packages is allowed for all users.
      * @deny (create) - User cannot create a package for another store.
      * @deny (update, delete) - User cannot update or delete packages in stores they don't own.
      * @principle Enforces document ownership for writes within a store's context.
@@ -193,7 +194,8 @@ service cloud.firestore {
       * @path /deliveryPartners/{partnerId}
       * @allow (get, update) - Delivery partner can get and update their own document.
       * @allow (create) - A delivery partner can create their document with their userId.
-      * @deny (list, delete) - Listing is only allowed for admins. Deleting is not allowed.
+      * @allow (list) - Listing is only allowed for admins.
+      * @deny (delete) - Deleting is not allowed.
       * @principle Only the partner can manage their own data, but admins can list all partners.
       */
     match /deliveryPartners/{partnerId} {
