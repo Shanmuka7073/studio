@@ -114,10 +114,10 @@ export default function CheckoutPage() {
         };
 
         recognition.onresult = (event) => {
-            let interim_transcript = '';
             let final_transcript = '';
+            let interim_transcript = '';
 
-            for (let i = 0; i < event.results.length; ++i) {
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
                 if (event.results[i].isFinal) {
                     final_transcript += event.results[i][0].transcript;
                 } else {
