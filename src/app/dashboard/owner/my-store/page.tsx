@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useTransition, useEffect, useMemo, useRef } from 'react';
@@ -297,136 +298,156 @@ function StoreImageUploader({ store }: { store: Store }) {
     );
 }
 
-function ProductChecklist({ storeId, isAdmin, adminStoreId }: { storeId: string; isAdmin: boolean; adminStoreId?: string; }) {
-  const { toast } = useToast();
-  const [isAdding, startTransition] = useTransition();
+function ProductChecklist({ storeId, adminStoreId }: { storeId: string; adminStoreId: string; }) {
   const { firestore } = useFirebase();
-  const [selectedProducts, setSelectedProducts] = useState<Record<string, boolean>>({});
+  const { toast } = useToast();
+  const [isSaving, startSaveTransition] = useTransition();
 
-  const handleProductSelection = (productName: string, isChecked: boolean) => {
-    setSelectedProducts(prev => ({ 
-        ...prev, 
-        [productName]: isChecked, 
-    }));
+  // Fetch all products from the master admin store
+  const masterProductsQuery = useMemoFirebase(() => {
+    if (!firestore || !adminStoreId) return null;
+    return collection(firestore, 'stores', adminStoreId, 'products');
+  }, [firestore, adminStoreId]);
+  const { data: masterProducts, isLoading: masterProductsLoading } = useCollection<Product>(masterProductsQuery);
+  
+  // Fetch products currently in this owner's store
+  const ownerProductsQuery = useMemoFirebase(() => {
+    if (!firestore || !storeId) return null;
+    return collection(firestore, 'stores', storeId, 'products');
+  }, [firestore, storeId]);
+  const { data: ownerProducts, isLoading: ownerProductsLoading } = useCollection<Product>(ownerProductsQuery);
+
+  // State to manage which products are checked
+  const [checkedProducts, setCheckedProducts] = useState<Record<string, boolean>>({});
+
+  // When owner's products load, initialize the checked state
+  useEffect(() => {
+    if (ownerProducts) {
+      const initialCheckedState = ownerProducts.reduce((acc, product) => {
+        // Use master product name as the key for consistency
+        acc[product.name] = true;
+        return acc;
+      }, {});
+      setCheckedProducts(initialCheckedState);
+    }
+  }, [ownerProducts]);
+  
+  const handleCheckChange = (productName: string, isChecked: boolean) => {
+    setCheckedProducts(prev => ({ ...prev, [productName]: isChecked }));
   };
 
-  const handleAddSelectedProducts = async () => {
-    if (!firestore || !storeId || (isAdmin && storeId !== adminStoreId) || !adminStoreId) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Cannot add products without a valid admin store reference.' });
-      return;
-    }
-    
-    startTransition(async () => {
-      const productNamesToAdd = Object.keys(selectedProducts).filter(name => selectedProducts[name]);
-      if (productNamesToAdd.length === 0) return;
+  const handleSaveChanges = () => {
+    startSaveTransition(async () => {
+        if (!firestore || !masterProducts || !ownerProducts) return;
 
-      toast({ title: 'Starting Bulk Add...', description: `Preparing to add ${productNamesToAdd.length} products.` });
+        const ownerProductMap = new Map(ownerProducts.map(p => [p.name, p.id]));
+        const batch = writeBatch(firestore);
+        let addedCount = 0;
+        let removedCount = 0;
 
-      // Get the master prices from the admin store
-      const adminProductsRef = collection(firestore, 'stores', adminStoreId, 'products');
-      const adminProductsQuery = query(adminProductsRef, where('name', 'in', productNamesToAdd));
-      const adminProductsSnapshot = await getDocs(adminProductsQuery);
-      const masterPrices = new Map<string, Product>();
-      adminProductsSnapshot.forEach(doc => {
-          const product = doc.data() as Product;
-          masterPrices.set(product.name, product);
-      });
+        for (const masterProduct of masterProducts) {
+            const isChecked = checkedProducts[masterProduct.name] || false;
+            const isInStore = ownerProductMap.has(masterProduct.name);
 
-      const batch = writeBatch(firestore);
-      const targetCollection = collection(firestore, 'stores', storeId, 'products');
-      let productsAdded = 0;
-
-      for (const productName of productNamesToAdd) {
-        const masterProduct = masterPrices.get(productName);
-        if (!masterProduct || !masterProduct.variants) {
-          console.warn(`No master price found for ${productName}. Skipping.`);
-          continue;
+            if (isChecked && !isInStore) {
+                // Add product to store
+                const newProductRef = doc(collection(firestore, 'stores', storeId, 'products'));
+                const newProductData = {
+                  ...masterProduct, // Copy all data from master
+                  storeId: storeId, // Set correct storeId
+                };
+                delete (newProductData as any).id; // Firestore generates ID, so remove from data
+                batch.set(newProductRef, newProductData);
+                addedCount++;
+            } else if (!isChecked && isInStore) {
+                // Remove product from store
+                const productIdToRemove = ownerProductMap.get(masterProduct.name);
+                if (productIdToRemove) {
+                    const productRef = doc(firestore, 'stores', storeId, 'products', productIdToRemove);
+                    batch.delete(productRef);
+                    removedCount++;
+                }
+            }
         }
-
-        const imageInfo = await generateSingleImage(productName);
         
-        const newProductDocRef = doc(targetCollection);
-        batch.set(newProductDocRef, {
-            name: productName,
-            storeId: storeId,
-            variants: masterProduct.variants,
-            category: groceryData.categories.find(c => c.items.includes(productName))?.categoryName || 'Miscellaneous',
-            imageId: imageInfo?.id || masterProduct.imageId || `prod-${createSlug(productName)}`,
-            imageUrl: imageInfo?.imageUrl || masterProduct.imageUrl || '',
-            imageHint: imageInfo?.imageHint || masterProduct.imageHint || '',
-        });
-        productsAdded++;
-      }
-      
-      try {
-        await batch.commit();
-        toast({
-          title: 'Products Added!',
-          description: `${productsAdded} products have been added to your inventory with master pricing.`,
-        });
-        setSelectedProducts({});
-      } catch (e) {
-          const permissionError = new FirestorePermissionError({
-            path: `stores/${storeId}/products`,
-            operation: 'create',
-            requestResourceData: { note: 'Bulk add operation.' },
-          });
-          errorEmitter.emit('permission-error', permissionError);
-      }
+        try {
+            await batch.commit();
+            toast({
+                title: "Inventory Updated",
+                description: `${addedCount} product(s) added and ${removedCount} product(s) removed.`
+            });
+        } catch (error) {
+             console.error("Failed to update inventory:", error);
+             toast({ variant: 'destructive', title: 'Update Failed', description: 'Could not update your product list.' });
+        }
     });
   };
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Bulk Add Products</CardTitle>
-        <CardDescription>
-            {isAdmin ? 'Please add products one-by-one to set master prices.' : 'Select products to add to your store. Prices are set by the admin.'}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <Accordion type="multiple" className="w-full">
-          {groceryData.categories.map((category) => {
-             const categoryItems = category.items && Array.isArray(category.items) ? category.items : [];
-            const selectedInCategory = categoryItems.filter(item => selectedProducts[item]).length;
+  if (masterProductsLoading || ownerProductsLoading) {
+    return <p>Loading product list...</p>
+  }
+  
+  if (!masterProducts || masterProducts.length === 0) {
+      return (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>No Master Products Found</AlertTitle>
+            <AlertDescription>The admin has not added any products to the master catalog yet. Please check back later.</AlertDescription>
+          </Alert>
+      )
+  }
+  
+  const productsByCategory = masterProducts.reduce((acc, product) => {
+      const category = product.category || 'Miscellaneous';
+      if (!acc[category]) {
+          acc[category] = [];
+      }
+      acc[category].push(product);
+      return acc;
+  }, {});
 
-            return (
-              <AccordionItem value={category.categoryName} key={category.categoryName}>
-                <AccordionTrigger>{category.categoryName} ({selectedInCategory}/{categoryItems.length})</AccordionTrigger>
-                <AccordionContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4 p-4">
-                    {categoryItems.map((item) => (
-                      <div key={item} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`${category.categoryName}-${item}`}
-                          onCheckedChange={(checked) => handleProductSelection(item, !!checked)}
-                          checked={selectedProducts[item] || false}
-                          disabled={isAdmin}
-                        />
-                        <label
-                          htmlFor={`${category.categoryName}-${item}`}
-                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-1"
-                        >
-                          {item}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            )
-          })}
-        </Accordion>
-        <Button onClick={handleAddSelectedProducts} disabled={isAdding || Object.values(selectedProducts).filter(Boolean).length === 0 || isAdmin} className="w-full">
-          {isAdding ? 'Adding...' : `Add ${Object.values(selectedProducts).filter(Boolean).length} Selected Products`}
-        </Button>
-      </CardContent>
-    </Card>
-  );
+
+  return (
+      <Card>
+          <CardHeader>
+              <CardTitle>Manage Your Inventory</CardTitle>
+              <CardDescription>Select the products you want to sell in your store. Prices are managed by the platform admin.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+              <Accordion type="multiple" className="w-full">
+                  {Object.entries(productsByCategory).map(([category, products]: [string, Product[]]) => (
+                       <AccordionItem value={category} key={category}>
+                          <AccordionTrigger>{category}</AccordionTrigger>
+                          <AccordionContent>
+                               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4 p-4">
+                                  {(products as Product[]).map((product) => (
+                                      <div key={product.id} className="flex items-center space-x-2">
+                                          <Checkbox
+                                              id={product.id}
+                                              checked={checkedProducts[product.name] || false}
+                                              onCheckedChange={(checked) => handleCheckChange(product.name, !!checked)}
+                                          />
+                                          <label htmlFor={product.id} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                              {product.name}
+                                          </label>
+                                      </div>
+                                  ))}
+                              </div>
+                          </AccordionContent>
+                       </AccordionItem>
+                  ))}
+              </Accordion>
+               <Button onClick={handleSaveChanges} disabled={isSaving} className="w-full">
+                  {isSaving ? 'Saving Changes...' : 'Save Inventory Changes'}
+              </Button>
+          </CardContent>
+      </Card>
+  )
+
 }
 
 
-function AddProductForm({ storeId, isAdmin, adminStoreId }: { storeId: string; isAdmin: boolean; adminStoreId?: string; }) {
+function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolean; }) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const { firestore } = useFirebase();
@@ -443,39 +464,17 @@ function AddProductForm({ storeId, isAdmin, adminStoreId }: { storeId: string; i
 
   const onSubmit = (data: ProductFormValues) => {
     if (!firestore) return;
+    if (!isAdmin) {
+        toast({ variant: 'destructive', title: 'Unauthorized', description: 'Only admins can create new master products.'});
+        return;
+    }
 
     startTransition(async () => {
       try {
-        let variantsWithSkus: ProductVariant[];
-        
-        // If not admin, fetch prices from admin store. If admin, use form data.
-        if (!isAdmin) {
-            if (!adminStoreId) {
-                toast({ variant: "destructive", title: "Admin Store Error", description: "Could not find the master admin store to fetch prices."});
-                return;
-            }
-            const adminProductsRef = collection(firestore, 'stores', adminStoreId, 'products');
-            const q = query(adminProductsRef, where('name', '==', data.name));
-            const querySnapshot = await getDocs(q);
-
-            if (!querySnapshot.empty) {
-                const adminProduct = querySnapshot.docs[0].data() as Product;
-                // Overwrite variants with master variants
-                variantsWithSkus = adminProduct.variants;
-            } else {
-                 toast({
-                    variant: 'destructive',
-                    title: 'Price Not Found',
-                    description: `The master price for "${data.name}" has not been set by the admin yet. You cannot add this product.`,
-                });
-                return;
-            }
-        } else { // Is admin
-             variantsWithSkus = data.variants.map((variant, index) => ({
-              ...variant,
-              sku: `${createSlug(data.name)}-${createSlug(variant.weight)}-${index}`
-            }));
-        }
+        const variantsWithSkus: ProductVariant[] = data.variants.map((variant, index) => ({
+            ...variant,
+            sku: `${createSlug(data.name)}-${createSlug(variant.weight)}-${index}`
+        }));
 
         const imageInfo = await generateSingleImage(data.name);
 
@@ -495,8 +494,8 @@ function AddProductForm({ storeId, isAdmin, adminStoreId }: { storeId: string; i
         await addDoc(productsCol, productData);
         
         toast({
-          title: 'Product Added!',
-          description: `${data.name} has been added with an AI-generated image.`,
+          title: 'Master Product Added!',
+          description: `${data.name} has been added to the master catalog.`,
         });
         form.reset();
 
@@ -515,8 +514,8 @@ function AddProductForm({ storeId, isAdmin, adminStoreId }: { storeId: string; i
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Add a Custom Product</CardTitle>
-        <CardDescription>Add a product to your inventory. An image will be generated by AI based on the product name.</CardDescription>
+        <CardTitle>Add a Master Product</CardTitle>
+        <CardDescription>Add a new product to the platform's master catalog. An image will be generated by AI.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -574,7 +573,7 @@ function AddProductForm({ storeId, isAdmin, adminStoreId }: { storeId: string; i
                 <CardHeader className="p-2">
                     <CardTitle className="text-lg">Price Variants</CardTitle>
                     <CardDescription className="text-xs">
-                        {isAdmin ? "Set the official price for this product for all stores." : "Prices are inherited from the master catalog and cannot be edited."}
+                        Set the official price for this product for all stores.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="p-2 space-y-4">
@@ -597,24 +596,20 @@ function AddProductForm({ storeId, isAdmin, adminStoreId }: { storeId: string; i
                                 render={({ field }) => (
                                     <FormItem className="flex-1">
                                         <FormLabel>Price (₹)</FormLabel>
-                                        <FormControl><Input type="number" step="0.01" {...field} disabled={!isAdmin} /></FormControl>
+                                        <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
                             />
-                             {isAdmin && (
-                                <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)}>
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
-                             )}
+                            <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)}>
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
                         </div>
                     ))}
-                     {isAdmin && (
-                        <Button type="button" variant="outline" onClick={() => append({ weight: '', price: 0, sku: `new-${fields.length}` })}>
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            Add Variant
-                        </Button>
-                     )}
+                    <Button type="button" variant="outline" onClick={() => append({ weight: '', price: 0, sku: `new-${fields.length}` })}>
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Add Variant
+                    </Button>
                 </CardContent>
             </Card>
 
@@ -918,17 +913,43 @@ function ManageStoreView({ store, isAdmin, adminStoreId }: { store: Store; isAdm
     return (
       <div className="space-y-8">
         {needsLocationUpdate && <UpdateLocationForm store={store} onUpdate={() => {}} />}
-        <div className="grid md:grid-cols-2 gap-8">
-            <StoreImageUploader store={store} />
-            <AddProductForm storeId={store.id} isAdmin={isAdmin} adminStoreId={adminStoreId} />
-        </div>
-         <div className="grid md:grid-cols-2 gap-8">
-            {!isAdmin && <ProductChecklist storeId={store.id} isAdmin={isAdmin} adminStoreId={adminStoreId} />}
-            <PromoteStore store={store} />
-        </div>
+        
+        {isAdmin ? (
+             <div className="grid md:grid-cols-2 gap-8">
+                <StoreImageUploader store={store} />
+                <AddProductForm storeId={store.id} isAdmin={true} />
+            </div>
+        ) : (
+            <>
+              <div className="grid md:grid-cols-2 gap-8">
+                <StoreImageUploader store={store} />
+                {adminStoreId ? (
+                    <ProductChecklist storeId={store.id} adminStoreId={adminStoreId} />
+                ) : (
+                    <Card>
+                        <CardHeader><CardTitle>Manage Inventory</CardTitle></CardHeader>
+                        <CardContent>
+                            <Alert>
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertTitle>Master Store Not Found</AlertTitle>
+                                <AlertDescription>The admin has not configured the master product store yet. Inventory management is temporarily unavailable.</AlertDescription>
+                            </Alert>
+                        </CardContent>
+                    </Card>
+                )}
+             </div>
+             <div className="grid md:grid-cols-2 gap-8">
+                <PromoteStore store={store} />
+             </div>
+            </>
+        )}
+
         <Card>
             <CardHeader>
                 <CardTitle>Your Products</CardTitle>
+                 <CardDescription>
+                    {isAdmin ? "This is the master list of products for the entire platform." : "This is your current store inventory."}
+                </CardDescription>
             </CardHeader>
             <CardContent>
                 {isLoading ? (
@@ -940,7 +961,7 @@ function ManageStoreView({ store, isAdmin, adminStoreId }: { store: Store; isAdm
                             <TableHead>Name</TableHead>
                             <TableHead>Variants</TableHead>
                             <TableHead>Category</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
+                            {isAdmin && <TableHead className="text-right">Actions</TableHead>}
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -949,17 +970,19 @@ function ManageStoreView({ store, isAdmin, adminStoreId }: { store: Store; isAdm
                                 <TableCell>{product.name}</TableCell>
                                 <TableCell>{product.variants?.map(v => `${v.weight} (₹${v.price})`).join(', ') || 'N/A'}</TableCell>
                                 <TableCell>{product.category}</TableCell>
-                                <TableCell className="text-right">
-                                    <Button 
-                                        variant="ghost" 
-                                        size="icon" 
-                                        onClick={() => handleDeleteProduct(product.id, product.name)}
-                                        disabled={isDeleting}
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                        <span className="sr-only">Delete {product.name}</span>
-                                    </Button>
-                                </TableCell>
+                                {isAdmin && (
+                                    <TableCell className="text-right">
+                                        <Button 
+                                            variant="ghost" 
+                                            size="icon" 
+                                            onClick={() => handleDeleteProduct(product.id, product.name)}
+                                            disabled={isDeleting}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                            <span className="sr-only">Delete {product.name}</span>
+                                        </Button>
+                                    </TableCell>
+                                )}
                             </TableRow>
                         ))}
                     </TableBody>
@@ -1201,7 +1224,7 @@ export default function MyStorePage() {
 
     if (isAdmin) {
       if (adminStore) {
-        return <ManageStoreView store={adminStore} isAdmin={true} adminStoreId={adminStore.id}/>;
+        return <ManageStoreView store={adminStore} isAdmin={true} />;
       } else {
         return <CreateStoreForm user={user} isAdmin={true} />;
       }
