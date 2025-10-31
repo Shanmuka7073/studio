@@ -446,12 +446,9 @@ function AddProductForm({ storeId, isAdmin, adminStoreId }: { storeId: string; i
 
     startTransition(async () => {
       try {
-        let variantsWithSkus = data.variants.map((variant, index) => ({
-          ...variant,
-          sku: `${createSlug(data.name)}-${createSlug(variant.weight)}-${index}`
-        }));
+        let variantsWithSkus: ProductVariant[];
         
-        // If not admin, fetch prices from admin store
+        // If not admin, fetch prices from admin store. If admin, use form data.
         if (!isAdmin && adminStoreId) {
             const adminProductsRef = collection(firestore, 'stores', adminStoreId, 'products');
             const q = query(adminProductsRef, where('name', '==', data.name));
@@ -465,10 +462,18 @@ function AddProductForm({ storeId, isAdmin, adminStoreId }: { storeId: string; i
                  toast({
                     variant: 'destructive',
                     title: 'Price Not Found',
-                    description: `The master price for "${data.name}" has not been set by the admin yet.`,
+                    description: `The master price for "${data.name}" has not been set by the admin yet. You cannot add this product.`,
                 });
                 return;
             }
+        } else if (isAdmin) {
+             variantsWithSkus = data.variants.map((variant, index) => ({
+              ...variant,
+              sku: `${createSlug(data.name)}-${createSlug(variant.weight)}-${index}`
+            }));
+        } else {
+            toast({ variant: "destructive", title: "Admin Store Error", description: "Could not find the master admin store to fetch prices."});
+            return;
         }
 
         const imageInfo = await generateSingleImage(data.name);
@@ -596,15 +601,19 @@ function AddProductForm({ storeId, isAdmin, adminStoreId }: { storeId: string; i
                                     </FormItem>
                                 )}
                             />
-                            <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)}>
-                                <Trash2 className="h-4 w-4" />
-                            </Button>
+                             {isAdmin && (
+                                <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)}>
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                             )}
                         </div>
                     ))}
-                    <Button type="button" variant="outline" onClick={() => append({ weight: '', price: 0, sku: `new-${fields.length}` })}>
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Add Variant
-                    </Button>
+                     {isAdmin && (
+                        <Button type="button" variant="outline" onClick={() => append({ weight: '', price: 0, sku: `new-${fields.length}` })}>
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Add Variant
+                        </Button>
+                     )}
                 </CardContent>
             </Card>
 
@@ -1191,7 +1200,7 @@ export default function MyStorePage() {
 
     if (isAdmin) {
       if (adminStore) {
-        return <ManageStoreView store={adminStore} isAdmin={true} />;
+        return <ManageStoreView store={adminStore} isAdmin={true} adminStoreId={adminStore.id}/>;
       } else {
         return <CreateStoreForm user={user} isAdmin={true} />;
       }
