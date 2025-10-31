@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useCart } from '@/lib/cart';
@@ -168,7 +167,7 @@ export default function CheckoutPage() {
         toast({
             variant: 'destructive',
             title: 'Processing Failed',
-            description: 'Could not understand the items in your list. Please try again or simplify the text.'
+            description: `Could not understand the items in your list. Error: ${(error as Error).message}`
         });
     } finally {
         setIsProcessing(false);

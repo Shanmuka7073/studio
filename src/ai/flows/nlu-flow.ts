@@ -167,12 +167,7 @@ const shoppingListFlow = ai.defineFlow(
     outputSchema: ShoppingListSchema.nullable(),
   },
   async ({ text }) => {
-    try {
-        const { output } = await shoppingListPrompt({ text });
-        return output;
-    } catch(e) {
-        console.error("Failed to understand shopping list:", e);
-        return null;
-    }
+    const { output } = await shoppingListPrompt({ text });
+    return output;
   }
 );
