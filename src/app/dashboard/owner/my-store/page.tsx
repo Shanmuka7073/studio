@@ -326,10 +326,10 @@ function ProductChecklist({ storeId, isAdmin, adminStoreId }: { storeId: string;
       const adminProductsRef = collection(firestore, 'stores', adminStoreId, 'products');
       const adminProductsQuery = query(adminProductsRef, where('name', 'in', productNamesToAdd));
       const adminProductsSnapshot = await getDocs(adminProductsQuery);
-      const masterPrices = new Map<string, ProductVariant[]>();
+      const masterPrices = new Map<string, Product>();
       adminProductsSnapshot.forEach(doc => {
           const product = doc.data() as Product;
-          masterPrices.set(product.name, product.variants);
+          masterPrices.set(product.name, product);
       });
 
       const batch = writeBatch(firestore);
@@ -337,8 +337,8 @@ function ProductChecklist({ storeId, isAdmin, adminStoreId }: { storeId: string;
       let productsAdded = 0;
 
       for (const productName of productNamesToAdd) {
-        const variants = masterPrices.get(productName);
-        if (!variants) {
+        const masterProduct = masterPrices.get(productName);
+        if (!masterProduct || !masterProduct.variants) {
           console.warn(`No master price found for ${productName}. Skipping.`);
           continue;
         }
@@ -349,11 +349,11 @@ function ProductChecklist({ storeId, isAdmin, adminStoreId }: { storeId: string;
         batch.set(newProductDocRef, {
             name: productName,
             storeId: storeId,
-            variants: variants,
+            variants: masterProduct.variants,
             category: groceryData.categories.find(c => c.items.includes(productName))?.categoryName || 'Miscellaneous',
-            imageId: imageInfo?.id || `prod-${createSlug(productName)}`,
-            imageUrl: imageInfo?.imageUrl || '',
-            imageHint: imageInfo?.imageHint || '',
+            imageId: imageInfo?.id || masterProduct.imageId || `prod-${createSlug(productName)}`,
+            imageUrl: imageInfo?.imageUrl || masterProduct.imageUrl || '',
+            imageHint: imageInfo?.imageHint || masterProduct.imageHint || '',
         });
         productsAdded++;
       }
@@ -449,7 +449,11 @@ function AddProductForm({ storeId, isAdmin, adminStoreId }: { storeId: string; i
         let variantsWithSkus: ProductVariant[];
         
         // If not admin, fetch prices from admin store. If admin, use form data.
-        if (!isAdmin && adminStoreId) {
+        if (!isAdmin) {
+            if (!adminStoreId) {
+                toast({ variant: "destructive", title: "Admin Store Error", description: "Could not find the master admin store to fetch prices."});
+                return;
+            }
             const adminProductsRef = collection(firestore, 'stores', adminStoreId, 'products');
             const q = query(adminProductsRef, where('name', '==', data.name));
             const querySnapshot = await getDocs(q);
@@ -466,14 +470,11 @@ function AddProductForm({ storeId, isAdmin, adminStoreId }: { storeId: string; i
                 });
                 return;
             }
-        } else if (isAdmin) {
+        } else { // Is admin
              variantsWithSkus = data.variants.map((variant, index) => ({
               ...variant,
               sku: `${createSlug(data.name)}-${createSlug(variant.weight)}-${index}`
             }));
-        } else {
-            toast({ variant: "destructive", title: "Admin Store Error", description: "Could not find the master admin store to fetch prices."});
-            return;
         }
 
         const imageInfo = await generateSingleImage(data.name);
@@ -922,7 +923,7 @@ function ManageStoreView({ store, isAdmin, adminStoreId }: { store: Store; isAdm
             <AddProductForm storeId={store.id} isAdmin={isAdmin} adminStoreId={adminStoreId} />
         </div>
          <div className="grid md:grid-cols-2 gap-8">
-            <ProductChecklist storeId={store.id} isAdmin={isAdmin} adminStoreId={adminStoreId} />
+            {!isAdmin && <ProductChecklist storeId={store.id} isAdmin={isAdmin} adminStoreId={adminStoreId} />}
             <PromoteStore store={store} />
         </div>
         <Card>
