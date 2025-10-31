@@ -105,7 +105,7 @@ export default function CheckoutPage() {
     if (SpeechRecognition) {
         speechRecognitionRef.current = new SpeechRecognition();
         const recognition = speechRecognitionRef.current;
-        recognition.lang = 'en-IN'; // Set language to Indian English
+        recognition.lang = 'en-IN';
         recognition.continuous = true;
         recognition.interimResults = true;
         
