@@ -124,7 +124,9 @@ export default function CheckoutPage() {
 
         recognition.onerror = (event) => {
             console.error("Speech recognition error:", event.error);
-            toast({ variant: 'destructive', title: 'Voice Error', description: `An error occurred: ${event.error}` });
+            if (event.error !== 'aborted' && event.error !== 'no-speech') {
+              toast({ variant: 'destructive', title: 'Voice Error', description: `An error occurred: ${event.error}` });
+            }
             setIsListening(false);
         };
 
