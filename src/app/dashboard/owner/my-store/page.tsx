@@ -1236,10 +1236,26 @@ function AdminProductRow({ product, storeId, onEdit, onDelete }: { product: Prod
                     <Edit className="h-4 w-4" />
                     <span className="sr-only">Edit {product.name}</span>
                 </Button>
-                <Button variant="ghost" size="icon" onClick={onDelete}>
-                    <Trash2 className="h-4 w-4" />
-                    <span className="sr-only">Delete {product.name}</span>
-                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="icon">
+                      <Trash2 className="h-4 w-4" />
+                      <span className="sr-only">Delete {product.name}</span>
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will permanently delete the master product "{product.name}" and its pricing from the entire platform. This cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={onDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
             </TableCell>
         </TableRow>
     );
@@ -1255,7 +1271,7 @@ function ManageStoreView({ store, isAdmin, adminStoreId }: { store: Store; isAdm
 
     const productsQuery = useMemoFirebase(() => {
         if (!firestore) return null;
-        return collection(firestore, 'stores', store.id, 'products');
+        return query(collection(firestore, 'stores', store.id, 'products'));
     }, [firestore, store.id]);
 
     const { data: products, isLoading } = useCollection<Product>(productsQuery);
@@ -1388,7 +1404,7 @@ function ManageStoreView({ store, isAdmin, adminStoreId }: { store: Store; isAdm
                     <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Name</TableHead>
+                            <TableHead>Product</TableHead>
                             <TableHead>Category</TableHead>
                             {isAdmin && <TableHead>Variants</TableHead>}
                             {isAdmin && <TableHead className="text-right">Actions</TableHead>}
@@ -1406,7 +1422,18 @@ function ManageStoreView({ store, isAdmin, adminStoreId }: { store: Store; isAdm
                                 />
                             ) : (
                                 <TableRow key={product.id}>
-                                    <TableCell>{product.name}</TableCell>
+                                     <TableCell>
+                                        <div className="flex items-center gap-4">
+                                            <Image
+                                                src={product.imageUrl || 'https://placehold.co/40x40/E2E8F0/64748B?text=?'}
+                                                alt={product.name}
+                                                width={40}
+                                                height={40}
+                                                className="rounded-sm object-cover"
+                                            />
+                                            <span>{product.name}</span>
+                                        </div>
+                                    </TableCell>
                                     <TableCell>{product.category}</TableCell>
                                 </TableRow>
                             )
