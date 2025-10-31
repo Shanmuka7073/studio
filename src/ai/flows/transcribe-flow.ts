@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A simple flow to transcribe an audio file.
@@ -27,18 +28,15 @@ const transcribeFlow = ai.defineFlow(
         outputSchema: TranscribeOutputSchema,
     },
     async (audioDataUri) => {
-        try {
-            const { text } = await ai.generate({
-                model: googleAI.model('gemini-1.5-flash'),
-                prompt: [
-                    { text: 'Transcribe the following audio recording of a shopping list. The user may speak in a mix of English and other languages like Telugu or Hindi. Transcribe it as accurately as possible.' },
-                    { media: { url: audioDataUri } },
-                ],
-            });
-            return text;
-        } catch (e) {
-            console.error("Transcription failed in flow:", e);
-            throw new Error("Failed to transcribe audio.");
-        }
+        // By removing the try/catch, the original GenkitError will be thrown,
+        // providing a more specific reason for the failure (e.g., model not found, API key issue).
+        const { text } = await ai.generate({
+            model: googleAI.model('gemini-1.5-flash'),
+            prompt: [
+                { text: 'Transcribe the following audio recording of a shopping list. The user may speak in a mix of English and other languages like Telugu or Hindi. Transcribe it as accurately as possible.' },
+                { media: { url: audioDataUri } },
+            ],
+        });
+        return text;
     }
 );
