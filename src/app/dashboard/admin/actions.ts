@@ -104,9 +104,9 @@ export async function saveProductPrices(productName: string, variants: ProductVa
         revalidatePath('/stores', 'layout');
 
         return { success: true };
-    } catch (error) {
+    } catch (error: any) {
         console.error(`Failed to save prices for ${productName}:`, error);
-        return { success: false, error: 'A server error occurred during the price update.' };
+        return { success: false, error: error.message || 'A server error occurred during the price update.' };
     }
 }
 
