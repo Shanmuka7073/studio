@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useTransition, useEffect, useMemo, useRef } from 'react';
@@ -56,7 +55,6 @@ import groceryData from '@/lib/grocery-data.json';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Share2, MapPin, Trash2, AlertCircle, Upload, Image as ImageIcon, Loader2, Camera, CameraOff, Sparkles } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { getProductPrices } from '@/app/dashboard/admin/server-actions';
 import { Progress } from '@/components/ui/progress';
 import { generateSingleImage } from '@/ai/flows/image-generator-flow';
 
@@ -1098,12 +1096,6 @@ export default function MyStorePage() {
   const { user, isUserLoading } = useFirebase();
   const router = useRouter();
 
-  useEffect(() => {
-    if (!isUserLoading && !user) {
-      router.push('/login?redirectTo=/dashboard/owner/my-store');
-    }
-  }, [isUserLoading, user, router]);
-
   const { firestore } = useFirebase();
   const storeQuery = useMemoFirebase(() => {
       if (!firestore || !user) return null;
@@ -1117,14 +1109,30 @@ export default function MyStorePage() {
   const [pricesLoading, setPricesLoading] = useState(true);
 
   useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.push('/login?redirectTo=/dashboard/owner/my-store');
+    }
+  }, [isUserLoading, user, router]);
+
+  useEffect(() => {
     async function fetchAdminPrices() {
+      if (!firestore) return;
       setPricesLoading(true);
-      const priceMap = await getProductPrices();
-      setAdminPrices(priceMap);
-      setPricesLoading(false);
+      try {
+        const pricesSnapshot = await getDocs(collection(firestore, 'productPrices'));
+        const priceMap: Record<string, ProductVariant[]> = {};
+        pricesSnapshot.forEach(doc => {
+            priceMap[doc.id] = doc.data().variants;
+        });
+        setAdminPrices(priceMap);
+      } catch (error) {
+        console.error("Failed to fetch admin prices:", error);
+      } finally {
+        setPricesLoading(false);
+      }
     }
     fetchAdminPrices();
-  }, []);
+  }, [firestore]);
 
   if (isUserLoading || isStoreLoading || pricesLoading) {
     return <div className="container mx-auto py-12 px-4 md:px-6">Loading your store...</div>

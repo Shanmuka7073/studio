@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useEffect, useTransition } from 'react';
+import { useState, useEffect, useTransition, useMemo } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -23,13 +22,14 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { useFirebase } from '@/firebase';
+import { useFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { useRouter } from 'next/navigation';
-import { getUniqueProductNames, saveProductPrices, getProductPrices } from '../server-actions';
 import { Trash2, PlusCircle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ProductVariant } from '@/lib/types';
+import type { ProductVariant } from '@/lib/types';
+import groceryData from '@/lib/grocery-data.json';
+import { collection, doc, getDocs, writeBatch, query, where, collectionGroup } from 'firebase/firestore';
 
 const ADMIN_EMAIL = 'admin@gmail.com';
 
@@ -47,14 +47,25 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 export default function PricingPage() {
-  const { user, isUserLoading } = useFirebase();
+  const { user, isUserLoading, firestore } = useFirebase();
   const router = useRouter();
   const { toast } = useToast();
   const [isSaving, startSaveTransition] = useTransition();
 
-  const [uniqueProducts, setUniqueProducts] = useState<string[]>([]);
   const [allPrices, setAllPrices] = useState<Record<string, ProductVariant[]>>({});
   const [isLoading, setIsLoading] = useState(true);
+
+  const uniqueProducts = useMemo(() => {
+    const nameSet = new Set<string>();
+    groceryData.categories.forEach(category => {
+        if (Array.isArray(category.items)) {
+            category.items.forEach(item => {
+                nameSet.add(item);
+            });
+        }
+    });
+    return Array.from(nameSet).sort();
+  }, []);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -72,18 +83,26 @@ export default function PricingPage() {
   const selectedProductName = form.watch('productName');
 
   useEffect(() => {
-    async function fetchData() {
+    async function fetchProductPrices() {
+        if (!firestore) return;
         setIsLoading(true);
-        const [names, prices] = await Promise.all([
-            getUniqueProductNames(),
-            getProductPrices()
-        ]);
-        setUniqueProducts(names);
-        setAllPrices(prices);
+        try {
+            const pricesSnapshot = await getDocs(collection(firestore, 'productPrices'));
+            const priceMap: Record<string, ProductVariant[]> = {};
+            if (!pricesSnapshot.empty) {
+                pricesSnapshot.docs.forEach(doc => {
+                    const data = doc.data();
+                    priceMap[doc.id] = data.variants as ProductVariant[];
+                });
+            }
+            setAllPrices(priceMap);
+        } catch (error) {
+            console.error('Failed to fetch product prices:', error);
+        }
         setIsLoading(false);
     }
-    fetchData();
-  }, []);
+    fetchProductPrices();
+  }, [firestore]);
   
   useEffect(() => {
     if (selectedProductName) {
@@ -100,22 +119,58 @@ export default function PricingPage() {
   }
 
   const onSubmit = (data: FormValues) => {
+    if (!firestore) {
+        toast({ variant: 'destructive', title: 'Firestore not available' });
+        return;
+    }
     startSaveTransition(async () => {
-      const result = await saveProductPrices(data.productName, data.variants);
-      if (result.success) {
+      try {
+        const batch = writeBatch(firestore);
+        const productName = data.productName.toLowerCase();
+
+        // 1. Set the canonical price in /productPrices/{productName}
+        const productPriceRef = doc(firestore, 'productPrices', productName);
+        batch.set(productPriceRef, {
+            productName: productName,
+            variants: data.variants,
+        });
+
+        // 2. Find all existing products with this name and update their variants
+        const productsQuery = query(collectionGroup(firestore, 'products'), where('name', '==', data.productName));
+        const productsSnapshot = await getDocs(productsQuery);
+        if (!productsSnapshot.empty) {
+            productsSnapshot.docs.forEach(doc => {
+                batch.update(doc.ref, { variants: data.variants });
+            });
+        }
+
+        await batch.commit();
+
         toast({
           title: 'Prices Updated!',
-          description: `Pricing for ${data.productName} has been saved.`,
+          description: `Pricing for ${data.productName} has been saved and applied to all stores.`,
         });
+
         // Refetch prices to update the local state
-        const updatedPrices = await getProductPrices();
-        setAllPrices(updatedPrices);
-      } else {
+        const updatedPricesSnapshot = await getDocs(collection(firestore, 'productPrices'));
+        const priceMap: Record<string, ProductVariant[]> = {};
+        updatedPricesSnapshot.forEach(doc => {
+            priceMap[doc.id] = doc.data().variants as ProductVariant[];
+        });
+        setAllPrices(priceMap);
+
+      } catch (error) {
         toast({
           variant: 'destructive',
           title: 'Update Failed',
-          description: result.error || 'Could not save prices.',
+          description: error instanceof Error ? error.message : 'Could not save prices.',
         });
+        const permissionError = new FirestorePermissionError({
+            path: `productPrices/${data.productName.toLowerCase()}`,
+            operation: 'write',
+            requestResourceData: data,
+        });
+        errorEmitter.emit('permission-error', permissionError);
       }
     });
   };

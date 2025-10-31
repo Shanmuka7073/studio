@@ -1,24 +1,17 @@
-
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Users, Store, Truck, ShoppingBag } from 'lucide-react';
 import Link from 'next/link';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
-import { getAdminStats } from './server-actions';
+import { useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { collection, query, where } from 'firebase/firestore';
+import type { Order } from '@/lib/types';
 
 const ADMIN_EMAIL = 'admin@gmail.com';
-
-type AdminStats = {
-    totalUsers: number;
-    totalStores: number;
-    totalDeliveryPartners: number;
-    totalOrdersDelivered: number;
-};
 
 function StatCard({ title, value, icon: Icon, loading }: { title: string, value: number, icon: React.ElementType, loading?: boolean }) {
     return (
@@ -35,39 +28,39 @@ function StatCard({ title, value, icon: Icon, loading }: { title: string, value:
 }
 
 export default function AdminDashboardPage() {
-    const { user, isUserLoading } = useFirebase();
+    const { user, isUserLoading, firestore } = useFirebase();
     const router = useRouter();
-    const [stats, setStats] = useState<AdminStats | null>(null);
-    const [statsLoading, setStatsLoading] = useState(true);
 
-    useEffect(() => {
-        if (!isUserLoading && (!user || user.email !== ADMIN_EMAIL)) {
-            router.replace('/dashboard');
-        }
-    }, [isUserLoading, user, router]);
+    // Queries for stats
+    const storesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'stores'), where('isClosed', '!=', true)) : null, [firestore]);
+    const partnersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'deliveryPartners') : null, [firestore]);
+    const deliveredOrdersQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'orders'), where('status', '==', 'Delivered')) : null, [firestore]);
+    const deliveredVoiceOrdersQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'voice-orders'), where('status', '==', 'Delivered')) : null, [firestore]);
 
-    useEffect(() => {
-        async function fetchStats() {
-            setStatsLoading(true);
-            const fetchedStats = await getAdminStats();
-            setStats(fetchedStats);
-            setStatsLoading(false);
-        }
+    const { data: stores, isLoading: storesLoading } = useCollection(storesQuery);
+    const { data: partners, isLoading: partnersLoading } = useCollection(partnersQuery);
+    const { data: deliveredOrders, isLoading: ordersLoading } = useCollection<Order>(deliveredOrdersQuery);
+    const { data: deliveredVoiceOrders, isLoading: voiceOrdersLoading } = useCollection<Order>(deliveredVoiceOrdersQuery);
 
-        if (user && user.email === ADMIN_EMAIL) {
-            fetchStats();
-        }
-    }, [user]);
+    const stats = useMemo(() => ({
+        totalUsers: 0, // This is disabled
+        totalStores: stores?.length ?? 0,
+        totalDeliveryPartners: partners?.length ?? 0,
+        totalOrdersDelivered: (deliveredOrders?.length ?? 0) + (deliveredVoiceOrders?.length ?? 0),
+    }), [stores, partners, deliveredOrders, deliveredVoiceOrders]);
 
-    if (isUserLoading || !user || user.email !== ADMIN_EMAIL) {
+    const statsLoading = isUserLoading || storesLoading || partnersLoading || ordersLoading || voiceOrdersLoading;
+
+    if (!isUserLoading && (!user || user.email !== ADMIN_EMAIL)) {
+        router.replace('/dashboard');
         return <p>Loading admin dashboard...</p>
     }
 
     const statItems = [
-        { title: 'Total Customers', value: stats?.totalUsers ?? 0, icon: Users },
-        { title: 'Total Stores', value: stats?.totalStores ?? 0, icon: Store },
-        { title: 'Delivery Partners', value: stats?.totalDeliveryPartners ?? 0, icon: Truck },
-        { title: 'Orders Delivered', value: stats?.totalOrdersDelivered ?? 0, icon: ShoppingBag },
+        { title: 'Total Customers', value: stats.totalUsers, icon: Users },
+        { title: 'Total Stores', value: stats.totalStores, icon: Store },
+        { title: 'Delivery Partners', value: stats.totalDeliveryPartners, icon: Truck },
+        { title: 'Orders Delivered', value: stats.totalOrdersDelivered, icon: ShoppingBag },
     ];
 
     return (
