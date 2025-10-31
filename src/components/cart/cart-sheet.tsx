@@ -4,7 +4,6 @@ import { useCart } from '@/lib/cart';
 import { Button } from '@/components/ui/button';
 import { SheetHeader, SheetTitle, SheetFooter, SheetClose, SheetDescription } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 import { Trash2, Plus, Minus } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -84,7 +83,7 @@ export function CartSheetContent() {
       </SheetHeader>
       
       {cartItems.length > 0 ? (
-      <>
+      <div className="flex flex-col h-full">
         <ScrollArea className="flex-1 my-4 pr-4">
             <div className="flex flex-col divide-y">
               {cartItems.map((item) => {
@@ -106,7 +105,7 @@ export function CartSheetContent() {
               </SheetClose>
             </div>
           </SheetFooter>
-        </>
+        </div>
       ) : (
           <div className="flex flex-1 h-full items-center justify-center">
             <p>Your cart is empty.</p>
