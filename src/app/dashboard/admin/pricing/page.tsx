@@ -25,8 +25,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
-import { getUniqueProductNames, getProductPrices } from '../actions';
-import { saveProductPrices } from '../server-actions';
+import { getUniqueProductNames } from '../actions';
+import { saveProductPrices, getProductPrices } from '../server-actions';
 import { Trash2, PlusCircle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';

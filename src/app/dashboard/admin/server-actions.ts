@@ -5,6 +5,29 @@ import type { ProductVariant } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
 import { getFirestore } from '@genkit-ai/google-cloud';
 
+export async function getProductPrices(): Promise<Record<string, ProductVariant[]>> {
+     try {
+        const firestore = getFirestore();
+        const pricesSnapshot = await firestore.collection('productPrices').get();
+
+        if (pricesSnapshot.empty) {
+            return {};
+        }
+
+        const priceMap: Record<string, ProductVariant[]> = {};
+        pricesSnapshot.docs.forEach(doc => {
+            const data = doc.data();
+            priceMap[doc.id] = data.variants as ProductVariant[];
+        });
+
+        return priceMap;
+    } catch (error) {
+        console.error('Failed to fetch product prices:', error);
+        return {};
+    }
+}
+
+
 export async function getAdminStats(): Promise<{
     totalUsers: number,
     totalStores: number,
