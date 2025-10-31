@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Package2, Menu, UserCircle, Store, ShoppingBag, Truck, Mic, LayoutDashboard, Settings, Tag } from 'lucide-react';
+import { Package2, Menu, UserCircle, Store, ShoppingBag, Truck, LayoutDashboard, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -15,7 +15,7 @@ import {
 import { CartIcon } from '@/components/cart/cart-icon';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { useFirebase, useAssistant } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,23 +40,6 @@ const dashboardLinks = [
     { href: '/dashboard/owner/orders', label: 'Store Orders', icon: ShoppingBag },
     { href: '/dashboard/delivery/deliveries', label: 'Deliveries', icon: Truck },
 ]
-
-function AssistantToggle() {
-    const { status, toggleListening } = useAssistant();
-    const isListening = status === 'listening';
-
-    return (
-        <Button 
-            variant="outline" 
-            size="icon" 
-            onClick={toggleListening}
-            className={cn(isListening && "bg-destructive text-destructive-foreground hover:bg-destructive/90")}
-        >
-          <Mic className="h-5 w-5" />
-          <span className="sr-only">Toggle Voice Assistant</span>
-        </Button>
-    )
-}
 
 function UserMenu() {
   const { user, isUserLoading } = useFirebase();
@@ -116,12 +99,6 @@ function UserMenu() {
             <>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>Admin</DropdownMenuLabel>
-                <Link href="/dashboard/admin/pricing" passHref>
-                    <DropdownMenuItem>
-                        <Tag className="mr-2 h-4 w-4" />
-                        <span>Product Pricing</span>
-                    </DropdownMenuItem>
-                 </Link>
                  <Link href="/dashboard/site-config" passHref>
                     <DropdownMenuItem>
                         <Settings className="mr-2 h-4 w-4" />
@@ -235,15 +212,6 @@ export function Header() {
                     ))}
                     {isAdmin && (
                         <>
-                        <SheetClose asChild>
-                            <Link
-                                href="/dashboard/admin/pricing"
-                                className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
-                            >
-                                <Tag className="h-4 w-4" />
-                                Product Pricing
-                            </Link>
-                        </SheetClose>
                          <SheetClose asChild>
                             <Link
                                 href="/dashboard/site-config"
@@ -262,7 +230,6 @@ export function Header() {
       </Sheet>
       
       <div className="flex w-full items-center justify-end gap-4 md:ml-auto md:gap-2 lg:gap-4">
-        {user && <AssistantToggle />}
         <CartIcon />
         <UserMenu />
       </div>

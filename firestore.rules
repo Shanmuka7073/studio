@@ -18,7 +18,6 @@
  * - /deliveryPartners/{partnerId}: Delivery partner earnings and payout information. Document ID is the same as the user ID.
  * - /deliveryPartners/{partnerId}/payouts/{payoutId}: Payout requests for delivery partners.
  * - /store-images/{storeId}/{fileName}: User uploaded store images.
- * - /productPrices/{productName}: Admin-managed canonical pricing for product variants.
  *
  * Key Security Decisions:
  * - User listing is disallowed.
@@ -216,18 +215,6 @@ service cloud.firestore {
       allow get, list: if isOwner(partnerId);
       allow create: if isOwner(partnerId);
       allow update, delete: if false;
-    }
-    
-    /**
-     * @description Defines rules for the admin-managed product prices.
-     * @path /productPrices/{productName}
-     * @allow (get, list) - All users can read the canonical prices.
-     * @allow (write) - Only admins can write, and the document ID must match the lowercase productName.
-     * @principle Centralized, admin-only control over pricing, with data consistency enforcement.
-     */
-    match /productPrices/{productName} {
-        allow get, list: if true;
-        allow write: if isAdmin() && request.resource.data.productName.lower() == productName;
     }
   }
 }

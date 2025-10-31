@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition, useEffect, useMemo, useRef } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -53,7 +53,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Checkbox } from '@/components/ui/checkbox';
 import groceryData from '@/lib/grocery-data.json';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Share2, MapPin, Trash2, AlertCircle, Upload, Image as ImageIcon, Loader2, Camera, CameraOff, Sparkles } from 'lucide-react';
+import { Share2, MapPin, Trash2, AlertCircle, Upload, Image as ImageIcon, Loader2, Camera, CameraOff, Sparkles, PlusCircle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { generateSingleImage } from '@/ai/flows/image-generator-flow';
@@ -74,10 +74,17 @@ const locationSchema = z.object({
     longitude: z.coerce.number().min(-180).max(180),
 });
 
+const variantSchema = z.object({
+  sku: z.string(),
+  weight: z.string().min(1, 'Weight is required'),
+  price: z.coerce.number().positive('Price must be a positive number'),
+});
+
 const productSchema = z.object({
   name: z.string().min(3, 'Product name is required'),
   description: z.string().optional(),
   category: z.string().min(1, "Category is required"),
+  variants: z.array(variantSchema).min(1, 'At least one price variant is required'),
 });
 
 type StoreFormValues = z.infer<typeof storeSchema>;
@@ -289,7 +296,7 @@ function StoreImageUploader({ store }: { store: Store }) {
     );
 }
 
-function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPrices: Record<string, ProductVariant[]> }) {
+function ProductChecklist({ storeId }: { storeId: string; }) {
   const { toast } = useToast();
   const [isAdding, startTransition] = useTransition();
   const { firestore } = useFirebase();
@@ -303,75 +310,12 @@ function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPric
   };
 
   const handleAddSelectedProducts = () => {
-    if (!firestore || !storeId) return;
-
-    const productsToAdd = Object.entries(selectedProducts)
-                                .filter(([_, isSelected]) => isSelected)
-                                .map(([name]) => name);
-    
-    if (productsToAdd.length === 0) {
-      toast({
+    toast({
         variant: 'destructive',
-        title: 'No products selected',
-        description: 'Please select at least one product to add.',
-      });
-      return;
-    }
-
-    startTransition(async () => {
-        const batch = writeBatch(firestore);
-        
-        for (const name of productsToAdd) {
-            const variants = adminPrices[name.toLowerCase()];
-            if (!variants || variants.length === 0) {
-                toast({
-                    variant: 'destructive',
-                    title: 'Pricing Not Found',
-                    description: `Admin has not set a price for "${name}". Please add it as a custom product or ask an admin to set the price.`,
-                });
-                continue; // Skip this product
-            }
-
-            const imageInfo = await generateSingleImage(name);
-            const newProductRef = doc(collection(firestore, 'stores', storeId, 'products'));
-            const category = groceryData.categories.find(c => Array.isArray(c.items) && c.items.includes(name))?.categoryName || 'Miscellaneous';
-            
-            const productData: Omit<Product, 'id'> = {
-                name,
-                variants,
-                description: '',
-                storeId,
-                imageId: imageInfo?.id || `prod-${createSlug(name)}`,
-                imageUrl: imageInfo?.imageUrl || '',
-                imageHint: imageInfo?.imageHint || '',
-                category,
-            };
-            
-            batch.set(newProductRef, productData);
-        }
-
-        try {
-            await batch.commit();
-
-            const productsAddedCount = productsToAdd.length;
-            if (productsAddedCount > 0) {
-                toast({
-                    title: `${productsAddedCount} Products Added!`,
-                    description: 'The selected products and their prices have been added to your store.',
-                });
-            }
-            setSelectedProducts({});
-
-        } catch (serverError) {
-          console.error("Failed to add products in bulk:", serverError);
-          const permissionError = new FirestorePermissionError({
-            path: `stores/${storeId}/products`,
-            operation: 'create',
-            requestResourceData: { note: "Bulk product addition failed. See logs for details." },
-          });
-          errorEmitter.emit('permission-error', permissionError);
-        }
+        title: 'Functionality Disabled',
+        description: 'Bulk adding with admin prices has been disabled. Please add products manually with your own prices.',
     });
+    return;
   };
 
   const selectedCount = Object.values(selectedProducts).filter(Boolean).length;
@@ -380,7 +324,7 @@ function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPric
     <Card>
       <CardHeader>
         <CardTitle>Bulk Add Products</CardTitle>
-        <CardDescription>Select from a master list. Prices are managed by the admin. Product images will be generated automatically by AI.</CardDescription>
+        <CardDescription>Select from a master list. Prices are managed by you. Product images will be generated automatically by AI.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <Accordion type="multiple" className="w-full">
@@ -430,37 +374,39 @@ function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPric
 }
 
 
-function AddProductForm({ storeId, adminPrices }: { storeId: string; adminPrices: Record<string, ProductVariant[]> }) {
+function AddProductForm({ storeId }: { storeId: string; }) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const { firestore } = useFirebase();
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
-    defaultValues: { name: '', description: '', category: '' },
+    defaultValues: { name: '', description: '', category: '', variants: [{ sku: '', weight: '', price: 0 }] },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: 'variants'
   });
 
   const onSubmit = (data: ProductFormValues) => {
     if (!firestore) return;
 
-    const variants = adminPrices[data.name.toLowerCase()];
-    if (!variants || variants.length === 0) {
-        toast({
-            variant: 'destructive',
-            title: 'Pricing Not Set',
-            description: `The admin has not set a price for "${data.name}". Please ask an admin to set the price before adding this product.`,
-        });
-        return;
-    }
+    const variantsWithSkus = data.variants.map((variant, index) => ({
+      ...variant,
+      sku: `${createSlug(data.name)}-${createSlug(variant.weight)}-${index}`
+    }));
 
     startTransition(async () => {
         try {
             const imageInfo = await generateSingleImage(data.name);
 
             const productData: Omit<Product, 'id'> = {
-                ...data,
+                name: data.name,
+                description: data.description,
+                category: data.category,
                 storeId,
-                variants,
+                variants: variantsWithSkus,
                 imageId: imageInfo?.id || `prod-${createSlug(data.name)}`,
                 imageUrl: imageInfo?.imageUrl || '',
                 imageHint: imageInfo?.imageHint || '',
@@ -472,7 +418,7 @@ function AddProductForm({ storeId, adminPrices }: { storeId: string; adminPrices
             
             toast({
                 title: 'Product Added!',
-                description: `${data.name} has been added with its standard prices and an AI-generated image.`,
+                description: `${data.name} has been added with an AI-generated image.`,
             });
             form.reset();
 
@@ -492,7 +438,7 @@ function AddProductForm({ storeId, adminPrices }: { storeId: string; adminPrices
     <Card>
       <CardHeader>
         <CardTitle>Add a Custom Product</CardTitle>
-        <CardDescription>Product prices must be set by an admin first. An image will be generated by AI based on the product name.</CardDescription>
+        <CardDescription>Add a product to your inventory. An image will be generated by AI based on the product name.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -506,7 +452,6 @@ function AddProductForm({ storeId, adminPrices }: { storeId: string; adminPrices
                   <FormControl>
                     <Input placeholder="e.g., Organic Apples" {...field} />
                   </FormControl>
-                   <FormDescription>Must match the name set by the admin exactly (case-insensitive).</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -546,6 +491,49 @@ function AddProductForm({ storeId, adminPrices }: { storeId: string; adminPrices
                 </FormItem>
               )}
             />
+
+            <Card className="bg-muted/50 p-4">
+                <CardHeader className="p-2">
+                    <CardTitle className="text-lg">Price Variants</CardTitle>
+                </CardHeader>
+                <CardContent className="p-2 space-y-4">
+                    {fields.map((field, index) => (
+                        <div key={field.id} className="flex items-end gap-4 p-4 border rounded-md bg-background">
+                            <FormField
+                                control={form.control}
+                                name={`variants.${index}.weight`}
+                                render={({ field }) => (
+                                    <FormItem className="flex-1">
+                                        <FormLabel>Weight (e.g., 500gm, 1kg)</FormLabel>
+                                        <FormControl><Input {...field} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name={`variants.${index}.price`}
+                                render={({ field }) => (
+                                    <FormItem className="flex-1">
+                                        <FormLabel>Price (₹)</FormLabel>
+                                        <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)}>
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    ))}
+                    <Button type="button" variant="outline" onClick={() => append({ weight: '', price: 0, sku: `new-${fields.length}` })}>
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Add Variant
+                    </Button>
+                </CardContent>
+            </Card>
+
+
             <Button type="submit" disabled={isPending} className="bg-accent hover:bg-accent/90 text-accent-foreground">
                 {isPending ? (
                     <>
@@ -791,7 +779,7 @@ function DangerZone({ store }: { store: Store }) {
 }
 
 
-function ManageStoreView({ store, adminPrices }: { store: Store; adminPrices: Record<string, ProductVariant[]> }) {
+function ManageStoreView({ store }: { store: Store; }) {
     const { firestore } = useFirebase();
     const { toast } = useToast();
     const [isDeleting, startDeleteTransition] = useTransition();
@@ -848,20 +836,10 @@ function ManageStoreView({ store, adminPrices }: { store: Store; adminPrices: Re
         {needsLocationUpdate && <UpdateLocationForm store={store} onUpdate={() => {}} />}
         <div className="grid md:grid-cols-2 gap-8">
             <StoreImageUploader store={store} />
-            <Card>
-                <CardHeader>
-                    <CardTitle>Manage {store.name}</CardTitle>
-                    <CardDescription>
-                        View your existing inventory below and add new products.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                   <AddProductForm storeId={store.id} adminPrices={adminPrices} />
-                </CardContent>
-            </Card>
+            <AddProductForm storeId={store.id} />
         </div>
          <div className="grid md:grid-cols-2 gap-8">
-            <ProductChecklist storeId={store.id} adminPrices={adminPrices} />
+            <ProductChecklist storeId={store.id} />
             <PromoteStore store={store} />
         </div>
         <Card>
@@ -1105,36 +1083,13 @@ export default function MyStorePage() {
   const { data: stores, isLoading: isStoreLoading } = useCollection<Store>(storeQuery);
   const myStore = stores?.[0];
 
-  const [adminPrices, setAdminPrices] = useState<Record<string, ProductVariant[]>>({});
-  const [pricesLoading, setPricesLoading] = useState(true);
-
   useEffect(() => {
     if (!isUserLoading && !user) {
       router.push('/login?redirectTo=/dashboard/owner/my-store');
     }
   }, [isUserLoading, user, router]);
 
-  useEffect(() => {
-    async function fetchAdminPrices() {
-      if (!firestore) return;
-      setPricesLoading(true);
-      try {
-        const pricesSnapshot = await getDocs(collection(firestore, 'productPrices'));
-        const priceMap: Record<string, ProductVariant[]> = {};
-        pricesSnapshot.forEach(doc => {
-            priceMap[doc.id] = doc.data().variants;
-        });
-        setAdminPrices(priceMap);
-      } catch (error) {
-        console.error("Failed to fetch admin prices:", error);
-      } finally {
-        setPricesLoading(false);
-      }
-    }
-    fetchAdminPrices();
-  }, [firestore]);
-
-  if (isUserLoading || isStoreLoading || pricesLoading) {
+  if (isUserLoading || isStoreLoading) {
     return <div className="container mx-auto py-12 px-4 md:px-6">Loading your store...</div>
   }
   
@@ -1145,7 +1100,7 @@ export default function MyStorePage() {
       </h1>
 
       {myStore ? (
-        <ManageStoreView store={myStore} adminPrices={adminPrices} />
+        <ManageStoreView store={myStore} />
       ) : (
         <CreateStoreForm user={user} />
       )}
