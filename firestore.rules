@@ -101,8 +101,7 @@ service cloud.firestore {
      * @principle Enforces document ownership for writes.
      */
     match /stores/{storeId} {
-      allow get: if true;
-      allow list: if true;
+      allow get, list: if true;
       allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
       allow update: if isSignedIn() && resource.data.ownerId == request.auth.uid;
       allow delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
@@ -176,6 +175,20 @@ service cloud.firestore {
     match /users/{userId}/productRecommendations/{productRecommendationId} {
       allow get, list: if isOwner(userId);
       allow create, update, delete: if false;
+    }
+    
+    /**
+     * @description Defines rules for voice-only orders.
+     * @path /voice-orders/{voiceOrderId}
+     * @allow (get, list, update) - Any signed-in user can access/update voice orders to allow claiming.
+     * @allow (create) - User can create a voice order for themselves.
+     * @deny (delete) - Deletion is not allowed.
+     * @principle Allows store owners and delivery partners to discover and claim unassigned voice orders.
+     */
+    match /voice-orders/{voiceOrderId} {
+      allow get, list, update: if isSignedIn();
+      allow create: if isOwner(request.resource.data.userId);
+      allow delete: if false;
     }
 
     /**
