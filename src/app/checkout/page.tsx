@@ -28,6 +28,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { Mic, StopCircle, CheckCircle, Loader2, MapPin, AudioLines } from 'lucide-react';
 import Link from 'next/link';
 import { Textarea } from '@/components/ui/textarea';
+import { transcribeAudio } from '@/ai/flows/transcribe-flow';
 
 const checkoutSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -63,11 +64,12 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isPlacingOrder, startPlaceOrderTransition] = useTransition();
+  const [isTranscribing, startTranscribeTransition] = useTransition();
   const { firestore, user } = useFirebase();
 
   const [isRecording, setIsRecording] = useState(false);
   const [voiceOrderText, setVoiceOrderText] = useState('');
-  const [recordedAudio, setRecordedAudio] = useState<Blob | null>(null);
+  const [recordedAudioUri, setRecordedAudioUri] = useState<string | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -102,7 +104,7 @@ export default function CheckoutPage() {
     navigator.mediaDevices.getUserMedia({ audio: true })
       .then(stream => {
         setIsRecording(true);
-        setRecordedAudio(null);
+        setRecordedAudioUri(null);
         setVoiceOrderText('');
 
         const recorder = new MediaRecorder(stream);
@@ -115,7 +117,13 @@ export default function CheckoutPage() {
         
         recorder.onstop = () => {
           const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-          setRecordedAudio(audioBlob);
+          const reader = new FileReader();
+          reader.readAsDataURL(audioBlob);
+          reader.onloadend = () => {
+             if(reader.result) {
+                setRecordedAudioUri(reader.result as string);
+             }
+          }
           setIsRecording(false);
           stream.getTracks().forEach(track => track.stop());
         };
@@ -128,43 +136,21 @@ export default function CheckoutPage() {
   };
   
   const handleTranscribe = () => {
-    if (!recordedAudio) {
+    if (!recordedAudioUri) {
       toast({ variant: 'destructive', title: 'No Recording', description: 'Please record your shopping list first.'});
       return;
     }
-
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      toast({ variant: 'destructive', title: 'Not Supported', description: 'Voice recognition is not supported by your browser.' });
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'en-IN'; // Set language for better accuracy
-    recognition.continuous = false;
-    recognition.interimResults = false;
-
-    // A hacky way to use the API with a blob
-    // This is not standard but works in some Chrome versions
-    try {
-        // @ts-ignore
-        recognition.audio = recordedAudio;
-    } catch (e) {
-        console.warn("Could not set audio source for recognition. It may still work with the microphone feed if timed correctly, but it is not ideal.");
-    }
     
-    recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        setVoiceOrderText(transcript);
-        toast({ title: "Transcription Complete!", description: "Your voice memo has been converted to text."});
-    };
-
-    recognition.onerror = (event) => {
-        toast({ variant: 'destructive', title: 'Transcription Error', description: `Could not understand the audio: ${event.error}` });
-        console.error("Transcription error:", event.error);
-    };
-
-    recognition.start();
+    startTranscribeTransition(async () => {
+        try {
+            const transcript = await transcribeAudio(recordedAudioUri);
+            setVoiceOrderText(transcript);
+            toast({ title: "Transcription Complete!", description: "Your voice memo has been converted to text."});
+        } catch (e) {
+            console.error("Transcription error:", e);
+            toast({ variant: 'destructive', title: 'Transcription Failed', description: 'Could not process the audio. Please try recording again.' });
+        }
+    });
   };
 
 
@@ -225,7 +211,8 @@ export default function CheckoutPage() {
     startPlaceOrderTransition(async () => {
         const totalAmount = isVoiceOrder ? DELIVERY_FEE : cartTotal + DELIVERY_FEE;
         
-        let collectionName = 'orders';
+        const isVoiceOrderWithAudio = cartItems.length === 0 && !!recordedAudioUri;
+        const collectionName = isVoiceOrderWithAudio ? 'voice-orders' : 'orders';
         
         let orderData: any = {
             userId: user.uid,
@@ -240,8 +227,9 @@ export default function CheckoutPage() {
             totalAmount,
         };
 
-        if (isVoiceOrder) {
-            orderData.translatedList = data.voiceOrderText; // Save the transcribed text
+        if (isVoiceOrderWithAudio) {
+            orderData.translatedList = data.voiceOrderText;
+            orderData.voiceMemoUrl = recordedAudioUri;
         } else {
             orderData.storeId = storeId;
             orderData.items = cartItems.map(item => ({
@@ -253,16 +241,12 @@ export default function CheckoutPage() {
                 price: item.variant.price,
             }));
         }
-        
-        if (isVoiceOrder) {
-            collectionName = 'voice-orders';
-            delete orderData.items; // No items in voice order
-        }
 
         const colRef = collection(firestore, collectionName);
         addDoc(colRef, orderData).then(() => {
             clearCart();
             setVoiceOrderText('');
+            setRecordedAudioUri(null);
             setDeliveryCoords(null);
             form.reset();
 
@@ -283,7 +267,7 @@ export default function CheckoutPage() {
     });
   };
 
-  if (cartItems.length === 0 && !recordedAudio && !voiceOrderText) {
+  if (cartItems.length === 0 && !recordedAudioUri && !voiceOrderText) {
      return (
         <div className="container mx-auto py-24 px-4 md:px-6">
             <div className="grid md:grid-cols-2 gap-12 items-center">
@@ -314,7 +298,7 @@ export default function CheckoutPage() {
                             {isRecording ? <StopCircle className="mr-2 h-5 w-5" /> : <Mic className="mr-2 h-5 w-5" />}
                             {isRecording ? 'Stop Recording' : 'Record List'}
                         </Button>
-                        <p className="text-sm text-muted-foreground text-center">Record your full shopping list. We'll attach the text to your order for the shopkeeper.</p>
+                        <p className="text-sm text-muted-foreground text-center">Record your full shopping list. We'll attach the audio to your order for the shopkeeper.</p>
                      </CardContent>
                   </Card>
                  </div>
@@ -380,7 +364,7 @@ export default function CheckoutPage() {
                       </FormItem>
                     )}
                   />
-                  {(voiceOrderText || recordedAudio) && (
+                  {(voiceOrderText || recordedAudioUri) && (
                     <FormField
                       control={form.control}
                       name="voiceOrderText"
@@ -388,7 +372,7 @@ export default function CheckoutPage() {
                         <FormItem>
                           <FormLabel>Your Transcribed Shopping List</FormLabel>
                           <FormControl>
-                            <Textarea {...field} rows={5} readOnly={!voiceOrderText} placeholder={recordedAudio && !voiceOrderText ? "Your recording is ready. Click 'Transcribe' to see the text." : "Your transcribed text will appear here."} />
+                            <Textarea {...field} rows={5} readOnly={!voiceOrderText} placeholder={recordedAudioUri && !voiceOrderText ? "Your recording is ready. Click 'Transcribe' to see the text." : "Your transcribed text will appear here."} />
                           </FormControl>
                           <FormDescription>
                             You can edit the transcribed text here before placing the order.
@@ -428,7 +412,7 @@ export default function CheckoutPage() {
                         </div>
                     </>
                  )}
-                 {cartItems.length === 0 && (voiceOrderText || recordedAudio) && (
+                 {cartItems.length === 0 && (voiceOrderText || recordedAudioUri) && (
                     <div>
                         <p className="text-muted-foreground text-sm text-center py-4">Your order will be fulfilled based on the transcribed text. The final price will be confirmed by the shopkeeper.</p>
                         <div className="flex justify-between items-center">
@@ -455,18 +439,18 @@ export default function CheckoutPage() {
                     className="w-48"
                   >
                     {isRecording ? <StopCircle className="mr-2 h-5 w-5" /> : <Mic className="mr-2 h-5 w-5" />}
-                    {isRecording ? 'Stop Recording' : (recordedAudio ? 'Re-record List' : 'Record List')}
+                    {isRecording ? 'Stop Recording' : (recordedAudioUri ? 'Re-record List' : 'Record List')}
                 </Button>
                 
-                {recordedAudio && (
-                    <Button onClick={handleTranscribe} size="lg" className="w-48">
-                        <AudioLines className="mr-2 h-5 w-5" />
-                        Transcribe
+                {recordedAudioUri && (
+                    <Button onClick={handleTranscribe} size="lg" className="w-48" disabled={isTranscribing}>
+                        {isTranscribing ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <AudioLines className="mr-2 h-5 w-5" />}
+                        {isTranscribing ? 'Transcribing...' : 'Transcribe'}
                     </Button>
                 )}
                 
                 <p className="text-sm text-muted-foreground text-center">
-                    {recordedAudio ? "Click 'Transcribe' to convert your recording to text." : "You can add special instructions or your full shopping list via voice."}
+                    {recordedAudioUri ? "Click 'Transcribe' to convert your recording to text." : "You can add special instructions or your full shopping list via voice."}
                 </p>
              </CardContent>
            </Card>
@@ -475,4 +459,3 @@ export default function CheckoutPage() {
     </div>
   );
 }
-    
