@@ -28,6 +28,7 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Mic, StopCircle, CheckCircle, Loader2, MapPin } from 'lucide-react';
 import Link from 'next/link';
+import { transcribeAndTranslate, TranscribeAndTranslateOutput } from '@/ai/flows/transcribe-translate-flow';
 
 
 const checkoutSchema = z.object({
@@ -66,13 +67,11 @@ export default function CheckoutPage() {
   const { firestore, user } = useFirebase();
 
   const [isRecording, setIsRecording] = useState(false);
-  const [audioDataUri, setAudioDataUri] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const speechRecognitionRef = useRef<SpeechRecognition | null>(null);
 
   const [isTranslating, startTranslationTransition] = useTransition();
-  const [translatedList, setTranslatedList] = useState<string | null>(null);
+  const [voiceOrderData, setVoiceOrderData] = useState<TranscribeAndTranslateOutput & { audioDataUri: string } | null>(null);
   const [deliveryCoords, setDeliveryCoords] = useState<{lat: number, lng: number} | null>(null);
   const [images, setImages] = useState({});
 
@@ -92,63 +91,48 @@ export default function CheckoutPage() {
     }
   }, [cartItems]);
 
-  const processTranscript = useCallback((transcript: string) => {
-    startTranslationTransition(() => {
-        setTranslatedList(transcript);
-        toast({ title: "Voice memo transcribed!", description: "Your shopping list has been converted to text." });
-    });
-  }, [toast]);
-
-
   const handleToggleRecording = () => {
     if (isRecording) {
       mediaRecorderRef.current?.stop();
-      speechRecognitionRef.current?.stop();
       setIsRecording(false);
     } else {
-      setAudioDataUri(null);
-      setTranslatedList(null);
+      setVoiceOrderData(null);
       navigator.mediaDevices.getUserMedia({ audio: true })
         .then(stream => {
-          
-          // Audio recording part
           const recorder = new MediaRecorder(stream);
           mediaRecorderRef.current = recorder;
           audioChunksRef.current = [];
-          recorder.ondataavailable = (event) => audioChunksRef.current.push(event.data);
+          
+          recorder.ondataavailable = (event) => {
+            audioChunksRef.current.push(event.data);
+          };
+
           recorder.onstop = () => {
             const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
             const reader = new FileReader();
             reader.readAsDataURL(audioBlob);
-            reader.onloadend = () => setAudioDataUri(reader.result as string);
+            reader.onloadend = () => {
+                const audioDataUri = reader.result as string;
+                if (audioDataUri) {
+                    startTranslationTransition(async () => {
+                        toast({ title: "Processing your voice memo...", description: "This may take a moment."});
+                        try {
+                            const result = await transcribeAndTranslate(audioDataUri);
+                            if (result) {
+                                setVoiceOrderData({ ...result, audioDataUri });
+                                toast({ title: "Voice memo transcribed!", description: "Your shopping list has been converted to text." });
+                            } else {
+                                throw new Error("Transcription returned null");
+                            }
+                        } catch (e) {
+                             toast({ variant: 'destructive', title: 'Transcription Failed', description: 'Could not process your voice memo. Please try again.' });
+                             console.error("Transcription error:", e);
+                        }
+                    });
+                }
+            };
             stream.getTracks().forEach(track => track.stop()); // Stop microphone
           };
-
-          // Speech recognition part
-          const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-          if (SpeechRecognition) {
-            const recognition = new SpeechRecognition();
-            speechRecognitionRef.current = recognition;
-            recognition.continuous = true;
-            recognition.interimResults = false;
-            
-            let fullTranscript = '';
-            recognition.onresult = (event) => {
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    fullTranscript += event.results[i][0].transcript + ' ';
-                }
-            };
-
-            recognition.onend = () => {
-                if (fullTranscript.trim()) {
-                    processTranscript(fullTranscript.trim());
-                }
-            };
-            
-            recognition.start();
-          } else {
-             toast({ variant: 'destructive', title: 'Not Supported', description: 'Voice transcription is not supported by your browser.' });
-          }
 
           recorder.start();
           setIsRecording(true);
@@ -198,10 +182,10 @@ export default function CheckoutPage() {
         return;
     }
 
-    const isVoiceOrder = cartItems.length === 0 && !!audioDataUri;
+    const isVoiceOrder = cartItems.length === 0 && !!voiceOrderData;
     const storeId = cartItems[0]?.product.storeId;
     
-    if (cartItems.length === 0 && !audioDataUri) {
+    if (cartItems.length === 0 && !isVoiceOrder) {
         toast({ variant: 'destructive', title: 'Error', description: 'Your cart is empty and no voice memo is recorded. Add items or record a list.' });
         return;
     }
@@ -245,8 +229,8 @@ export default function CheckoutPage() {
             orderData = {
                 ...orderPayload,
                 totalAmount: DELIVERY_FEE, // Price to be confirmed by shopkeeper, but delivery fee is fixed
-                voiceMemoUrl: audioDataUri,
-                translatedList: translatedList,
+                voiceMemoUrl: voiceOrderData.audioDataUri,
+                translatedList: voiceOrderData.bilingualList,
             };
             delete orderData.items;
             delete orderData.storeId;
@@ -257,8 +241,7 @@ export default function CheckoutPage() {
         addDoc(colRef, orderData).then(() => {
             clearCart();
             // Reset local state for next order
-            setAudioDataUri(null);
-            setTranslatedList(null);
+            setVoiceOrderData(null);
             setDeliveryCoords(null);
             form.reset();
 
@@ -279,7 +262,7 @@ export default function CheckoutPage() {
     });
   };
 
-  if (cartItems.length === 0 && !audioDataUri) {
+  if (cartItems.length === 0 && !voiceOrderData) {
      return (
         <div className="container mx-auto py-24 px-4 md:px-6">
             <div className="grid md:grid-cols-2 gap-12 items-center">
@@ -306,9 +289,10 @@ export default function CheckoutPage() {
                             variant={isRecording ? 'destructive' : 'default'}
                             size="lg"
                             className="w-48"
+                            disabled={isTranslating}
                           >
-                            {isRecording ? <StopCircle className="mr-2 h-5 w-5" /> : <Mic className="mr-2 h-5 w-5" />}
-                            {isRecording ? 'Stop Recording' : 'Record List'}
+                            {isRecording ? <StopCircle className="mr-2 h-5 w-5" /> : (isTranslating ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Mic className="mr-2 h-5 w-5" />) }
+                            {isRecording ? 'Stop Recording' : (isTranslating ? 'Processing...' : 'Record List')}
                         </Button>
                         <p className="text-sm text-muted-foreground text-center">Record your full shopping list. We'll convert it to text for the shopkeeper.</p>
                         <p className="text-xs text-muted-foreground/80 text-center">(Note: This action saves an audio recording to your order.)</p>
@@ -391,13 +375,13 @@ export default function CheckoutPage() {
               <CardTitle>Order Summary</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-                {audioDataUri && (
+                {voiceOrderData && (
                     <div className="rounded-md border p-4 space-y-2">
                         <div className="flex items-center gap-2 font-medium">
                             <CheckCircle className="h-5 w-5 text-green-500" />
                             <p>Voice Memo Recorded</p>
                         </div>
-                        <audio src={audioDataUri} controls className="w-full" />
+                        <audio src={voiceOrderData.audioDataUri} controls className="w-full" />
                     </div>
                 )}
                  {isTranslating && (
@@ -406,14 +390,14 @@ export default function CheckoutPage() {
                         <p>Processing your list...</p>
                     </div>
                  )}
-                {translatedList && (
+                {voiceOrderData?.bilingualList && (
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-lg">Your Transcribed Shopping List</CardTitle>
                         </CardHeader>
                         <CardContent>
                              <pre className="text-sm whitespace-pre-wrap font-sans bg-muted/50 p-4 rounded-md">
-                                {translatedList}
+                                {voiceOrderData.bilingualList}
                             </pre>
                         </CardContent>
                     </Card>
@@ -434,7 +418,7 @@ export default function CheckoutPage() {
                         </div>
                     </>
                  )}
-                 {cartItems.length === 0 && audioDataUri && (
+                 {cartItems.length === 0 && voiceOrderData && (
                     <div>
                         <p className="text-muted-foreground text-sm text-center py-4">Your order will be fulfilled based on your voice memo. The final price will be confirmed by the shopkeeper.</p>
                         <div className="flex justify-between items-center">
@@ -459,9 +443,10 @@ export default function CheckoutPage() {
                     variant={isRecording ? 'destructive' : 'outline'}
                     size="lg"
                     className="w-48"
+                    disabled={isTranslating}
                   >
-                    {isRecording ? <StopCircle className="mr-2 h-5 w-5" /> : <Mic className="mr-2 h-5 w-5" />}
-                    {isRecording ? 'Stop Recording' : (audioDataUri ? 'Re-record' : 'Record List')}
+                    {isRecording ? <StopCircle className="mr-2 h-5 w-5" /> : (isTranslating ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Mic className="mr-2 h-5 w-5" />) }
+                    {isRecording ? 'Stop Recording' : (isTranslating ? 'Processing...' : (voiceOrderData ? 'Re-record' : 'Record List'))}
                 </Button>
                 <p className="text-sm text-muted-foreground text-center">You can add special instructions or your full shopping list via voice.</p>
                  <p className="text-xs text-muted-foreground/80 text-center">(Note: This action saves an audio recording to your order.)</p>
@@ -472,4 +457,3 @@ export default function CheckoutPage() {
     </div>
   );
 }
-    
