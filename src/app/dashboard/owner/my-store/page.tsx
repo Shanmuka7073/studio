@@ -63,10 +63,9 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Checkbox } from '@/components/ui/checkbox';
 import groceryData from '@/lib/grocery-data.json';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Share2, MapPin, Trash2, AlertCircle, Upload, Image as ImageIcon, Loader2, Camera, CameraOff, Sparkles, PlusCircle, Edit } from 'lucide-react';
+import { Share2, MapPin, Trash2, AlertCircle, Upload, Image as ImageIcon, Loader2, Camera, CameraOff, Sparkles, PlusCircle, Edit, Link2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
-import { generateSingleImage, type ImageInfo } from '@/ai/flows/image-generator-flow';
 
 
 const ADMIN_EMAIL = 'admin@gmail.com';
@@ -96,6 +95,7 @@ const productSchema = z.object({
   name: z.string().min(3, 'Product name is required'),
   description: z.string().optional(),
   category: z.string().min(1, "Category is required"),
+  imageUrl: z.string().url("Please enter a valid image URL.").optional(),
   variants: z.array(variantSchema).min(1, 'At least one price variant is required'),
 });
 
@@ -326,6 +326,7 @@ function EditProductDialog({ storeId, product, isOpen, onOpenChange }: { storeId
             name: product.name,
             description: product.description,
             category: product.category,
+            imageUrl: product.imageUrl || '',
             variants: [],
         },
     });
@@ -336,6 +337,7 @@ function EditProductDialog({ storeId, product, isOpen, onOpenChange }: { storeId
                 name: product.name,
                 description: product.description,
                 category: product.category,
+                imageUrl: product.imageUrl || '',
                 variants: priceData?.variants || [],
             });
         }
@@ -363,6 +365,7 @@ function EditProductDialog({ storeId, product, isOpen, onOpenChange }: { storeId
                     name: data.name,
                     description: data.description,
                     category: data.category,
+                    imageUrl: data.imageUrl,
                 };
                 
                 batch.update(productRef, productData);
@@ -438,6 +441,17 @@ function EditProductDialog({ storeId, product, isOpen, onOpenChange }: { storeId
                                     <FormItem>
                                         <FormLabel>Product Description (Optional)</FormLabel>
                                         <FormControl><Textarea {...field} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                             <FormField
+                                control={form.control}
+                                name="imageUrl"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Image URL</FormLabel>
+                                        <FormControl><Input placeholder="https://example.com/image.webp" {...field} /></FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
@@ -653,7 +667,7 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
-    defaultValues: { name: '', description: '', category: '', variants: [{ sku: '', weight: '', price: 0 }] },
+    defaultValues: { name: '', description: '', category: '', imageUrl: '', variants: [{ sku: '', weight: '', price: 0 }] },
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -670,14 +684,8 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
 
     startTransition(async () => {
       try {
-        const imageInfo = await generateSingleImage(data.name);
-
-        if (!imageInfo) {
-            toast({ variant: 'destructive', title: 'Image Generation Failed', description: 'Could not generate a product image. Please try again.' });
-            return;
-        }
-        
         const batch = writeBatch(firestore);
+        const imageId = `prod-${createSlug(data.name)}`;
         
         const variantsWithSkus = data.variants.map((variant, index) => ({
             ...variant,
@@ -691,9 +699,9 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
           description: data.description,
           category: data.category,
           storeId,
-          imageId: imageInfo.id,
-          imageUrl: imageInfo.imageUrl,
-          imageHint: imageInfo.imageHint,
+          imageId: imageId,
+          imageUrl: data.imageUrl,
+          imageHint: data.name.toLowerCase(),
         };
         batch.set(productRef, productData);
         
@@ -708,7 +716,7 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
         
         toast({
           title: 'Master Product Added!',
-          description: `${data.name} has been added with an AI-generated image.`,
+          description: `${data.name} has been added to the catalog.`,
         });
         form.reset();
 
@@ -723,7 +731,7 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
     <Card>
       <CardHeader>
         <CardTitle>Add a Master Product</CardTitle>
-        <CardDescription>Add a new product to the platform's master catalog. An image will be generated automatically.</CardDescription>
+        <CardDescription>Add a new product to the platform's master catalog. You must provide an image URL.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -737,6 +745,25 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
                   <FormControl>
                     <Input placeholder="e.g., Organic Apples" {...field} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+             <FormField
+              control={form.control}
+              name="imageUrl"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Product Image URL</FormLabel>
+                  <FormControl>
+                    <div className="flex items-center">
+                       <Link2 className="h-4 w-4 mr-2 text-muted-foreground"/>
+                       <Input placeholder="https://images.unsplash.com/..." {...field} />
+                    </div>
+                  </FormControl>
+                   <FormDescription>
+                    Paste a direct link to a product image (e.g., from Unsplash). Recommended format: WebP.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -1190,7 +1217,18 @@ function AdminProductRow({ product, storeId, onEdit, onDelete }: { product: Prod
 
     return (
         <TableRow>
-            <TableCell>{product.name}</TableCell>
+            <TableCell>
+                 <div className="flex items-center gap-4">
+                    <Image
+                        src={product.imageUrl || 'https://placehold.co/40x40/E2E8F0/64748B?text=?'}
+                        alt={product.name}
+                        width={40}
+                        height={40}
+                        className="rounded-sm object-cover"
+                    />
+                    <span>{product.name}</span>
+                </div>
+            </TableCell>
             <TableCell>{product.category}</TableCell>
             <TableCell>{variantsString}</TableCell>
             <TableCell className="text-right">
