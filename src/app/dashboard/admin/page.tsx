@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { getAdminStats } from './actions';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 const ADMIN_EMAIL = 'admin@gmail.com';
 
@@ -74,6 +75,14 @@ export default function AdminDashboardPage() {
                 <h1 className="text-4xl font-bold font-headline">Admin Dashboard</h1>
                 <p className="text-lg text-muted-foreground mt-2">A high-level overview of your application's activity.</p>
             </div>
+            
+            <Alert className="mb-8">
+                <Users className="h-4 w-4" />
+                <AlertTitle>User Count Disabled</AlertTitle>
+                <AlertDescription>
+                    The "Total Customers" count has been temporarily disabled to resolve a server authentication issue. All other stats are live.
+                </AlertDescription>
+            </Alert>
             
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
                 {statItems.map(item => (
