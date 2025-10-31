@@ -8,7 +8,6 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { googleAI } from '@genkit-ai/google-genai';
 import { getCachedRecipe, setCachedRecipe } from '@/lib/recipe-cache';
 import { initializeFirebase } from '@/firebase';
 
@@ -31,7 +30,7 @@ const recipePrompt = ai.definePrompt({
   name: 'recipePrompt',
   input: { schema: RecipeInputSchema },
   output: { schema: RecipeOutputSchema },
-  model: googleAI.model('gemini-1.5-flash'),
+  model: 'gemini-1.5-flash',
   prompt: `You are a helpful recipe assistant. The user wants to cook a dish and needs the ingredients.
     
     Dish: {{{dishName}}}

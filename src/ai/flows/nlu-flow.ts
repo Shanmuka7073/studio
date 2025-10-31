@@ -8,7 +8,6 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { googleAI } from '@genkit-ai/google-genai';
 
 
 // Schema for general command interpretation
@@ -70,7 +69,7 @@ const nluPrompt = ai.definePrompt({
   name: 'nluPrompt',
   input: { schema: commandSchema },
   output: { schema: interpretedCommandSchema },
-  model: googleAI.model('gemini-1.5-flash'),
+  model: 'gemini-1.5-flash',
   prompt: `You are an NLU engine for a grocery shopping app. Your task is to interpret the user's spoken command and extract the intent and relevant entities.
 
     The user is interacting with the app via voice.
@@ -118,7 +117,7 @@ const shoppingListPrompt = ai.definePrompt({
     name: 'shoppingListPrompt',
     input: { schema: commandSchema },
     output: { schema: ShoppingListSchema },
-    model: googleAI.model('gemini-1.5-flash'),
+    model: 'gemini-1.5-flash',
     prompt: `You are an expert grocery list parser. Your task is to take a raw text string, which is a transcription of a user's voice, and convert it into a structured list of items with their quantities.
 
     **Instructions:**

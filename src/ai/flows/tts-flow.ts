@@ -7,7 +7,6 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'genkit';
 import wav from 'wav';
 
@@ -54,7 +53,7 @@ const ttsFlow = ai.defineFlow(
     },
     async (query) => {
         const { media } = await ai.generate({
-            model: googleAI.model('tts-1'),
+            model: 'tts-1',
             config: {
                 responseModalities: ['AUDIO'],
                 speechConfig: {

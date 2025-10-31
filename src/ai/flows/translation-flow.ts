@@ -6,7 +6,6 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { googleAI } from '@genkit-ai/google-genai';
 
 const TranslationInputSchema = z.object({
   productNames: z.array(z.string()).describe('A list of product names in English.'),
@@ -32,7 +31,7 @@ const translationPrompt = ai.definePrompt({
     name: 'translationPrompt',
     input: { schema: TranslationInputSchema },
     output: { schema: TranslationOutputSchema },
-    model: googleAI.model('gemini-1.5-flash'),
+    model: 'gemini-1.5-flash',
     prompt: `You are a translation expert specializing in English to Telugu for grocery items.
     
     Translate the following list of product names into Telugu. Provide the output in the specified JSON format.
