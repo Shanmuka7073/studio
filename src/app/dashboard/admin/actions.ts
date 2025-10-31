@@ -1,7 +1,7 @@
 
 'use server';
 
-import type { Product } from '@/lib/types';
+import type { Product, ProductVariant } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
 import { getApps, initializeApp, getApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
@@ -73,70 +73,86 @@ export async function getAdminStats(): Promise<{
 }
 
 
-export async function updatePriceForProductByName(productName: string, newPrice: number): Promise<{ success: boolean; updatedCount: number; error?: string }> {
-    if (typeof newPrice !== 'number' || newPrice < 0) {
-        return { success: false, updatedCount: 0, error: 'Invalid price provided.' };
+export async function saveProductPrices(productName: string, variants: ProductVariant[]): Promise<{ success: boolean; error?: string }> {
+    if (!productName || !variants || variants.length === 0) {
+        return { success: false, error: 'Invalid product data provided.' };
     }
 
     try {
         const { firestore } = getAdminServices();
+        const productPriceRef = firestore.collection('productPrices').doc(productName.toLowerCase());
+
+        await productPriceRef.set({
+            productName: productName.toLowerCase(),
+            variants: variants,
+        });
+
+        // After updating the canonical price, we need to update all existing products in all stores
         const productsQuery = firestore.collectionGroup('products').where('name', '==', productName);
         const productsSnapshot = await productsQuery.get();
 
-        if (productsSnapshot.empty) {
-            // This is not an error, it just means no stores currently have this product.
-            // We proceed as if successful, since the goal is to update existing ones.
-            // The admin UI will show the updated price for future additions.
-             return { success: true, updatedCount: 0, error: `No products named "${productName}" found to update, but the admin price is conceptually set.` };
+        if (!productsSnapshot.empty) {
+            const batch = firestore.batch();
+            productsSnapshot.docs.forEach(doc => {
+                batch.update(doc.ref, { variants: variants });
+            });
+            await batch.commit();
         }
 
-        const batch = firestore.batch();
-        productsSnapshot.docs.forEach(doc => {
-            batch.update(doc.ref, { price: newPrice });
-        });
+        revalidatePath('/dashboard/admin/pricing', 'page');
+        revalidatePath('/stores', 'layout');
 
-        await batch.commit();
-        
-        // Revalidate paths to ensure data freshness across the app
-        try {
-            revalidatePath('/stores', 'layout');
-            revalidatePath('/cart', 'layout');
-            revalidatePath('/dashboard/admin', 'page');
-            revalidatePath('/dashboard/owner/my-store', 'page');
-        } catch (revalError) {
-            console.error('Failed to revalidate paths:', revalError);
-        }
-
-        return { success: true, updatedCount: productsSnapshot.size };
-
+        return { success: true };
     } catch (error) {
-        console.error(`Failed to update price for ${productName}:`, error);
-        return { success: false, updatedCount: 0, error: 'A server error occurred during the price update.' };
+        console.error(`Failed to save prices for ${productName}:`, error);
+        return { success: false, error: 'A server error occurred during the price update.' };
     }
 }
 
-export async function getUniqueProductNames(): Promise<Record<string, number>> {
+export async function getUniqueProductNames(): Promise<string[]> {
     try {
         const { firestore } = getAdminServices();
         const productsSnapshot = await firestore.collectionGroup('products').get();
 
         if (productsSnapshot.empty) {
-            return {};
+            return [];
         }
 
-        const priceMap = productsSnapshot.docs.reduce((acc, doc) => {
+        const nameSet = new Set<string>();
+        productsSnapshot.docs.forEach(doc => {
             const product = doc.data() as Product;
-            // Only set the price if it hasn't been set yet, ensuring consistency
-            if (product.name && acc[product.name] === undefined) {
-                acc[product.name] = product.price;
+            if (product.name) {
+                nameSet.add(product.name);
             }
-            return acc;
-        }, {} as Record<string, number>);
+        });
 
-        return priceMap;
+        return Array.from(nameSet);
 
     } catch (error) {
         console.error(`Failed to fetch unique product names:`, error);
+        return [];
+    }
+}
+
+export async function getProductPrices(): Promise<Record<string, ProductVariant[]>> {
+     try {
+        const { firestore } = getAdminServices();
+        const pricesSnapshot = await firestore.collection('productPrices').get();
+
+        if (pricesSnapshot.empty) {
+            return {};
+        }
+
+        const priceMap: Record<string, ProductVariant[]> = {};
+        pricesSnapshot.docs.forEach(doc => {
+            const data = doc.data();
+            priceMap[doc.id] = data.variants as ProductVariant[];
+        });
+
+        return priceMap;
+    } catch (error) {
+        console.error('Failed to fetch product prices:', error);
         return {};
     }
 }
+    

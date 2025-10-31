@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useCart } from '@/lib/cart';
@@ -28,7 +29,7 @@ const DELIVERY_FEE = 30;
 
 function CartRow({ item, image }) {
   const { removeItem, updateQuantity } = useCart();
-  const { product, quantity } = item;
+  const { product, variant, quantity } = item;
 
   return (
     <TableRow>
@@ -42,27 +43,30 @@ function CartRow({ item, image }) {
             height={64}
             className="rounded-md object-cover"
           />
-          <span className="font-medium">{product.name}</span>
+          <div>
+            <span className="font-medium">{product.name}</span>
+            <p className="text-sm text-muted-foreground">{variant.weight}</p>
+          </div>
         </div>
       </TableCell>
-      <TableCell>₹{product.price.toFixed(2)}</TableCell>
+      <TableCell>₹{variant.price.toFixed(2)}</TableCell>
       <TableCell>
         <Input
           type="number"
           min="0"
           value={quantity}
-          onChange={(e) => updateQuantity(product.id, parseInt(e.target.value) || 0)}
+          onChange={(e) => updateQuantity(variant.sku, parseInt(e.target.value) || 0)}
           className="w-20 text-center mx-auto"
-          aria-label={`Quantity for ${product.name}`}
+          aria-label={`Quantity for ${product.name} ${variant.weight}`}
         />
       </TableCell>
       <TableCell className="text-right">
-        ₹{(product.price * quantity).toFixed(2)}
+        ₹{(variant.price * quantity).toFixed(2)}
       </TableCell>
       <TableCell>
-        <Button variant="ghost" size="icon" onClick={() => removeItem(product.id)}>
+        <Button variant="ghost" size="icon" onClick={() => removeItem(variant.sku)}>
           <Trash2 className="h-4 w-4" />
-          <span className="sr-only">Remove {product.name}</span>
+          <span className="sr-only">Remove {product.name} {variant.weight}</span>
         </Button>
       </TableCell>
     </TableRow>
@@ -71,7 +75,7 @@ function CartRow({ item, image }) {
 
 function MobileCartItem({ item, image }) {
     const { removeItem, updateQuantity } = useCart();
-    const { product, quantity } = item;
+    const { product, variant, quantity } = item;
 
     return (
         <Card>
@@ -85,26 +89,26 @@ function MobileCartItem({ item, image }) {
                     className="rounded-lg object-cover"
                 />
                 <div className="flex-1 space-y-2">
-                    <p className="font-semibold">{product.name}</p>
-                    <p className="font-bold text-lg">₹{(product.price * quantity).toFixed(2)}</p>
+                    <p className="font-semibold">{product.name} <span className="font-normal text-muted-foreground">({variant.weight})</span></p>
+                    <p className="font-bold text-lg">₹{(variant.price * quantity).toFixed(2)}</p>
                      <div className="flex items-center gap-2">
-                        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => updateQuantity(product.id, quantity - 1)}>
+                        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => updateQuantity(variant.sku, quantity - 1)}>
                             <Minus className="h-4 w-4" />
                         </Button>
                         <Input
                             type="number"
                             min="0"
                             value={quantity}
-                            onChange={(e) => updateQuantity(product.id, parseInt(e.target.value) || 0)}
+                            onChange={(e) => updateQuantity(variant.sku, parseInt(e.target.value) || 0)}
                             className="w-14 h-8 text-center"
-                            aria-label={`Quantity for ${product.name}`}
+                            aria-label={`Quantity for ${product.name} ${variant.weight}`}
                         />
-                         <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => updateQuantity(product.id, quantity + 1)}>
+                         <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => updateQuantity(variant.sku, quantity + 1)}>
                             <Plus className="h-4 w-4" />
                         </Button>
                     </div>
                 </div>
-                 <Button variant="ghost" size="icon" onClick={() => removeItem(product.id)} className="self-start">
+                 <Button variant="ghost" size="icon" onClick={() => removeItem(variant.sku)} className="self-start">
                     <Trash2 className="h-5 w-5 text-muted-foreground" />
                 </Button>
             </CardContent>
@@ -124,7 +128,7 @@ export default function CartPage() {
         );
         const resolvedImages = await Promise.all(imagePromises);
         const imageMap = cartItems.reduce((acc, item, index) => {
-          acc[item.product.id] = resolvedImages[index];
+          acc[item.variant.sku] = resolvedImages[index];
           return acc;
         }, {});
         setImages(imageMap);
@@ -169,8 +173,8 @@ export default function CartPage() {
             {/* Mobile View */}
             <div className="lg:hidden space-y-4">
                  {cartItems.map((item) => {
-                    const image = images[item.product.id] || { imageUrl: 'https://placehold.co/80x80/E2E8F0/64748B?text=...', imageHint: 'loading' };
-                    return <MobileCartItem key={item.product.id} item={item} image={image} />
+                    const image = images[item.variant.sku] || { imageUrl: 'https://placehold.co/80x80/E2E8F0/64748B?text=...', imageHint: 'loading' };
+                    return <MobileCartItem key={item.variant.sku} item={item} image={image} />
                 })}
             </div>
 
@@ -190,8 +194,8 @@ export default function CartPage() {
                     </TableHeader>
                     <TableBody>
                       {cartItems.map((item) => {
-                        const image = images[item.product.id] || { imageUrl: 'https://placehold.co/64x64/E2E8F0/64748B?text=...', imageHint: 'loading' };
-                        return <CartRow key={item.product.id} item={item} image={image} />;
+                        const image = images[item.variant.sku] || { imageUrl: 'https://placehold.co/64x64/E2E8F0/64748B?text=...', imageHint: 'loading' };
+                        return <CartRow key={item.variant.sku} item={item} image={image} />;
                       })}
                     </TableBody>
                   </Table>
@@ -227,3 +231,4 @@ export default function CartPage() {
     </div>
   );
 }
+    

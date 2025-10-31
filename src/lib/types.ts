@@ -1,11 +1,17 @@
 
 import { Timestamp } from "firebase/firestore";
 
+export type ProductVariant = {
+  sku: string; // Unique identifier for the variant, e.g., 'prod-potatoes-1kg'
+  weight: string; // e.g., '500gm', '1kg', '2kg'
+  price: number;
+};
+
 export type Product = {
   id: string;
-  name: string;
+  name: string; // Base name, e.g., 'Potatoes'
   description: string;
-  price: number;
+  variants: ProductVariant[]; // Array of different weights and prices
   imageId: string;
   storeId: string;
   category?: string;
@@ -15,7 +21,7 @@ export type Product = {
 
 export type Store = {
   id: string;
-  name: string;
+  name:string;
   description: string;
   address: string;
   imageId: string;
@@ -28,13 +34,16 @@ export type Store = {
 };
 
 export type CartItem = {
-  product: Product;
+  product: Product; // The base product
+  variant: ProductVariant; // The specific variant chosen
   quantity: number;
 };
 
 export type OrderItem = {
   productId: string;
-  name: string;
+  productName: string;
+  variantSku: string;
+  variantWeight: string;
   quantity: number;
   price: number;
 }
@@ -84,5 +93,4 @@ export type Payout = {
   payoutMethod: 'bank' | 'upi';
   payoutDetails: any; // upiId or bankDetails
 };
-
     

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useTransition, useEffect, useMemo, useRef } from 'react';
@@ -23,9 +24,9 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import type { Store, Product } from '@/lib/types';
+import type { Store, Product, ProductVariant } from '@/lib/types';
 import { useFirebase, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, deleteDocumentNonBlocking } from '@/firebase';
-import { collection, query, where, addDoc, writeBatch, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, addDoc, writeBatch, doc, updateDoc, getDocs } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -54,7 +55,7 @@ import groceryData from '@/lib/grocery-data.json';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Share2, MapPin, Trash2, AlertCircle, Upload, Image as ImageIcon, Loader2, Camera, CameraOff, Sparkles } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { getUniqueProductNames } from '@/app/dashboard/admin/actions';
+import { getProductPrices } from '@/app/dashboard/admin/actions';
 import { Progress } from '@/components/ui/progress';
 import { generateSingleImage } from '@/ai/flows/image-generator-flow';
 
@@ -76,7 +77,6 @@ const locationSchema = z.object({
 
 const productSchema = z.object({
   name: z.string().min(3, 'Product name is required'),
-  price: z.coerce.number().positive('Price must be a positive number'),
   description: z.string().optional(),
   category: z.string().min(1, "Category is required"),
 });
@@ -290,35 +290,25 @@ function StoreImageUploader({ store }: { store: Store }) {
     );
 }
 
-function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPrices: Record<string, number> }) {
+function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPrices: Record<string, ProductVariant[]> }) {
   const { toast } = useToast();
   const [isAdding, startTransition] = useTransition();
   const { firestore } = useFirebase();
-  const [selectedProducts, setSelectedProducts] = useState<Record<string, {selected: boolean, price: string}>>({});
+  const [selectedProducts, setSelectedProducts] = useState<Record<string, boolean>>({});
 
   const handleProductSelection = (productName: string, isChecked: boolean) => {
     setSelectedProducts(prev => ({ 
         ...prev, 
-        [productName]: { 
-            ...prev[productName],
-            selected: isChecked, 
-            price: prev[productName]?.price || (adminPrices[productName] !== undefined ? String(adminPrices[productName]) : '')
-        } 
+        [productName]: isChecked, 
     }));
   };
-  
-  const handlePriceChange = (productName: string, price: string) => {
-      setSelectedProducts(prev => ({
-          ...prev,
-          [productName]: { ...prev[productName], price }
-      }))
-  }
 
   const handleAddSelectedProducts = () => {
     if (!firestore || !storeId) return;
 
     const productsToAdd = Object.entries(selectedProducts)
-                                .filter(([_, value]) => value.selected);
+                                .filter(([_, isSelected]) => isSelected)
+                                .map(([name]) => name);
     
     if (productsToAdd.length === 0) {
       toast({
@@ -328,48 +318,50 @@ function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPric
       });
       return;
     }
-    
-    for (const [name, { price }] of productsToAdd) {
-        if (!price || isNaN(parseFloat(price)) || parseFloat(price) <= 0) {
-            toast({
-                variant: 'destructive',
-                title: 'Missing or Invalid Price',
-                description: `Please enter a valid, positive price for ${name}.`,
-            });
-            return;
-        }
-    }
 
     startTransition(async () => {
         const batch = writeBatch(firestore);
+        let productsAddedCount = 0;
         
         try {
-            for (const [name, { price }] of productsToAdd) {
+            for (const name of productsToAdd) {
+                const variants = adminPrices[name.toLowerCase()];
+                if (!variants || variants.length === 0) {
+                    toast({
+                        variant: 'destructive',
+                        title: 'Pricing Not Found',
+                        description: `Admin has not set a price for "${name}". Please add it as a custom product or ask an admin to set the price.`,
+                    });
+                    continue; // Skip this product
+                }
+
                 const imageInfo = await generateSingleImage(name);
-                
                 const newProductRef = doc(collection(firestore, 'stores', storeId, 'products'));
                 const category = groceryData.categories.find(c => Array.isArray(c.items) && c.items.includes(name))?.categoryName || 'Miscellaneous';
                 
-                const productData = {
+                const productData: Omit<Product, 'id'> = {
                     name,
-                    price: parseFloat(price),
+                    variants,
                     description: '',
-                    storeId: storeId,
+                    storeId,
                     imageId: imageInfo?.id || `prod-${createSlug(name)}`,
                     imageUrl: imageInfo?.imageUrl || '',
                     imageHint: imageInfo?.imageHint || '',
-                    category: category,
+                    category,
                 };
                 
                 batch.set(newProductRef, productData);
+                productsAddedCount++;
             }
 
-            await batch.commit();
+            if (productsAddedCount > 0) {
+              await batch.commit();
 
-            toast({
-                title: `${productsToAdd.length} Products Added!`,
-                description: 'The selected products and their AI-generated images have been added.',
-            });
+              toast({
+                  title: `${productsAddedCount} Products Added!`,
+                  description: 'The selected products and their prices have been added to your store.',
+              });
+            }
             setSelectedProducts({});
 
         } catch (serverError) {
@@ -384,19 +376,19 @@ function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPric
     });
   };
 
-  const selectedCount = Object.values(selectedProducts).filter(val => val && val.selected).length;
+  const selectedCount = Object.values(selectedProducts).filter(Boolean).length;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Bulk Add Products</CardTitle>
-        <CardDescription>Select from a master list. Product images will be generated automatically by AI.</CardDescription>
+        <CardDescription>Select from a master list. Prices are managed by the admin. Product images will be generated automatically by AI.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <Accordion type="multiple" className="w-full">
           {groceryData.categories.map((category) => {
              const categoryItems = category.items && Array.isArray(category.items) ? category.items : [];
-            const selectedInCategory = categoryItems.filter(item => selectedProducts[item]?.selected).length;
+            const selectedInCategory = categoryItems.filter(item => selectedProducts[item]).length;
 
             return (
               <AccordionItem value={category.categoryName} key={category.categoryName}>
@@ -408,7 +400,7 @@ function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPric
                         <Checkbox
                           id={`${category.categoryName}-${item}`}
                           onCheckedChange={(checked) => handleProductSelection(item, !!checked)}
-                          checked={selectedProducts[item]?.selected || false}
+                          checked={selectedProducts[item] || false}
                         />
                         <label
                           htmlFor={`${category.categoryName}-${item}`}
@@ -416,18 +408,6 @@ function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPric
                         >
                           {item}
                         </label>
-                         {selectedProducts[item]?.selected && (
-                            <div className="flex items-center gap-1 w-28">
-                               <span>₹</span>
-                                <Input
-                                    type="number"
-                                    placeholder="Price"
-                                    value={selectedProducts[item]?.price || ''}
-                                    onChange={(e) => handlePriceChange(item, e.target.value)}
-                                    className="h-8"
-                                />
-                            </div>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -440,7 +420,7 @@ function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPric
             {isAdding ? (
                 <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Adding & Generating Images...
+                    Adding Products...
                 </>
             ) : (
                 `Add ${selectedCount} Selected Products`
@@ -452,26 +432,37 @@ function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPric
 }
 
 
-function AddProductForm({ storeId }: { storeId: string }) {
+function AddProductForm({ storeId, adminPrices }: { storeId: string; adminPrices: Record<string, ProductVariant[]> }) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const { firestore } = useFirebase();
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
-    defaultValues: { name: '', price: 0, description: '', category: '' },
+    defaultValues: { name: '', description: '', category: '' },
   });
 
   const onSubmit = (data: ProductFormValues) => {
     if (!firestore) return;
 
+    const variants = adminPrices[data.name.toLowerCase()];
+    if (!variants || variants.length === 0) {
+        toast({
+            variant: 'destructive',
+            title: 'Pricing Not Set',
+            description: `The admin has not set a price for "${data.name}". Please ask an admin to set the price before adding this product.`,
+        });
+        return;
+    }
+
     startTransition(async () => {
         try {
             const imageInfo = await generateSingleImage(data.name);
 
-            const productData = {
+            const productData: Omit<Product, 'id'> = {
                 ...data,
                 storeId,
+                variants,
                 imageId: imageInfo?.id || `prod-${createSlug(data.name)}`,
                 imageUrl: imageInfo?.imageUrl || '',
                 imageHint: imageInfo?.imageHint || '',
@@ -483,7 +474,7 @@ function AddProductForm({ storeId }: { storeId: string }) {
             
             toast({
                 title: 'Product Added!',
-                description: `${data.name} has been added with an AI-generated image.`,
+                description: `${data.name} has been added with its standard prices and an AI-generated image.`,
             });
             form.reset();
 
@@ -503,7 +494,7 @@ function AddProductForm({ storeId }: { storeId: string }) {
     <Card>
       <CardHeader>
         <CardTitle>Add a Custom Product</CardTitle>
-        <CardDescription>An image will be generated by AI based on the product name.</CardDescription>
+        <CardDescription>Product prices must be set by an admin first. An image will be generated by AI based on the product name.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -517,23 +508,7 @@ function AddProductForm({ storeId }: { storeId: string }) {
                   <FormControl>
                     <Input placeholder="e.g., Organic Apples" {...field} />
                   </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="price"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Price (₹)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      {...field}
-                    />
-                  </FormControl>
+                   <FormDescription>Must match the name set by the admin exactly (case-insensitive).</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -577,7 +552,7 @@ function AddProductForm({ storeId }: { storeId: string }) {
                 {isPending ? (
                     <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Adding & Generating Image...
+                        Adding Product...
                     </>
                 ) : (
                     <>
@@ -818,7 +793,7 @@ function DangerZone({ store }: { store: Store }) {
 }
 
 
-function ManageStoreView({ store, adminPrices }: { store: Store; adminPrices: Record<string, number> }) {
+function ManageStoreView({ store, adminPrices }: { store: Store; adminPrices: Record<string, ProductVariant[]> }) {
     const { firestore } = useFirebase();
     const { toast } = useToast();
     const [isDeleting, startDeleteTransition] = useTransition();
@@ -883,7 +858,7 @@ function ManageStoreView({ store, adminPrices }: { store: Store; adminPrices: Re
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                   <AddProductForm storeId={store.id} />
+                   <AddProductForm storeId={store.id} adminPrices={adminPrices} />
                 </CardContent>
             </Card>
         </div>
@@ -903,7 +878,7 @@ function ManageStoreView({ store, adminPrices }: { store: Store; adminPrices: Re
                     <TableHeader>
                         <TableRow>
                             <TableHead>Name</TableHead>
-                            <TableHead>Price</TableHead>
+                            <TableHead>Variants</TableHead>
                             <TableHead>Category</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
@@ -912,7 +887,7 @@ function ManageStoreView({ store, adminPrices }: { store: Store; adminPrices: Re
                         {products.map(product => (
                             <TableRow key={product.id}>
                                 <TableCell>{product.name}</TableCell>
-                                <TableCell>₹{product.price.toFixed(2)}</TableCell>
+                                <TableCell>{product.variants?.map(v => `${v.weight} (₹${v.price})`).join(', ') || 'N/A'}</TableCell>
                                 <TableCell>{product.category}</TableCell>
                                 <TableCell className="text-right">
                                     <Button 
@@ -939,7 +914,7 @@ function ManageStoreView({ store, adminPrices }: { store: Store; adminPrices: Re
     )
 }
 
-function CreateStoreForm({ user, adminPrices }: { user: any; adminPrices: Record<string, number> }) {
+function CreateStoreForm({ user }: { user: any; }) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const { firestore } = useFirebase();
@@ -1138,13 +1113,13 @@ export default function MyStorePage() {
   const { data: stores, isLoading: isStoreLoading } = useCollection<Store>(storeQuery);
   const myStore = stores?.[0];
 
-  const [adminPrices, setAdminPrices] = useState<Record<string, number>>({});
+  const [adminPrices, setAdminPrices] = useState<Record<string, ProductVariant[]>>({});
   const [pricesLoading, setPricesLoading] = useState(true);
 
   useEffect(() => {
     async function fetchAdminPrices() {
       setPricesLoading(true);
-      const priceMap = await getUniqueProductNames();
+      const priceMap = await getProductPrices();
       setAdminPrices(priceMap);
       setPricesLoading(false);
     }
@@ -1164,8 +1139,9 @@ export default function MyStorePage() {
       {myStore ? (
         <ManageStoreView store={myStore} adminPrices={adminPrices} />
       ) : (
-        <CreateStoreForm user={user} adminPrices={adminPrices} />
+        <CreateStoreForm user={user} />
       )}
     </div>
   );
 }
+    

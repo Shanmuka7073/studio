@@ -19,6 +19,7 @@
  * - /deliveryPartners/{partnerId}: Delivery partner earnings and payout information. Document ID is the same as the user ID.
  * - /deliveryPartners/{partnerId}/payouts/{payoutId}: Payout requests for delivery partners.
  * - /store-images/{storeId}/{fileName}: User uploaded store images.
+ * - /productPrices/{productName}: Admin-managed canonical pricing for product variants.
  *
  * Key Security Decisions:
  * - User listing is disallowed.
@@ -34,15 +35,20 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the request is made by the authenticated user.
-     * @param {string} userId - The user ID to compare against the authenticated user's ID.
-     * @returns {boolean} - True if the user IDs match, false otherwise.
-     * @example
-     * isSignedIn()
+     * @description Checks if the request is made by an authenticated user.
+     * @returns {boolean} - True if the user is signed in, false otherwise.
      */
     function isSignedIn() {
       return request.auth != null;
     }
+    
+    /**
+     * @description Checks if the authenticated user has an admin role via custom claims.
+     * @returns {boolean} - True if the user is an admin, false otherwise.
+     */
+     function isAdmin() {
+        return isSignedIn() && request.auth.token.admin == true;
+     }
 
     /**
      * @description Checks if the authenticated user is the owner of the resource.
@@ -224,6 +230,18 @@ service cloud.firestore {
       allow create: if isOwner(partnerId);
       allow update, delete: if false;
     }
+    
+    /**
+     * @description Defines rules for the admin-managed product prices.
+     * @path /productPrices/{productName}
+     * @allow (get, list) - All users can read the canonical prices.
+     * @allow (create, update, delete) - Only admins can manage the pricing information.
+     * @principle Centralized, admin-only control over pricing.
+     */
+    match /productPrices/{productName} {
+        allow get, list: if true;
+        allow write: if isAdmin();
+    }
   }
 }
 service firebase.storage {
@@ -236,3 +254,4 @@ service firebase.storage {
     }
   }
 }
+    

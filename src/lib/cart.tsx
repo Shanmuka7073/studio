@@ -1,14 +1,15 @@
+
 'use client';
 
 import { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
-import type { CartItem, Product } from './types';
+import type { CartItem, Product, ProductVariant } from './types';
 import { useToast } from '@/hooks/use-toast';
 
 interface CartContextType {
   cartItems: CartItem[];
-  addItem: (product: Product, quantity?: number) => void;
-  removeItem: (productId: string) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
+  addItem: (product: Product, variant: ProductVariant, quantity?: number) => void;
+  removeItem: (variantSku: string) => void;
+  updateQuantity: (variantSku: string, quantity: number) => void;
   clearCart: () => void;
   cartCount: number;
   cartTotal: number;
@@ -42,40 +43,40 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [cartItems]);
 
 
-  const addItem = useCallback((product: Product, quantity = 1) => {
+  const addItem = useCallback((product: Product, variant: ProductVariant, quantity = 1) => {
     setCartItems((prevItems) => {
-      const existingItem = prevItems.find((item) => item.product.id === product.id);
+      const existingItem = prevItems.find((item) => item.variant.sku === variant.sku);
       if (existingItem) {
         return prevItems.map((item) =>
-          item.product.id === product.id
+          item.variant.sku === variant.sku
             ? { ...item, quantity: item.quantity + quantity }
             : item
         );
       }
-      return [...prevItems, { product, quantity }];
+      return [...prevItems, { product, variant, quantity }];
     });
     toast({
       title: 'Item added to cart',
-      description: `${product.name} has been added to your cart.`,
+      description: `${product.name} (${variant.weight}) has been added.`,
     });
   }, [toast]);
 
-  const removeItem = useCallback((productId: string) => {
-    setCartItems((prevItems) => prevItems.filter((item) => item.product.id !== productId));
+  const removeItem = useCallback((variantSku: string) => {
+    setCartItems((prevItems) => prevItems.filter((item) => item.variant.sku !== variantSku));
     toast({
       title: 'Item removed from cart',
       variant: 'destructive'
     });
   }, [toast]);
 
-  const updateQuantity = useCallback((productId: string, quantity: number) => {
+  const updateQuantity = useCallback((variantSku: string, quantity: number) => {
     if (quantity <= 0) {
-      removeItem(productId);
+      removeItem(variantSku);
       return;
     }
     setCartItems((prevItems) =>
       prevItems.map((item) =>
-        item.product.id === productId ? { ...item, quantity } : item
+        item.variant.sku === variantSku ? { ...item, quantity } : item
       )
     );
   }, [removeItem]);
@@ -87,7 +88,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const cartCount = cartItems.reduce((count, item) => count + item.quantity, 0);
 
   const cartTotal = cartItems.reduce(
-    (total, item) => total + item.product.price * item.quantity,
+    (total, item) => total + item.variant.price * item.quantity,
     0
   );
 
@@ -115,3 +116,4 @@ export function useCart() {
   }
   return context;
 }
+    

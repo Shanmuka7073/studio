@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useCart } from '@/lib/cart';
@@ -14,7 +15,7 @@ import { useEffect, useState } from 'react';
 // A component to render each item, now receiving image data directly
 function CartSheetItem({ item, image }) {
     const { removeItem, updateQuantity } = useCart();
-    const { product, quantity } = item;
+    const { product, variant, quantity } = item;
 
     return (
         <div className="flex items-center gap-4 py-3">
@@ -27,28 +28,28 @@ function CartSheetItem({ item, image }) {
                 className="rounded-md object-cover"
             />
             <div className="flex-1 grid gap-1">
-                <p className="font-medium leading-tight line-clamp-2">{product.name}</p>
-                <p className="text-sm font-semibold">₹{(product.price * quantity).toFixed(2)}</p>
+                <p className="font-medium leading-tight line-clamp-2">{product.name} <span className="text-sm text-muted-foreground">({variant.weight})</span></p>
+                <p className="text-sm font-semibold">₹{(variant.price * quantity).toFixed(2)}</p>
                  <div className="flex items-center gap-2">
-                    <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => updateQuantity(product.id, quantity - 1)}>
+                    <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => updateQuantity(variant.sku, quantity - 1)}>
                         <Minus className="h-3.5 w-3.5" />
                     </Button>
                     <Input
                         type="number"
                         min="1"
                         value={quantity}
-                        onChange={(e) => updateQuantity(product.id, parseInt(e.target.value) || 1)}
+                        onChange={(e) => updateQuantity(variant.sku, parseInt(e.target.value) || 1)}
                         className="w-12 h-7 text-center"
-                        aria-label={`Quantity for ${product.name}`}
+                        aria-label={`Quantity for ${product.name} (${variant.weight})`}
                     />
-                    <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => updateQuantity(product.id, quantity + 1)}>
+                    <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => updateQuantity(variant.sku, quantity + 1)}>
                         <Plus className="h-3.5 w-3.5" />
                     </Button>
                 </div>
             </div>
-            <Button variant="ghost" size="icon" onClick={() => removeItem(product.id)} className="self-center">
+            <Button variant="ghost" size="icon" onClick={() => removeItem(variant.sku)} className="self-center">
                 <Trash2 className="h-4 w-4 text-muted-foreground" />
-                <span className="sr-only">Remove {product.name}</span>
+                <span className="sr-only">Remove {product.name} ({variant.weight})</span>
             </Button>
         </div>
     );
@@ -64,7 +65,7 @@ export function CartSheetContent() {
         const imagePromises = cartItems.map(item => getProductImage(item.product.imageId));
         const resolvedImages = await Promise.all(imagePromises);
         const imageMap = cartItems.reduce((acc, item, index) => {
-            acc[item.product.id] = resolvedImages[index];
+            acc[item.variant.sku] = resolvedImages[index];
             return acc;
         }, {});
         setImages(imageMap);
@@ -87,8 +88,8 @@ export function CartSheetContent() {
         <ScrollArea className="flex-1 my-4 pr-4">
             <div className="flex flex-col divide-y">
               {cartItems.map((item) => {
-                const image = images[item.product.id] || { imageUrl: 'https://placehold.co/64x64/E2E8F0/64748B?text=...', imageHint: 'loading' };
-                return <CartSheetItem key={item.product.id} item={item} image={image} />
+                const image = images[item.variant.sku] || { imageUrl: 'https://placehold.co/64x64/E2E8F0/64748B?text=...', imageHint: 'loading' };
+                return <CartSheetItem key={item.variant.sku} item={item} image={image} />
               })}
             </div>
         </ScrollArea>
@@ -114,3 +115,4 @@ export function CartSheetContent() {
     </>
   );
 }
+    

@@ -41,18 +41,18 @@ const DELIVERY_FEE = 30;
 
 // A component to render each summary item, now receiving image data directly
 function OrderSummaryItem({ item, image }) {
-    const { product, quantity } = item;
+    const { product, variant, quantity } = item;
 
     return (
         <div className="flex justify-between items-center">
             <div className="flex items-center gap-4">
                 <Image src={image.imageUrl} alt={product.name} data-ai-hint={image.imageHint} width={48} height={48} className="rounded-md" />
                 <div>
-                    <p className="font-medium">{product.name}</p>
+                    <p className="font-medium">{product.name} <span className="text-sm text-muted-foreground">({variant.weight})</span></p>
                     <p className="text-sm text-muted-foreground">Qty: {quantity}</p>
                 </div>
             </div>
-            <p>₹{(product.price * quantity).toFixed(2)}</p>
+            <p>₹{(variant.price * quantity).toFixed(2)}</p>
         </div>
     );
 }
@@ -81,7 +81,7 @@ export default function CheckoutPage() {
         const imagePromises = cartItems.map(item => getProductImage(item.product.imageId));
         const resolvedImages = await Promise.all(imagePromises);
         const imageMap = cartItems.reduce((acc, item, index) => {
-            acc[item.product.id] = resolvedImages[index];
+            acc[item.variant.sku] = resolvedImages[index];
             return acc;
         }, {});
         setImages(imageMap);
@@ -232,9 +232,11 @@ export default function CheckoutPage() {
             storeId: storeId,
             items: cartItems.map(item => ({
                 productId: item.product.id,
-                name: item.product.name,
+                productName: item.product.name,
+                variantSku: item.variant.sku,
+                variantWeight: item.variant.weight,
                 quantity: item.quantity,
-                price: item.product.price,
+                price: item.variant.price,
             })),
         };
 
@@ -417,8 +419,8 @@ export default function CheckoutPage() {
                     </Card>
                 )}
                 {cartItems.map((item) => {
-                    const image = images[item.product.id] || { imageUrl: 'https://placehold.co/48x48/E2E8F0/64748B?text=...', imageHint: 'loading' };
-                    return <OrderSummaryItem key={item.product.id} item={item} image={image} />
+                    const image = images[item.variant.sku] || { imageUrl: 'https://placehold.co/48x48/E2E8F0/64748B?text=...', imageHint: 'loading' };
+                    return <OrderSummaryItem key={item.variant.sku} item={item} image={image} />
                 })}
                  {cartItems.length > 0 && (
                     <>
@@ -470,5 +472,4 @@ export default function CheckoutPage() {
     </div>
   );
 }
-
     

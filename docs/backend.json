@@ -63,7 +63,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Product",
       "type": "object",
-      "description": "Represents a product listed by a store.",
+      "description": "Represents a product listed by a store, with multiple price/weight variants.",
       "properties": {
         "id": {
           "type": "string",
@@ -75,15 +75,33 @@
         },
         "name": {
           "type": "string",
-          "description": "The name of the product."
+          "description": "The base name of the product (e.g., 'Potatoes')."
         },
         "description": {
           "type": "string",
           "description": "A detailed description of the product."
         },
-        "price": {
-          "type": "number",
-          "description": "The price of the product."
+        "variants": {
+          "type": "array",
+          "description": "An array of different weights and prices for the product.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "sku": {
+                "type": "string",
+                "description": "Unique identifier for the variant (e.g., 'prod-potatoes-1kg')."
+              },
+              "weight": {
+                "type": "string",
+                "description": "The weight or size of the variant (e.g., '500gm', '1kg')."
+              },
+              "price": {
+                "type": "number",
+                "description": "The price of this specific variant."
+              }
+            },
+            "required": ["sku", "weight", "price"]
+          }
         },
         "category": {
           "type": "string",
@@ -106,7 +124,7 @@
         "id",
         "storeId",
         "name",
-        "price",
+        "variants",
         "imageId"
       ]
     },
@@ -270,7 +288,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "OrderItem",
       "type": "object",
-      "description": "Represents an item within an order.",
+      "description": "Represents an item within an order, pointing to a specific product variant.",
       "properties": {
         "id": {
           "type": "string",
@@ -282,21 +300,35 @@
         },
         "productId": {
           "type": "string",
-          "description": "Reference to Product. (Relationship: Product 1:N OrderItem)"
+          "description": "Reference to the base Product."
+        },
+        "productName": {
+            "type": "string",
+            "description": "Denormalized product name."
+        },
+        "variantSku": {
+            "type": "string",
+            "description": "The SKU of the specific product variant that was ordered."
+        },
+        "variantWeight": {
+            "type": "string",
+            "description": "The weight of the specific product variant."
         },
         "quantity": {
           "type": "number",
-          "description": "The quantity of the product in the order item."
+          "description": "The quantity of this variant in the order item."
         },
         "price": {
           "type": "number",
-          "description": "The price of the product at the time of the order."
+          "description": "The price of the variant at the time of the order."
         }
       },
       "required": [
         "id",
         "orderId",
         "productId",
+        "variantSku",
+        "variantWeight",
         "quantity",
         "price"
       ]
@@ -504,6 +536,41 @@
         }
       },
       "required": ["id", "partnerId", "amount", "requestDate", "status", "payoutMethod", "payoutDetails"]
+    },
+    "ProductPrice": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ProductPrice",
+      "description": "Defines the canonical pricing for product variants, managed by the admin.",
+      "type": "object",
+      "properties": {
+        "productName": {
+          "type": "string",
+          "description": "The unique, case-insensitive name of the product (e.g., 'potatoes'). This serves as the document ID."
+        },
+        "variants": {
+          "type": "array",
+          "description": "A list of available weights and prices for this product.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "sku": {
+                "type": "string",
+                "description": "A unique identifier for the variant (e.g., 'prod-potatoes-1kg')."
+              },
+              "weight": {
+                "type": "string",
+                "description": "The weight or size of the variant (e.g., '500gm', '1kg')."
+              },
+              "price": {
+                "type": "number",
+                "description": "The admin-defined price for this variant."
+              }
+            },
+            "required": ["sku", "weight", "price"]
+          }
+        }
+      },
+      "required": ["productName", "variants"]
     }
   },
   "auth": {
@@ -708,9 +775,24 @@
             }
           ]
         }
+      },
+      {
+        "path": "/productPrices/{productName}",
+        "definition": {
+          "entityName": "ProductPrice",
+          "schema": {
+            "$ref": "#/backend/entities/ProductPrice"
+          },
+          "description": "Admin-managed canonical pricing for product variants. The document ID is the product name.",
+          "params": [
+            {
+              "name": "productName",
+              "description": "The unique name of the product."
+            }
+          ]
+        }
       }
     ]
   }
 }
-
     

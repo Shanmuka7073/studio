@@ -116,6 +116,12 @@ function UserMenu() {
             <>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>Admin</DropdownMenuLabel>
+                <Link href="/dashboard/admin/pricing" passHref>
+                    <DropdownMenuItem>
+                        <Tag className="mr-2 h-4 w-4" />
+                        <span>Product Pricing</span>
+                    </DropdownMenuItem>
+                 </Link>
                  <Link href="/dashboard/site-config" passHref>
                     <DropdownMenuItem>
                         <Settings className="mr-2 h-4 w-4" />
@@ -229,6 +235,15 @@ export function Header() {
                     ))}
                     {isAdmin && (
                         <>
+                        <SheetClose asChild>
+                            <Link
+                                href="/dashboard/admin/pricing"
+                                className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+                            >
+                                <Tag className="h-4 w-4" />
+                                Product Pricing
+                            </Link>
+                        </SheetClose>
                          <SheetClose asChild>
                             <Link
                                 href="/dashboard/site-config"
@@ -254,3 +269,4 @@ export function Header() {
     </header>
   );
 }
+    
