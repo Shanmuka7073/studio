@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useCart } from '@/lib/cart';
@@ -114,12 +115,11 @@ export default function CheckoutPage() {
 
         recognition.onresult = (event) => {
             let finalTranscript = '';
-            // Iterate through all results from the beginning
+            // Iterate through all results from the beginning to build the full transcript
             for (let i = 0; i < event.results.length; ++i) {
-                // Get the transcript from the result
                 finalTranscript += event.results[i][0].transcript;
             }
-            // Update the form value with the complete transcript
+            // Update the form value with the complete, rebuilt transcript
             form.setValue('shoppingList', finalTranscript);
         };
 
@@ -302,7 +302,7 @@ export default function CheckoutPage() {
                             {isListening ? <StopCircle className="mr-2 h-5 w-5" /> : <Mic className="mr-2 h-5 w-5" />}
                             {isListening ? 'Stop Listening' : 'Record List'}
                         </Button>
-                        <p className="text-sm text-muted-foreground text-center">Click and hold to record your shopping list. The text will appear on the next page.</p>
+                        <p className="text-sm text-muted-foreground text-center">Click to record your shopping list. The text will appear on the next page.</p>
                      </CardContent>
                   </Card>
                  </div>
@@ -416,7 +416,7 @@ export default function CheckoutPage() {
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                     <span>Understanding your list...</span>
                                 </div>
-                                ) : structuredList.length > 0 && (
+                                ) : structuredList.length > 0 ? (
                                 <Card className="bg-muted/50">
                                     <CardHeader><CardTitle className="text-base">Understood Items</CardTitle></CardHeader>
                                     <CardContent>
@@ -438,6 +438,13 @@ export default function CheckoutPage() {
                                         </Table>
                                     </CardContent>
                                 </Card>
+                                ) : (
+                                     form.getValues('shoppingList') && !isProcessing && (
+                                        <Button type="button" onClick={handleUnderstandList} className="w-full">
+                                            <Bot className="mr-2 h-5 w-5" />
+                                            Understand List
+                                        </Button>
+                                    )
                                 )}
                                 <div className="flex justify-between items-center">
                                     <p className="font-medium">Delivery Fee</p>
@@ -446,7 +453,7 @@ export default function CheckoutPage() {
                             </div>
                         )}
                     </CardContent>
-                    <CardFooter className="flex justify-between font-bold text-lg">
+                    <CardFooter className="flex justify-between font-bold text-lg border-t pt-4">
                         <span>Total</span>
                         <span>₹{finalTotal.toFixed(2)}</span>
                     </CardFooter>
@@ -466,14 +473,6 @@ export default function CheckoutPage() {
                             {isListening ? <StopCircle className="mr-2 h-5 w-5" /> : <Mic className="mr-2 h-5 w-5" />}
                             {isListening ? 'Stop Listening' : 'Record List'}
                         </Button>
-                        
-                        {form.getValues('shoppingList') && !isProcessing && (
-                            <Button type="button" onClick={handleUnderstandList} size="lg" className="w-48">
-                                <Bot className="mr-2 h-5 w-5" />
-                                Understand List
-                            </Button>
-                        )}
-
                         <p className="text-sm text-muted-foreground text-center">
                             {isListening ? "I'm listening..." : "Click 'Record List' and start speaking."}
                         </p>
