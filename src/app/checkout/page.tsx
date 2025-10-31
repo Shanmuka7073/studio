@@ -195,13 +195,16 @@ export default function CheckoutPage() {
 
         recognition.onresult = (event) => {
             let final_transcript = '';
+            let interim_transcript = '';
+
             for (let i = event.resultIndex; i < event.results.length; ++i) {
                 if (event.results[i].isFinal) {
-                    final_transcript += event.results[i][0].transcript + '\n'; // Use newline as a separator
+                    final_transcript += event.results[i][0].transcript + ' ';
+                } else {
+                    interim_transcript += event.results[i][0].transcript;
                 }
             }
-             // Use a more robust update to prevent garbled text
-            form.setValue('shoppingList', form.getValues('shoppingList') + final_transcript);
+            form.setValue('shoppingList', final_transcript + interim_transcript);
         };
 
         recognition.onerror = (event) => {
