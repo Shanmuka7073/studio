@@ -68,16 +68,16 @@ export async function getAdminStats(): Promise<{
             storesPromise,
             partnersPromise,
             ordersPromise,
-            voiceOrdersSnapshot,
+            voiceOrdersPromise, 
         ]);
         
         const totalUsers = 0; 
-        const totalOrdersDelivered = ordersSnapshot.data().count + voiceOrdersSnapshot.data().count;
+        const totalOrdersDelivered = (ordersSnapshot.data().count || 0) + (voiceOrdersSnapshot.data().count || 0);
 
         return {
             totalUsers: totalUsers,
-            totalStores: storesSnapshot.data().count,
-            totalDeliveryPartners: partnersSnapshot.data().count,
+            totalStores: storesSnapshot.data().count || 0,
+            totalDeliveryPartners: partnersSnapshot.data().count || 0,
             totalOrdersDelivered: totalOrdersDelivered,
         };
 
@@ -94,8 +94,24 @@ export async function getAdminStats(): Promise<{
 
 
 export async function saveProductPrices(productName: string, variants: ProductVariant[]): Promise<{ success: boolean; error?: string }> {
-    if (!productName || !variants || variants.length === 0) {
-        return { success: false, error: 'Invalid product data provided.' };
+    if (!productName || typeof productName !== 'string' || productName.trim().length === 0) {
+        return { success: false, error: 'A valid product name is required.' };
+    }
+    
+    if (!Array.isArray(variants) || variants.length === 0) {
+        return { success: false, error: 'At least one product variant is required.' };
+    }
+
+    for (const variant of variants) {
+        if (!variant.weight || typeof variant.weight !== 'string' || variant.weight.trim().length === 0) {
+             return { success: false, error: 'Each variant must have a valid weight.' };
+        }
+         if (typeof variant.price !== 'number' || variant.price < 0) {
+            return { success: false, error: `Variant with weight "${variant.weight}" has an invalid price.` };
+        }
+         if (!variant.sku || typeof variant.sku !== 'string' || variant.sku.trim().length === 0) {
+            return { success: false, error: `Variant with weight "${variant.weight}" is missing a SKU.` };
+        }
     }
 
     try {
