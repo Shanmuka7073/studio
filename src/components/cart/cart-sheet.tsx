@@ -85,7 +85,7 @@ export function CartSheetContent() {
       
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         {cartItems.length > 0 ? (
-        <ScrollArea className="flex-1 -mx-6 px-6">
+        <ScrollArea className="flex-1">
             <div className="flex flex-col divide-y">
               {cartItems.map((item) => {
                 const image = images[item.product.id] || { imageUrl: 'https://placehold.co/64x64/E2E8F0/64748B?text=...', imageHint: 'loading' };
