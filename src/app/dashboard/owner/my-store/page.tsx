@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useTransition, useEffect, useMemo, useRef } from 'react';
@@ -815,7 +814,7 @@ function DangerZone({ store }: { store: Store }) {
                 await updateDoc(storeRef, { isClosed: true });
                 toast({
                     title: "Store Closed",
-                    description: `${store.name} has been permanently closed and will no longer be visible to customers.`,
+                    description: `${store.name} has been closed and will no longer be visible to customers.`,
                 });
             } catch (error) {
                 console.error("Failed to close store:", error);
@@ -837,9 +836,9 @@ function DangerZone({ store }: { store: Store }) {
             <CardContent className="space-y-4">
                 <div className="flex justify-between items-center">
                     <div>
-                        <p className="font-medium">Permanently Close Store</p>
+                        <p className="font-medium">Close Store</p>
                         <p className="text-sm text-muted-foreground">
-                            This action cannot be undone. Your store will be removed from all public listings.
+                            This will make your store invisible to customers. You can re-open it later.
                         </p>
                     </div>
                     <AlertDialog>
@@ -848,9 +847,9 @@ function DangerZone({ store }: { store: Store }) {
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                             <AlertDialogHeader>
-                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    This action is permanent. Your store and all its products will no longer be visible to any users. You will not be able to accept any new orders.
+                                    Your store and all its products will no longer be visible to any users. You will not be able to accept any new orders. You can re-open it from this page.
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
@@ -979,6 +978,7 @@ function ManageStoreView({ store, isAdmin, adminStoreId }: { store: Store; isAdm
     const { firestore } = useFirebase();
     const { toast } = useToast();
     const [isDeleting, startDeleteTransition] = useTransition();
+    const [isOpening, startOpenTransition] = useTransition();
 
     const productsQuery = useMemoFirebase(() => {
         if (!firestore) return null;
@@ -989,14 +989,39 @@ function ManageStoreView({ store, isAdmin, adminStoreId }: { store: Store; isAdm
     
     const needsLocationUpdate = !store.latitude || !store.longitude;
 
+    const handleOpenStore = () => {
+        if (!firestore) return;
+        startOpenTransition(async () => {
+             const storeRef = doc(firestore, 'stores', store.id);
+             try {
+                await updateDoc(storeRef, { isClosed: false });
+                toast({
+                    title: "Store Re-opened!",
+                    description: `${store.name} is now visible to customers again.`,
+                });
+             } catch (error) {
+                console.error("Failed to re-open store:", error);
+                const permissionError = new FirestorePermissionError({
+                    path: storeRef.path,
+                    operation: 'update',
+                    requestResourceData: { isClosed: false },
+                });
+                errorEmitter.emit('permission-error', permissionError);
+             }
+        });
+    };
+
     if (store.isClosed) {
         return (
             <Alert variant="destructive">
                  <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Store Permanently Closed</AlertTitle>
+                <AlertTitle>This Store Is Closed</AlertTitle>
                 <AlertDescription>
-                    This store is closed and is no longer visible to customers. To re-open, please contact support.
+                    Your store is currently not visible to customers. You can re-open it at any time.
                 </AlertDescription>
+                <Button onClick={handleOpenStore} disabled={isOpening} className="mt-4">
+                    {isOpening ? "Re-opening..." : "Re-open Store"}
+                </Button>
             </Alert>
         )
     }
@@ -1368,3 +1393,5 @@ export default function MyStorePage() {
     </div>
   );
 }
+
+    
