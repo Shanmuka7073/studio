@@ -77,58 +77,54 @@ async function parseShoppingListFromText(text: string, db: any): Promise<Structu
     const foundItems: StructuredListItem[] = [];
 
     for (const line of lines) {
-        const words = line.split(/\s+/);
-        // Look for product names that can be multi-word
-        for (let i = 0; i < words.length; i++) {
-            for (let j = words.length; j > i; j--) {
-                const potentialProductName = words.slice(i, j).join(' ');
+        // Find all products mentioned in the line
+        for (const product of masterProductList) {
+            const productName = product.productName.toLowerCase();
+            if (line.includes(productName)) {
                 
-                const matchedProduct = masterProductList.find(p => p.productName.toLowerCase() === potentialProductName);
+                let foundVariant: ProductVariant | undefined = undefined;
 
-                if (matchedProduct) {
-                    // Found a product, now look for quantity and variant
-                    const precedingWords = words.slice(0, i);
-                    let quantityStr = '1';
-                    
-                    // Simple heuristic: find the last number in the preceding words
-                    for(let k = precedingWords.length - 1; k >= 0; k--) {
-                        if(!isNaN(parseInt(precedingWords[k]))) {
-                            quantityStr = precedingWords[k];
-                            break;
-                        }
+                // 1. Exact variant match (e.g., "1 kg", "500gm")
+                for (const variant of product.variants) {
+                    const weight = variant.weight.toLowerCase().replace(/\s/g, '');
+                    const lineNoSpaces = line.replace(/\s/g, '');
+                    if (lineNoSpaces.includes(weight)) {
+                        foundVariant = variant;
+                        break;
                     }
-
-                    // Simple heuristic for weight: check word after quantity or common weights
-                    let foundVariant: ProductVariant | undefined = undefined;
-
-                    // Try to find a variant that matches a pattern like "1kg", "500gm"
-                    for (const variant of matchedProduct.variants) {
-                        const variantWeight = variant.weight.toLowerCase().replace(/\s/g, '');
-                         if (line.includes(variantWeight)) {
+                }
+                
+                // 2. If no exact match, try to find a variant like "1kg" or "2 kg"
+                if (!foundVariant) {
+                     for (const variant of product.variants) {
+                        const weight = variant.weight.toLowerCase();
+                        if (line.includes(weight)) {
                             foundVariant = variant;
                             break;
                         }
                     }
-                    
-                    // If no specific weight found, default to the first variant if only one exists
-                    if (!foundVariant && matchedProduct.variants.length > 0) {
-                         foundVariant = matchedProduct.variants[0];
-                    }
+                }
 
-                    if (foundVariant) {
-                         const alreadyAdded = foundItems.some(item => item.variant.sku === foundVariant!.sku);
-                         if (!alreadyAdded) {
-                            foundItems.push({
-                                productName: matchedProduct.productName,
-                                quantity: foundVariant.weight,
-                                price: foundVariant.price,
-                                variant: foundVariant,
-                            });
-                         }
+                // 3. If still no variant, check for a common default like "1 kg"
+                if (!foundVariant) {
+                    foundVariant = product.variants.find(v => v.weight.toLowerCase() === '1 kg' || v.weight.toLowerCase() === '1kg');
+                }
+
+                // 4. If still nothing, default to the first variant available
+                if (!foundVariant && product.variants.length > 0) {
+                    foundVariant = product.variants[0];
+                }
+
+                if (foundVariant) {
+                    const alreadyAdded = foundItems.some(item => item.variant.sku === foundVariant!.sku);
+                    if (!alreadyAdded) {
+                        foundItems.push({
+                            productName: product.productName,
+                            quantity: foundVariant.weight,
+                            price: foundVariant.price,
+                            variant: foundVariant,
+                        });
                     }
-                    // Move to the next line after finding a product
-                    i = words.length; 
-                    break;
                 }
             }
         }
