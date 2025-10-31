@@ -155,4 +155,3 @@ export async function getProductPrices(): Promise<Record<string, ProductVariant[
         return {};
     }
 }
-    
