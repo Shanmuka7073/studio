@@ -22,7 +22,9 @@ interface ProductCardProps {
 export default function ProductCard({ product, image }: ProductCardProps) {
   const { addItem } = useCart();
   const { toast } = useToast();
-  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(product.variants.length > 0 ? product.variants[0] : null);
+  // Ensure product.variants is treated as an array even if it's undefined
+  const variants = product.variants || [];
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(variants.length > 0 ? variants[0] : null);
 
   // Use the AI-generated data URI if available, otherwise use the placeholder
   const displayImageUrl = product.imageUrl ? product.imageUrl : image.imageUrl;
@@ -40,7 +42,7 @@ export default function ProductCard({ product, image }: ProductCardProps) {
   };
   
   const handleVariantChange = (sku: string) => {
-    const variant = product.variants.find(v => v.sku === sku);
+    const variant = variants.find(v => v.sku === sku);
     if (variant) {
       setSelectedVariant(variant);
     }
@@ -60,25 +62,29 @@ export default function ProductCard({ product, image }: ProductCardProps) {
       </CardHeader>
       <CardContent className="p-2 pb-1 flex-1 text-center">
         <CardTitle className="text-sm font-headline truncate">{product.name}</CardTitle>
-        <p className="text-lg font-bold text-primary">₹{selectedVariant?.price.toFixed(2)}</p>
+        <p className="text-lg font-bold text-primary">₹{selectedVariant?.price.toFixed(2) ?? 'N/A'}</p>
       </CardContent>
       <CardFooter className="p-2 pt-0 flex-col items-stretch gap-2">
-         {product.variants.length > 1 ? (
+         {variants.length > 1 ? (
              <Select onValueChange={handleVariantChange} defaultValue={selectedVariant?.sku}>
                 <SelectTrigger className="text-xs h-9">
                     <SelectValue placeholder="Select weight" />
                 </SelectTrigger>
                 <SelectContent>
-                    {product.variants.map(variant => (
+                    {variants.map(variant => (
                         <SelectItem key={variant.sku} value={variant.sku}>
                             {variant.weight} - ₹{variant.price.toFixed(2)}
                         </SelectItem>
                     ))}
                 </SelectContent>
             </Select>
-         ) : (
+         ) : variants.length === 1 ? (
             <div className="h-9 flex items-center justify-center">
                 <p className="text-sm text-muted-foreground">{selectedVariant?.weight}</p>
+            </div>
+         ) : (
+            <div className="h-9 flex items-center justify-center">
+                <p className="text-xs text-destructive">No prices set</p>
             </div>
          )}
         <Button
