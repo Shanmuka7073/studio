@@ -73,62 +73,63 @@ async function parseShoppingListFromText(text: string, db: any): Promise<Structu
     const productSnapshot = await getDocs(productPricesRef);
     const masterProductList = productSnapshot.docs.map(doc => doc.data() as ProductPrice);
 
-    const lines = text.toLowerCase().split('\n').filter(line => line.trim() !== '');
     const foundItems: StructuredListItem[] = [];
+    const lowerCaseText = text.toLowerCase();
 
-    for (const line of lines) {
-        // Find all products mentioned in the line
-        for (const product of masterProductList) {
-            const productName = product.productName.toLowerCase();
-            if (line.includes(productName)) {
+    for (const product of masterProductList) {
+        const productName = product.productName.toLowerCase();
+        if (lowerCaseText.includes(productName)) {
+            // This product is mentioned, now check for all its variants
+            for (const variant of product.variants) {
+                const weight = variant.weight.toLowerCase().replace(/\s/g, '');
                 
-                let foundVariant: ProductVariant | undefined = undefined;
-
-                // 1. Exact variant match (e.g., "1 kg", "500gm")
-                for (const variant of product.variants) {
-                    const weight = variant.weight.toLowerCase().replace(/\s/g, '');
-                    const lineNoSpaces = line.replace(/\s/g, '');
-                    if (lineNoSpaces.includes(weight)) {
-                        foundVariant = variant;
-                        break;
-                    }
-                }
+                // Create a regex to find the weight near the product name
+                // This looks for "1kg chicken" or "chicken 1kg"
+                const pattern1 = new RegExp(`(\\d*\\.?\\d+)\\s*${weight}\\s*${productName}`, 'g');
+                const pattern2 = new RegExp(`${productName}\\s*(\\d*\\.?\\d+)\\s*${weight}`, 'g');
+                const lineNoSpaces = lowerCaseText.replace(/\s/g, '');
                 
-                // 2. If no exact match, try to find a variant like "1kg" or "2 kg"
-                if (!foundVariant) {
-                     for (const variant of product.variants) {
-                        const weight = variant.weight.toLowerCase();
-                        if (line.includes(weight)) {
-                            foundVariant = variant;
-                            break;
-                        }
-                    }
-                }
+                let foundMatch = false;
 
-                // 3. If still no variant, check for a common default like "1 kg"
-                if (!foundVariant) {
-                    foundVariant = product.variants.find(v => v.weight.toLowerCase() === '1 kg' || v.weight.toLowerCase() === '1kg');
-                }
-
-                // 4. If still nothing, default to the first variant available
-                if (!foundVariant && product.variants.length > 0) {
-                    foundVariant = product.variants[0];
-                }
-
-                if (foundVariant) {
-                    const alreadyAdded = foundItems.some(item => item.variant.sku === foundVariant!.sku);
+                // Check for patterns like "1kg", "500gm" etc.
+                if (lineNoSpaces.includes(weight)) {
+                    // To avoid adding the same variant multiple times for one product mention
+                    const alreadyAdded = foundItems.some(item => item.variant.sku === variant.sku);
                     if (!alreadyAdded) {
-                        foundItems.push({
+                         foundItems.push({
                             productName: product.productName,
-                            quantity: foundVariant.weight,
-                            price: foundVariant.price,
-                            variant: foundVariant,
+                            quantity: variant.weight,
+                            price: variant.price,
+                            variant: variant,
                         });
                     }
                 }
             }
         }
     }
+    
+    // Fallback for items mentioned without a specific weight
+    const mentionedProductNames = new Set(foundItems.map(item => item.productName.toLowerCase()));
+    for (const product of masterProductList) {
+        const productName = product.productName.toLowerCase();
+        if (lowerCaseText.includes(productName) && !mentionedProductNames.has(productName)) {
+            // Product was mentioned but no variant was matched. Let's use a default.
+            let defaultVariant = product.variants.find(v => v.weight.toLowerCase() === '1 kg' || v.weight.toLowerCase() === '1kg');
+            if (!defaultVariant) {
+                defaultVariant = product.variants[0]; // fallback to first variant
+            }
+
+            if (defaultVariant) {
+                foundItems.push({
+                    productName: product.productName,
+                    quantity: defaultVariant.weight,
+                    price: defaultVariant.price,
+                    variant: defaultVariant,
+                });
+            }
+        }
+    }
+
 
     return foundItems;
 }
