@@ -76,27 +76,25 @@ async function parseShoppingListFromText(text: string, db: any): Promise<Structu
     const foundItems: StructuredListItem[] = [];
     const lowerCaseText = text.toLowerCase();
 
+    // Iterate through each product in our master catalog
     for (const product of masterProductList) {
         const productName = product.productName.toLowerCase();
-        if (lowerCaseText.includes(productName)) {
-            // This product is mentioned, now check for all its variants
-            for (const variant of product.variants) {
-                const weight = variant.weight.toLowerCase().replace(/\s/g, '');
-                
-                // Create a regex to find the weight near the product name
-                // This looks for "1kg chicken" or "chicken 1kg"
-                const pattern1 = new RegExp(`(\\d*\\.?\\d+)\\s*${weight}\\s*${productName}`, 'g');
-                const pattern2 = new RegExp(`${productName}\\s*(\\d*\\.?\\d+)\\s*${weight}`, 'g');
-                const lineNoSpaces = lowerCaseText.replace(/\s/g, '');
-                
-                let foundMatch = false;
 
-                // Check for patterns like "1kg", "500gm" etc.
-                if (lineNoSpaces.includes(weight)) {
-                    // To avoid adding the same variant multiple times for one product mention
+        // Check if the product name is even mentioned in the transcript
+        if (lowerCaseText.includes(productName)) {
+            // This product is mentioned. Now check for all its specific variants.
+            for (const variant of product.variants) {
+                // Check if this specific variant's weight is mentioned.
+                // e.g., for "1 kg", check for "1kg" or "1 kg"
+                const weightNoSpace = variant.weight.toLowerCase().replace(/\s/g, '');
+                const weightWithSpace = variant.weight.toLowerCase();
+
+                if (lowerCaseText.includes(weightNoSpace) || lowerCaseText.includes(weightWithSpace)) {
+                    // This specific variant is mentioned.
+                    // To avoid adding duplicates, check if we've already added this exact SKU
                     const alreadyAdded = foundItems.some(item => item.variant.sku === variant.sku);
                     if (!alreadyAdded) {
-                         foundItems.push({
+                        foundItems.push({
                             productName: product.productName,
                             quantity: variant.weight,
                             price: variant.price,
@@ -108,15 +106,20 @@ async function parseShoppingListFromText(text: string, db: any): Promise<Structu
         }
     }
     
-    // Fallback for items mentioned without a specific weight
+    // After checking for specific variants, handle cases where a product is mentioned
+    // but no specific weight was matched. This is a fallback.
     const mentionedProductNames = new Set(foundItems.map(item => item.productName.toLowerCase()));
     for (const product of masterProductList) {
         const productName = product.productName.toLowerCase();
+        
+        // If product is in text but we haven't matched any of its variants yet
         if (lowerCaseText.includes(productName) && !mentionedProductNames.has(productName)) {
-            // Product was mentioned but no variant was matched. Let's use a default.
+            // Let's use a smart default. Prefer "1 kg" or "1kg" if available.
             let defaultVariant = product.variants.find(v => v.weight.toLowerCase() === '1 kg' || v.weight.toLowerCase() === '1kg');
+            
+            // If "1kg" isn't an option, just fall back to the first variant in the list.
             if (!defaultVariant) {
-                defaultVariant = product.variants[0]; // fallback to first variant
+                defaultVariant = product.variants[0];
             }
 
             if (defaultVariant) {
@@ -194,7 +197,7 @@ export default function CheckoutPage() {
             let final_transcript = '';
             let interim_transcript = '';
 
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
+            for (let i = 0; i < event.results.length; ++i) {
                 if (event.results[i].isFinal) {
                     final_transcript += event.results[i][0].transcript + ' ';
                 } else {
