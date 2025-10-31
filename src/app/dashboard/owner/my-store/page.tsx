@@ -329,13 +329,12 @@ function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPric
       return;
     }
     
-    // Validate that all selected products have a price
     for (const [name, { price }] of productsToAdd) {
-        if (!price || isNaN(parseFloat(price)) || parseFloat(price) < 0) {
+        if (!price || isNaN(parseFloat(price)) || parseFloat(price) <= 0) {
             toast({
                 variant: 'destructive',
                 title: 'Missing or Invalid Price',
-                description: `Please enter a valid price for ${name}.`,
+                description: `Please enter a valid, positive price for ${name}.`,
             });
             return;
         }
@@ -344,47 +343,45 @@ function ProductChecklist({ storeId, adminPrices }: { storeId: string; adminPric
     startTransition(async () => {
         const batch = writeBatch(firestore);
         
-        // Use Promise.all to wait for all image generations
-        const imageGenerationPromises = productsToAdd.map(async ([name]) => {
+        const processingPromises = productsToAdd.map(async ([name, { price }]) => {
             const imageInfo = await generateSingleImage(name);
-            return { name, imageInfo };
-        });
-
-        const generatedImages = await Promise.all(imageGenerationPromises);
-
-        productsToAdd.forEach(([name, { price }]) => {
+            
             const newProductRef = doc(collection(firestore, 'stores', storeId, 'products'));
             const category = groceryData.categories.find(c => Array.isArray(c.items) && c.items.includes(name))?.categoryName || 'Miscellaneous';
             
-            const generated = generatedImages.find(gen => gen.name === name);
-
-            batch.set(newProductRef, {
+            const productData = {
                 name,
                 price: parseFloat(price),
                 description: '',
                 storeId: storeId,
-                imageId: generated?.imageInfo?.id || `prod-${createSlug(name)}`,
-                imageUrl: generated?.imageInfo?.imageUrl || '',
-                imageHint: generated?.imageInfo?.imageHint || '',
+                imageId: imageInfo?.id || `prod-${createSlug(name)}`,
+                imageUrl: imageInfo?.imageUrl || '',
+                imageHint: imageInfo?.imageHint || '',
                 category: category,
-            });
+            };
+            
+            batch.set(newProductRef, productData);
         });
-        
-        batch.commit().then(() => {
-          toast({
-            title: `${productsToAdd.length} Products Added!`,
-            description: 'The selected products and their AI-generated images have been added.',
-          });
-          setSelectedProducts({});
-        }).catch((serverError) => {
-          console.error("Failed to add products:", serverError);
+
+        try {
+            await Promise.all(processingPromises);
+            await batch.commit();
+
+            toast({
+                title: `${productsToAdd.length} Products Added!`,
+                description: 'The selected products and their AI-generated images have been added.',
+            });
+            setSelectedProducts({});
+
+        } catch (serverError) {
+          console.error("Failed to add products in bulk:", serverError);
           const permissionError = new FirestorePermissionError({
             path: `stores/${storeId}/products`,
             operation: 'create',
-            requestResourceData: { products: productsToAdd.map(([name, val]) => ({ name, price: val.price })) },
+            requestResourceData: { note: "Bulk product addition failed. See logs for details." },
           });
           errorEmitter.emit('permission-error', permissionError);
-        });
+        }
     });
   };
 
@@ -1173,5 +1170,3 @@ export default function MyStorePage() {
     </div>
   );
 }
-
-    
