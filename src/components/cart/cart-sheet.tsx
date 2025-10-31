@@ -83,9 +83,9 @@ export function CartSheetContent() {
         </SheetDescription>
       </SheetHeader>
       
-      <div className="flex-1 flex flex-col h-full overflow-hidden">
-        {cartItems.length > 0 ? (
-        <ScrollArea className="flex-1">
+      {cartItems.length > 0 ? (
+      <>
+        <ScrollArea className="flex-1 my-4 pr-4">
             <div className="flex flex-col divide-y">
               {cartItems.map((item) => {
                 const image = images[item.product.id] || { imageUrl: 'https://placehold.co/64x64/E2E8F0/64748B?text=...', imageHint: 'loading' };
@@ -93,13 +93,7 @@ export function CartSheetContent() {
               })}
             </div>
         </ScrollArea>
-        ) : (
-          <div className="flex flex-1 h-full items-center justify-center">
-            <p>Your cart is empty.</p>
-          </div>
-        )}
-        {cartItems.length > 0 && (
-          <SheetFooter className="mt-auto pt-4 border-t">
+        <SheetFooter className="pt-4 border-t">
             <div className="w-full space-y-4">
               <div className="flex justify-between font-bold text-lg">
                 <span>Total</span>
@@ -112,8 +106,12 @@ export function CartSheetContent() {
               </SheetClose>
             </div>
           </SheetFooter>
-        )}
-      </div>
+        </>
+      ) : (
+          <div className="flex flex-1 h-full items-center justify-center">
+            <p>Your cart is empty.</p>
+          </div>
+      )}
     </>
   );
 }
