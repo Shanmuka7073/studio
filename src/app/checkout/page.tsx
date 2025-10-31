@@ -150,6 +150,7 @@ export default function CheckoutPage() {
   const [structuredList, setStructuredList] = useState<StructuredListItem[]>([]);
   
   const speechRecognitionRef = useRef<SpeechRecognition | null>(null);
+  const finalTranscriptRef = useRef<string>('');
 
   const [deliveryCoords, setDeliveryCoords] = useState<{lat: number, lng: number} | null>(null);
   const [images, setImages] = useState({});
@@ -194,17 +195,16 @@ export default function CheckoutPage() {
         };
 
         recognition.onresult = (event) => {
-            let final_transcript = '';
             let interim_transcript = '';
 
-            for (let i = 0; i < event.results.length; ++i) {
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
                 if (event.results[i].isFinal) {
-                    final_transcript += event.results[i][0].transcript + ' ';
+                    finalTranscriptRef.current += event.results[i][0].transcript + ' ';
                 } else {
                     interim_transcript += event.results[i][0].transcript;
                 }
             }
-            form.setValue('shoppingList', final_transcript + interim_transcript);
+            form.setValue('shoppingList', finalTranscriptRef.current + interim_transcript);
         };
 
         recognition.onerror = (event) => {
@@ -228,6 +228,7 @@ export default function CheckoutPage() {
     if (isListening) {
         speechRecognitionRef.current?.stop();
     } else {
+        finalTranscriptRef.current = ''; // Clear previous transcript
         form.setValue('shoppingList', ''); // Clear previous list
         setStructuredList([]);
         speechRecognitionRef.current?.start();
