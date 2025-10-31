@@ -32,7 +32,8 @@ const getImage = async (id: string) => {
 
 export async function getStores(db: Firestore): Promise<Store[]> {
   const storesCol = collection(db, 'stores');
-  const q = query(storesCol, where('isClosed', '!=', true));
+  // Correctly query for stores that are not closed.
+  const q = query(storesCol, where('isClosed', '==', false));
   const storeSnapshot = await getDocs(q);
   const storeList = storeSnapshot.docs.map((doc) => ({
     id: doc.id,
