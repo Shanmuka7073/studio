@@ -261,12 +261,6 @@ export default function MyOrdersPage() {
                              <div className="space-y-4">
                                 <h4 className="font-semibold">Voice Order</h4>
                                 <audio src={order.voiceMemoUrl} controls className="w-full" />
-                                {order.translatedList && (
-                                    <div>
-                                        <h5 className="font-semibold text-sm">Transcribed List:</h5>
-                                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{order.translatedList}</p>
-                                    </div>
-                                )}
                                 <div className="flex justify-end font-bold">
                                   <span>Total (incl. delivery): ₹{order.totalAmount.toFixed(2)}</span>
                                 </div>
@@ -301,3 +295,5 @@ export default function MyOrdersPage() {
     </div>
   );
 }
+
+    

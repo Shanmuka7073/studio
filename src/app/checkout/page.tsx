@@ -28,8 +28,6 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Mic, StopCircle, CheckCircle, Loader2, MapPin } from 'lucide-react';
 import Link from 'next/link';
-import { transcribeAndTranslate, TranscribeAndTranslateOutput } from '@/ai/flows/transcribe-translate-flow';
-
 
 const checkoutSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -70,8 +68,8 @@ export default function CheckoutPage() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  const [isTranslating, startTranslationTransition] = useTransition();
-  const [voiceOrderData, setVoiceOrderData] = useState<TranscribeAndTranslateOutput & { audioDataUri: string } | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [voiceOrderData, setVoiceOrderData] = useState<{ audioDataUri: string } | null>(null);
   const [deliveryCoords, setDeliveryCoords] = useState<{lat: number, lng: number} | null>(null);
   const [images, setImages] = useState({});
 
@@ -108,28 +106,17 @@ export default function CheckoutPage() {
           };
 
           recorder.onstop = () => {
+            setIsProcessing(true);
             const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
             const reader = new FileReader();
             reader.readAsDataURL(audioBlob);
             reader.onloadend = () => {
                 const audioDataUri = reader.result as string;
                 if (audioDataUri) {
-                    startTranslationTransition(async () => {
-                        toast({ title: "Processing your voice memo...", description: "This may take a moment."});
-                        try {
-                            const result = await transcribeAndTranslate(audioDataUri);
-                            if (result) {
-                                setVoiceOrderData({ ...result, audioDataUri });
-                                toast({ title: "Voice memo transcribed!", description: "Your shopping list has been converted to text." });
-                            } else {
-                                throw new Error("Transcription returned null");
-                            }
-                        } catch (e) {
-                             toast({ variant: 'destructive', title: 'Transcription Failed', description: 'Could not process your voice memo. Please try again.' });
-                             console.error("Transcription error:", e);
-                        }
-                    });
+                    setVoiceOrderData({ audioDataUri });
+                    toast({ title: "Voice memo recorded!", description: "Your audio shopping list is ready." });
                 }
+                setIsProcessing(false);
             };
             stream.getTracks().forEach(track => track.stop()); // Stop microphone
           };
@@ -227,13 +214,18 @@ export default function CheckoutPage() {
         if (isVoiceOrder) {
             collectionName = 'voice-orders';
             orderData = {
-                ...orderPayload,
+                userId: user.uid,
+                customerName: data.name,
+                deliveryAddress: 'Delivery via captured GPS coordinates',
+                deliveryLat: deliveryCoords.lat,
+                deliveryLng: deliveryCoords.lng,
+                phone: data.phone,
+                email: user.email,
+                orderDate: serverTimestamp(),
+                status: 'Pending' as 'Pending',
                 totalAmount: DELIVERY_FEE, // Price to be confirmed by shopkeeper, but delivery fee is fixed
                 voiceMemoUrl: voiceOrderData.audioDataUri,
-                translatedList: voiceOrderData.bilingualList,
             };
-            delete orderData.items;
-            delete orderData.storeId;
         }
 
 
@@ -289,13 +281,12 @@ export default function CheckoutPage() {
                             variant={isRecording ? 'destructive' : 'default'}
                             size="lg"
                             className="w-48"
-                            disabled={isTranslating}
+                            disabled={isProcessing}
                           >
-                            {isRecording ? <StopCircle className="mr-2 h-5 w-5" /> : (isTranslating ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Mic className="mr-2 h-5 w-5" />) }
-                            {isRecording ? 'Stop Recording' : (isTranslating ? 'Processing...' : 'Record List')}
+                            {isRecording ? <StopCircle className="mr-2 h-5 w-5" /> : (isProcessing ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Mic className="mr-2 h-5 w-5" />) }
+                            {isRecording ? 'Stop Recording' : (isProcessing ? 'Processing...' : 'Record List')}
                         </Button>
-                        <p className="text-sm text-muted-foreground text-center">Record your full shopping list. We'll convert it to text for the shopkeeper.</p>
-                        <p className="text-xs text-muted-foreground/80 text-center">(Note: This action saves an audio recording to your order.)</p>
+                        <p className="text-sm text-muted-foreground text-center">Record your full shopping list. We'll attach the audio to your order for the shopkeeper.</p>
                      </CardContent>
                   </Card>
                  </div>
@@ -384,24 +375,12 @@ export default function CheckoutPage() {
                         <audio src={voiceOrderData.audioDataUri} controls className="w-full" />
                     </div>
                 )}
-                 {isTranslating && (
+                 {isProcessing && (
                     <div className="flex items-center justify-center text-muted-foreground p-4">
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        <p>Processing your list...</p>
+                        <p>Processing your audio...</p>
                     </div>
                  )}
-                {voiceOrderData?.bilingualList && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-lg">Your Transcribed Shopping List</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                             <pre className="text-sm whitespace-pre-wrap font-sans bg-muted/50 p-4 rounded-md">
-                                {voiceOrderData.bilingualList}
-                            </pre>
-                        </CardContent>
-                    </Card>
-                )}
                 {cartItems.map((item) => {
                     const image = images[item.variant.sku] || { imageUrl: 'https://placehold.co/48x48/E2E8F0/64748B?text=...', imageHint: 'loading' };
                     return <OrderSummaryItem key={item.variant.sku} item={item} image={image} />
@@ -443,13 +422,12 @@ export default function CheckoutPage() {
                     variant={isRecording ? 'destructive' : 'outline'}
                     size="lg"
                     className="w-48"
-                    disabled={isTranslating}
+                    disabled={isProcessing}
                   >
-                    {isRecording ? <StopCircle className="mr-2 h-5 w-5" /> : (isTranslating ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Mic className="mr-2 h-5 w-5" />) }
-                    {isRecording ? 'Stop Recording' : (isTranslating ? 'Processing...' : (voiceOrderData ? 'Re-record' : 'Record List'))}
+                    {isRecording ? <StopCircle className="mr-2 h-5 w-5" /> : (isProcessing ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Mic className="mr-2 h-5 w-5" />) }
+                    {isRecording ? 'Stop Recording' : (isProcessing ? 'Processing...' : (voiceOrderData ? 'Re-record' : 'Record List'))}
                 </Button>
                 <p className="text-sm text-muted-foreground text-center">You can add special instructions or your full shopping list via voice.</p>
-                 <p className="text-xs text-muted-foreground/80 text-center">(Note: This action saves an audio recording to your order.)</p>
              </CardContent>
            </Card>
         </div>
@@ -457,3 +435,5 @@ export default function CheckoutPage() {
     </div>
   );
 }
+
+    

@@ -68,18 +68,6 @@ function OrderDetailsDialog({ order, isOpen, onClose }: { order: Order | null; i
                 </DialogHeader>
                 <ScrollArea className="max-h-[60vh]">
                 <div className="grid gap-4 py-4 pr-6">
-                    {order.translatedList && (
-                         <Card>
-                            <CardHeader>
-                                <CardTitle className="text-lg">Translated Shopping List</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <pre className="text-sm whitespace-pre-wrap font-sans bg-muted/50 p-4 rounded-md">
-                                    {order.translatedList}
-                                </pre>
-                            </CardContent>
-                        </Card>
-                    )}
                      {order.voiceMemoUrl && (
                         <Card>
                             <CardHeader><CardTitle className="text-lg">Customer Voice Memo</CardTitle></CardHeader>
@@ -342,18 +330,6 @@ export default function OrdersDashboardPage() {
               <div className="p-1">
                  <ScrollArea className="max-h-[50vh]">
                     <div className="grid gap-4 py-4 pr-6">
-                         {newOrderAlert?.translatedList && (
-                             <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-lg">Translated Shopping List</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <pre className="text-sm whitespace-pre-wrap font-sans bg-muted/50 p-4 rounded-md">
-                                        {newOrderAlert.translatedList}
-                                    </pre>
-                                </CardContent>
-                            </Card>
-                        )}
                          {newOrderAlert?.voiceMemoUrl && (
                             <Card>
                                 <CardHeader><CardTitle className="text-lg">Customer Voice Memo</CardTitle></CardHeader>
@@ -521,3 +497,5 @@ export default function OrdersDashboardPage() {
     </div>
   );
 }
+
+    
