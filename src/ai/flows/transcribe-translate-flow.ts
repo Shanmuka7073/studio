@@ -1,8 +1,8 @@
 
 'use server';
 /**
- * @fileOverview This flow is no longer used for transcription. Voice memos are now saved directly.
- * The bilingual translation part might be used elsewhere later.
+ * @fileOverview This flow is deprecated. Voice transcription is now handled
+ * by the browser's native SpeechRecognition API for stability.
  */
 
 import { ai } from '@/ai/genkit';
@@ -32,7 +32,7 @@ export async function transcribeAndTranslate(
 ): Promise<TranscribeAndTranslateOutput | null> {
     // This flow is being deprecated in favor of direct audio memo saving.
     // The AI transcription part is removed to improve stability.
-    console.warn("transcribeAndTranslate is deprecated for transcription.");
+    console.warn("transcribeAndTranslate is deprecated and should not be used.");
     return null;
 }
 
