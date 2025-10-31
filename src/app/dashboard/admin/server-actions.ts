@@ -1,0 +1,86 @@
+
+'use server';
+
+import type { ProductVariant } from '@/lib/types';
+import { revalidatePath } from 'next/cache';
+import { getFirestore } from '@genkit-ai/google-cloud';
+
+export async function getAdminStats(): Promise<{
+    totalUsers: number,
+    totalStores: number,
+    totalDeliveryPartners: number,
+    totalOrdersDelivered: number,
+}> {
+    try {
+        const firestore = getFirestore();
+        
+        const storesPromise = firestore.collection('stores').where('isClosed', '!=', true).count().get();
+        const partnersPromise = firestore.collection('deliveryPartners').count().get();
+        const ordersPromise = firestore.collectionGroup('orders').where('status', '==', 'Delivered').count().get();
+        const voiceOrdersPromise = firestore.collectionGroup('voice-orders').where('status', '==', 'Delivered').count().get();
+
+
+        const [storesSnapshot, partnersSnapshot, ordersSnapshot, voiceOrdersSnapshot] = await Promise.all([
+            storesPromise,
+            partnersPromise,
+            ordersPromise,
+            voiceOrdersSnapshot,
+        ]);
+        
+        const totalUsers = 0; 
+        const totalOrdersDelivered = ordersSnapshot.data().count + voiceOrdersSnapshot.data().count;
+
+        return {
+            totalUsers: totalUsers,
+            totalStores: storesSnapshot.data().count,
+            totalDeliveryPartners: partnersSnapshot.data().count,
+            totalOrdersDelivered: totalOrdersDelivered,
+        };
+
+    } catch (error) {
+        console.error('Failed to fetch admin stats:', error);
+        return {
+            totalUsers: 0,
+            totalStores: 0,
+            totalDeliveryPartners: 0,
+            totalOrdersDelivered: 0,
+        };
+    }
+}
+
+
+export async function saveProductPrices(productName: string, variants: ProductVariant[]): Promise<{ success: boolean; error?: string }> {
+    if (!productName || !variants || variants.length === 0) {
+        return { success: false, error: 'Invalid product data provided.' };
+    }
+
+    try {
+        const firestore = getFirestore();
+        const productPriceRef = firestore.collection('productPrices').doc(productName.toLowerCase());
+
+        await productPriceRef.set({
+            productName: productName.toLowerCase(),
+            variants: variants,
+        });
+
+        // After updating the canonical price, we need to update all existing products in all stores
+        const productsQuery = firestore.collectionGroup('products').where('name', '==', productName);
+        const productsSnapshot = await productsQuery.get();
+
+        if (!productsSnapshot.empty) {
+            const batch = firestore.batch();
+            productsSnapshot.docs.forEach(doc => {
+                batch.update(doc.ref, { variants: variants });
+            });
+            await batch.commit();
+        }
+
+        revalidatePath('/dashboard/admin/pricing', 'page');
+        revalidatePath('/stores', 'layout');
+
+        return { success: true };
+    } catch (error: any) {
+        console.error(`Failed to save prices for ${productName}:`, error);
+        return { success: false, error: error.message || 'A server error occurred during the price update.' };
+    }
+}
