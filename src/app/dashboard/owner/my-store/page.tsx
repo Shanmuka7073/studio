@@ -24,8 +24,17 @@ import {
   CardTitle,
   CardDescription,
 } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import type { Store, Product, ProductVariant } from '@/lib/types';
+import type { Store, Product } from '@/lib/types';
 import { useFirebase, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, query, where, addDoc, writeBatch, doc, updateDoc, getDocs } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -54,7 +63,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Checkbox } from '@/components/ui/checkbox';
 import groceryData from '@/lib/grocery-data.json';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Share2, MapPin, Trash2, AlertCircle, Upload, Image as ImageIcon, Loader2, Camera, CameraOff, Sparkles, PlusCircle } from 'lucide-react';
+import { Share2, MapPin, Trash2, AlertCircle, Upload, Image as ImageIcon, Loader2, Camera, CameraOff, Sparkles, PlusCircle, Edit } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { generateSingleImage } from '@/ai/flows/image-generator-flow';
@@ -471,7 +480,7 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
 
     startTransition(async () => {
       try {
-        const variantsWithSkus: ProductVariant[] = data.variants.map((variant, index) => ({
+        const variantsWithSkus = data.variants.map((variant, index) => ({
             ...variant,
             sku: `${createSlug(data.name)}-${createSlug(variant.weight)}-${index}`
         }));
@@ -858,6 +867,113 @@ function DangerZone({ store }: { store: Store }) {
     );
 }
 
+function StoreDetails({ store, onUpdate }: { store: Store, onUpdate: () => void }) {
+    const { firestore } = useFirebase();
+    const [isPending, startTransition] = useTransition();
+    const { toast } = useToast();
+    const [isOpen, setIsOpen] = useState(false);
+
+    const form = useForm<Omit<StoreFormValues, 'latitude' | 'longitude'>>({
+        resolver: zodResolver(storeSchema.omit({ latitude: true, longitude: true })),
+        defaultValues: {
+            name: store.name,
+            description: store.description,
+            address: store.address,
+        },
+    });
+    
+    const onSubmit = (data: Omit<StoreFormValues, 'latitude' | 'longitude'>) => {
+        if (!firestore) return;
+
+        startTransition(async () => {
+            const storeRef = doc(firestore, 'stores', store.id);
+            try {
+                await updateDoc(storeRef, data);
+                toast({ title: "Store Details Updated!", description: "Your store's information has been saved." });
+                setIsOpen(false);
+                onUpdate(); // Trigger re-fetch in parent if needed
+            } catch (error) {
+                const permissionError = new FirestorePermissionError({
+                    path: storeRef.path,
+                    operation: 'update',
+                    requestResourceData: data,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            }
+        });
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <div className="flex justify-between items-center">
+                    <CardTitle>Store Details</CardTitle>
+                    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" size="sm">
+                                <Edit className="mr-2 h-4 w-4" /> Edit
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Edit Store Details</DialogTitle>
+                                <DialogDescription>Update your store's public information.</DialogDescription>
+                            </DialogHeader>
+                            <Form {...form}>
+                                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                                    <FormField
+                                        control={form.control}
+                                        name="name"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Store Name</FormLabel>
+                                                <FormControl>
+                                                    <Input {...field} disabled={store.name === 'LocalBasket'} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="description"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Description</FormLabel>
+                                                <FormControl><Textarea {...field} /></FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="address"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Address</FormLabel>
+                                                <FormControl><Input {...field} /></FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <DialogFooter>
+                                        <Button type="button" variant="secondary" onClick={() => setIsOpen(false)}>Cancel</Button>
+                                        <Button type="submit" disabled={isPending}>{isPending ? "Saving..." : "Save Changes"}</Button>
+                                    </DialogFooter>
+                                </form>
+                            </Form>
+                        </DialogContent>
+                    </Dialog>
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+                <p><strong>Description:</strong> {store.description}</p>
+                <p><strong>Address:</strong> {store.address}</p>
+                <p><strong>Location:</strong> {store.latitude}, {store.longitude}</p>
+            </CardContent>
+        </Card>
+    );
+}
 
 function ManageStoreView({ store, isAdmin, adminStoreId }: { store: Store; isAdmin: boolean, adminStoreId?: string; }) {
     const { firestore } = useFirebase();
@@ -914,6 +1030,8 @@ function ManageStoreView({ store, isAdmin, adminStoreId }: { store: Store; isAdm
       <div className="space-y-8">
         {needsLocationUpdate && <UpdateLocationForm store={store} onUpdate={() => {}} />}
         
+        <StoreDetails store={store} onUpdate={() => {}} />
+
         {isAdmin ? (
              <div className="grid md:grid-cols-2 gap-8">
                 <StoreImageUploader store={store} />
