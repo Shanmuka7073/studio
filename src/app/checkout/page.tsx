@@ -113,16 +113,14 @@ export default function CheckoutPage() {
         };
 
         recognition.onresult = (event) => {
-            let interimTranscript = '';
             let finalTranscript = '';
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-                if (event.results[i].isFinal) {
-                    finalTranscript += event.results[i][0].transcript;
-                } else {
-                    interimTranscript += event.results[i][0].transcript;
-                }
+            // Iterate through all results from the beginning
+            for (let i = 0; i < event.results.length; ++i) {
+                // Get the transcript from the result
+                finalTranscript += event.results[i][0].transcript;
             }
-            form.setValue('shoppingList', form.getValues('shoppingList') + finalTranscript);
+            // Update the form value with the complete transcript
+            form.setValue('shoppingList', finalTranscript);
         };
 
         recognition.onerror = (event) => {
