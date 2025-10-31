@@ -66,7 +66,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Share2, MapPin, Trash2, AlertCircle, Upload, Image as ImageIcon, Loader2, Camera, CameraOff, Sparkles, PlusCircle, Edit } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
-import { generateSingleImage } from '@/ai/flows/image-generator-flow';
+import { generateSingleImage, type ImageInfo } from '@/ai/flows/image-generator-flow';
+import placeholderImagesData from '@/lib/placeholder-images.json';
+import { updateImages } from '@/app/actions';
+
 
 const ADMIN_EMAIL = 'admin@gmail.com';
 
@@ -669,13 +672,18 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
 
     startTransition(async () => {
       try {
+        const imageInfo = await generateSingleImage(data.name);
+
+        if (!imageInfo) {
+            toast({ variant: 'destructive', title: 'Image Generation Failed', description: 'Could not generate an image for the product. Aborting.'});
+            return;
+        }
+
         const batch = writeBatch(firestore);
         const variantsWithSkus = data.variants.map((variant, index) => ({
             ...variant,
             sku: `${createSlug(data.name)}-${createSlug(variant.weight)}-${index}`
         }));
-
-        const imageInfo = await generateSingleImage(data.name);
 
         // 1. Add product to the master /stores/{adminId}/products collection
         const productRef = doc(collection(firestore, 'stores', storeId, 'products'));
@@ -684,9 +692,9 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
           description: data.description,
           category: data.category,
           storeId,
-          imageId: imageInfo?.id || `prod-${createSlug(data.name)}`,
-          imageUrl: imageInfo?.imageUrl || '',
-          imageHint: imageInfo?.imageHint || '',
+          imageId: imageInfo.id,
+          imageUrl: imageInfo.imageUrl,
+          imageHint: imageInfo.imageHint,
         };
         batch.set(productRef, productData);
         
@@ -698,6 +706,10 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
         });
         
         await batch.commit();
+
+        // 3. Update the placeholder images JSON file
+        const newImageList = [...placeholderImagesData.placeholderImages, imageInfo];
+        await updateImages(newImageList);
         
         toast({
           title: 'Master Product Added!',
