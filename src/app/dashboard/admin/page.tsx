@@ -32,22 +32,24 @@ export default function AdminDashboardPage() {
     const router = useRouter();
 
     // Queries for stats
+    const usersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'users') : null, [firestore]);
     const storesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'stores'), where('isClosed', '!=', true)) : null, [firestore]);
     const partnersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'deliveryPartners') : null, [firestore]);
     const deliveredOrdersQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'orders'), where('status', '==', 'Delivered')) : null, [firestore]);
 
+    const { data: users, isLoading: usersLoading } = useCollection(usersQuery);
     const { data: stores, isLoading: storesLoading } = useCollection(storesQuery);
     const { data: partners, isLoading: partnersLoading } = useCollection(partnersQuery);
     const { data: deliveredOrders, isLoading: ordersLoading } = useCollection<Order>(deliveredOrdersQuery);
 
     const stats = useMemo(() => ({
-        totalUsers: 0, // This is disabled
+        totalUsers: users?.length ?? 0,
         totalStores: stores?.length ?? 0,
         totalDeliveryPartners: partners?.length ?? 0,
         totalOrdersDelivered: deliveredOrders?.length ?? 0,
-    }), [stores, partners, deliveredOrders]);
+    }), [users, stores, partners, deliveredOrders]);
 
-    const statsLoading = isUserLoading || storesLoading || partnersLoading || ordersLoading;
+    const statsLoading = isUserLoading || usersLoading || storesLoading || partnersLoading || ordersLoading;
 
     if (!isUserLoading && (!user || user.email !== ADMIN_EMAIL)) {
         router.replace('/dashboard');
@@ -67,14 +69,6 @@ export default function AdminDashboardPage() {
                 <h1 className="text-4xl font-bold font-headline">Admin Dashboard</h1>
                 <p className="text-lg text-muted-foreground mt-2">A high-level overview of your application's activity.</p>
             </div>
-            
-            <Alert className="mb-8">
-                <Users className="h-4 w-4" />
-                <AlertTitle>User Count Disabled</AlertTitle>
-                <AlertDescription>
-                    The "Total Customers" count has been temporarily disabled to resolve a server authentication issue. All other stats are live.
-                </AlertDescription>
-            </Alert>
             
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
                 {statItems.map(item => (

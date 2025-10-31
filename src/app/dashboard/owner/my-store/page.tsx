@@ -58,6 +58,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { generateSingleImage } from '@/ai/flows/image-generator-flow';
 
+const ADMIN_EMAIL = 'admin@gmail.com';
 
 const storeSchema = z.object({
   name: z.string().min(3, 'Store name must be at least 3 characters'),
@@ -296,7 +297,7 @@ function StoreImageUploader({ store }: { store: Store }) {
     );
 }
 
-function ProductChecklist({ storeId }: { storeId: string; }) {
+function ProductChecklist({ storeId, isAdmin, adminStoreId }: { storeId: string; isAdmin: boolean; adminStoreId?: string; }) {
   const { toast } = useToast();
   const [isAdding, startTransition] = useTransition();
   const { firestore } = useFirebase();
@@ -309,22 +310,79 @@ function ProductChecklist({ storeId }: { storeId: string; }) {
     }));
   };
 
-  const handleAddSelectedProducts = () => {
-    toast({
-        variant: 'destructive',
-        title: 'Functionality Disabled',
-        description: 'Bulk adding with admin prices has been disabled. Please add products manually with your own prices.',
-    });
-    return;
-  };
+  const handleAddSelectedProducts = async () => {
+    if (!firestore || !storeId || (isAdmin && storeId !== adminStoreId) || !adminStoreId) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Cannot add products without a valid admin store reference.' });
+      return;
+    }
+    
+    startTransition(async () => {
+      const productNamesToAdd = Object.keys(selectedProducts).filter(name => selectedProducts[name]);
+      if (productNamesToAdd.length === 0) return;
 
-  const selectedCount = Object.values(selectedProducts).filter(Boolean).length;
+      toast({ title: 'Starting Bulk Add...', description: `Preparing to add ${productNamesToAdd.length} products.` });
+
+      // Get the master prices from the admin store
+      const adminProductsRef = collection(firestore, 'stores', adminStoreId, 'products');
+      const adminProductsQuery = query(adminProductsRef, where('name', 'in', productNamesToAdd));
+      const adminProductsSnapshot = await getDocs(adminProductsQuery);
+      const masterPrices = new Map<string, ProductVariant[]>();
+      adminProductsSnapshot.forEach(doc => {
+          const product = doc.data() as Product;
+          masterPrices.set(product.name, product.variants);
+      });
+
+      const batch = writeBatch(firestore);
+      const targetCollection = collection(firestore, 'stores', storeId, 'products');
+      let productsAdded = 0;
+
+      for (const productName of productNamesToAdd) {
+        const variants = masterPrices.get(productName);
+        if (!variants) {
+          console.warn(`No master price found for ${productName}. Skipping.`);
+          continue;
+        }
+
+        const imageInfo = await generateSingleImage(productName);
+        
+        const newProductDocRef = doc(targetCollection);
+        batch.set(newProductDocRef, {
+            name: productName,
+            storeId: storeId,
+            variants: variants,
+            category: groceryData.categories.find(c => c.items.includes(productName))?.categoryName || 'Miscellaneous',
+            imageId: imageInfo?.id || `prod-${createSlug(productName)}`,
+            imageUrl: imageInfo?.imageUrl || '',
+            imageHint: imageInfo?.imageHint || '',
+        });
+        productsAdded++;
+      }
+      
+      try {
+        await batch.commit();
+        toast({
+          title: 'Products Added!',
+          description: `${productsAdded} products have been added to your inventory with master pricing.`,
+        });
+        setSelectedProducts({});
+      } catch (e) {
+          const permissionError = new FirestorePermissionError({
+            path: `stores/${storeId}/products`,
+            operation: 'create',
+            requestResourceData: { note: 'Bulk add operation.' },
+          });
+          errorEmitter.emit('permission-error', permissionError);
+      }
+    });
+  };
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Bulk Add Products</CardTitle>
-        <CardDescription>Select from a master list. Prices are managed by you. Product images will be generated automatically by AI.</CardDescription>
+        <CardDescription>
+            {isAdmin ? 'Select products to add to the master catalog. You must set prices manually.' : 'Select products to add to your store. Prices are set by the admin.'}
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <Accordion type="multiple" className="w-full">
@@ -358,15 +416,8 @@ function ProductChecklist({ storeId }: { storeId: string; }) {
             )
           })}
         </Accordion>
-        <Button onClick={handleAddSelectedProducts} disabled={isAdding || selectedCount === 0} className="w-full">
-            {isAdding ? (
-                <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Adding Products...
-                </>
-            ) : (
-                `Add ${selectedCount} Selected Products`
-            )}
+        <Button onClick={handleAddSelectedProducts} disabled={isAdding || Object.values(selectedProducts).filter(Boolean).length === 0} className="w-full">
+          {isAdding ? 'Adding...' : `Add ${Object.values(selectedProducts).filter(Boolean).length} Selected Products`}
         </Button>
       </CardContent>
     </Card>
@@ -374,7 +425,7 @@ function ProductChecklist({ storeId }: { storeId: string; }) {
 }
 
 
-function AddProductForm({ storeId }: { storeId: string; }) {
+function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolean }) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const { firestore } = useFirebase();
@@ -495,6 +546,7 @@ function AddProductForm({ storeId }: { storeId: string; }) {
             <Card className="bg-muted/50 p-4">
                 <CardHeader className="p-2">
                     <CardTitle className="text-lg">Price Variants</CardTitle>
+                    {!isAdmin && <CardDescription className="text-xs">You cannot edit prices. They are inherited from the master catalog.</CardDescription>}
                 </CardHeader>
                 <CardContent className="p-2 space-y-4">
                     {fields.map((field, index) => (
@@ -516,7 +568,7 @@ function AddProductForm({ storeId }: { storeId: string; }) {
                                 render={({ field }) => (
                                     <FormItem className="flex-1">
                                         <FormLabel>Price (₹)</FormLabel>
-                                        <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
+                                        <FormControl><Input type="number" step="0.01" {...field} disabled={!isAdmin} /></FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
@@ -779,11 +831,10 @@ function DangerZone({ store }: { store: Store }) {
 }
 
 
-function ManageStoreView({ store }: { store: Store; }) {
+function ManageStoreView({ store, isAdmin, adminStoreId }: { store: Store; isAdmin: boolean, adminStoreId?: string; }) {
     const { firestore } = useFirebase();
     const { toast } = useToast();
     const [isDeleting, startDeleteTransition] = useTransition();
-
 
     const productsQuery = useMemoFirebase(() => {
         if (!firestore) return null;
@@ -836,10 +887,17 @@ function ManageStoreView({ store }: { store: Store; }) {
         {needsLocationUpdate && <UpdateLocationForm store={store} onUpdate={() => {}} />}
         <div className="grid md:grid-cols-2 gap-8">
             <StoreImageUploader store={store} />
-            <AddProductForm storeId={store.id} />
+            <AddProductForm storeId={store.id} isAdmin={isAdmin} />
         </div>
          <div className="grid md:grid-cols-2 gap-8">
-            <ProductChecklist storeId={store.id} />
+             {isAdmin ? (
+                <Card>
+                    <CardHeader><CardTitle>Bulk Add Master Products</CardTitle></CardHeader>
+                    <CardContent><p className="text-muted-foreground">Please add products one-by-one to set master prices.</p></CardContent>
+                </Card>
+             ) : (
+                <ProductChecklist storeId={store.id} isAdmin={isAdmin} adminStoreId={adminStoreId} />
+             )}
             <PromoteStore store={store} />
         </div>
         <Card>
@@ -890,7 +948,7 @@ function ManageStoreView({ store }: { store: Store; }) {
     )
 }
 
-function CreateStoreForm({ user }: { user: any; }) {
+function CreateStoreForm({ user, isAdmin }: { user: any; isAdmin: boolean; }) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const { firestore } = useFirebase();
@@ -898,9 +956,9 @@ function CreateStoreForm({ user }: { user: any; }) {
   const form = useForm<StoreFormValues>({
     resolver: zodResolver(storeSchema),
     defaultValues: {
-      name: '',
-      description: '',
-      address: '',
+      name: isAdmin ? 'LocalBasket' : '',
+      description: isAdmin ? 'The master store for setting canonical product prices.' : '',
+      address: isAdmin ? 'Platform-wide' : '',
       latitude: 0,
       longitude: 0,
     },
@@ -933,7 +991,7 @@ function CreateStoreForm({ user }: { user: any; }) {
         });
         return;
     }
-     if (data.latitude === 0 || data.longitude === 0) {
+     if (!isAdmin && (data.latitude === 0 || data.longitude === 0)) {
         toast({
             variant: 'destructive',
             title: 'Location Required',
@@ -973,10 +1031,12 @@ function CreateStoreForm({ user }: { user: any; }) {
       <Card className="max-w-3xl mx-auto">
         <CardHeader>
           <CardTitle className="text-3xl font-headline">
-            Create Your Store
+            {isAdmin ? 'Create Master Store' : 'Create Your Store'}
           </CardTitle>
           <CardDescription>
-            Fill out the details below to get your shop listed on LocalBasket. Once created, you can add products to your inventory.
+            {isAdmin 
+                ? "This will be the master store for the entire platform. Add products here to set their official prices." 
+                : "Fill out the details below to get your shop listed. Once created, you can add products to your inventory."}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -992,6 +1052,7 @@ function CreateStoreForm({ user }: { user: any; }) {
                       <Input
                         placeholder="e.g., Patel Kirana Store"
                         {...field}
+                        disabled={isAdmin}
                       />
                     </FormControl>
                     <FormMessage />
@@ -1030,6 +1091,7 @@ function CreateStoreForm({ user }: { user: any; }) {
                   </FormItem>
                 )}
               />
+              {!isAdmin && (
                <div className="space-y-2">
                     <FormLabel>Store Location (GPS)</FormLabel>
                     <div className="flex items-end gap-4">
@@ -1054,6 +1116,7 @@ function CreateStoreForm({ user }: { user: any; }) {
                         </Button>
                     </div>
                </div>
+              )}
 
               <Button
                 type="submit"
@@ -1073,15 +1136,26 @@ function CreateStoreForm({ user }: { user: any; }) {
 export default function MyStorePage() {
   const { user, isUserLoading } = useFirebase();
   const router = useRouter();
-
   const { firestore } = useFirebase();
-  const storeQuery = useMemoFirebase(() => {
+
+  const isAdmin = useMemo(() => user?.email === ADMIN_EMAIL, [user]);
+
+  const ownerStoreQuery = useMemoFirebase(() => {
       if (!firestore || !user) return null;
       return query(collection(firestore, 'stores'), where('ownerId', '==', user.uid));
   }, [firestore, user]);
 
-  const { data: stores, isLoading: isStoreLoading } = useCollection<Store>(storeQuery);
-  const myStore = stores?.[0];
+  const { data: ownerStores, isLoading: isOwnerStoreLoading } = useCollection<Store>(ownerStoreQuery);
+  const myStore = ownerStores?.[0];
+
+  const adminStoreQuery = useMemoFirebase(() => {
+      if (!firestore || !isAdmin) return null;
+      // The admin store might be created by an admin, so we find it by its canonical name
+      return query(collection(firestore, 'stores'), where('name', '==', 'LocalBasket'));
+  }, [firestore, isAdmin]);
+
+  const { data: adminStores, isLoading: isAdminStoreLoading } = useCollection<Store>(adminStoreQuery);
+  const adminStore = adminStores?.[0];
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -1089,20 +1163,28 @@ export default function MyStorePage() {
     }
   }, [isUserLoading, user, router]);
 
-  if (isUserLoading || isStoreLoading) {
+  const isLoading = isUserLoading || isOwnerStoreLoading || isAdminStoreLoading;
+
+  if (isLoading) {
     return <div className="container mx-auto py-12 px-4 md:px-6">Loading your store...</div>
   }
   
+  const storeToManage = isAdmin ? adminStore : myStore;
+
+  const pageTitle = isAdmin
+    ? (adminStore ? `Master Catalog: ${adminStore.name}`: 'Create Master Store')
+    : (myStore ? `Dashboard: ${myStore.name}` : 'Create Your Store');
+
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
       <h1 className="text-4xl font-bold font-headline mb-8">
-        {myStore ? `Dashboard: ${myStore.name}` : 'Create Your Store'}
+        {pageTitle}
       </h1>
 
-      {myStore ? (
-        <ManageStoreView store={myStore} />
+      {storeToManage ? (
+        <ManageStoreView store={storeToManage} isAdmin={isAdmin} adminStoreId={adminStore?.id} />
       ) : (
-        <CreateStoreForm user={user} />
+        <CreateStoreForm user={user} isAdmin={isAdmin} />
       )}
     </div>
   );
