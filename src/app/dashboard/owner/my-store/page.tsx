@@ -67,8 +67,6 @@ import { Share2, MapPin, Trash2, AlertCircle, Upload, Image as ImageIcon, Loader
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { generateSingleImage, type ImageInfo } from '@/ai/flows/image-generator-flow';
-import placeholderImagesData from '@/lib/placeholder-images.json';
-import { updateImages } from '@/app/actions';
 
 
 const ADMIN_EMAIL = 'admin@gmail.com';
@@ -672,7 +670,13 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
 
     startTransition(async () => {
       try {
-        const imageId = `prod-${createSlug(data.name)}`;
+        const imageInfo = await generateSingleImage(data.name);
+
+        if (!imageInfo) {
+            toast({ variant: 'destructive', title: 'Image Generation Failed', description: 'Could not generate a product image. Please try again.' });
+            return;
+        }
+        
         const batch = writeBatch(firestore);
         
         const variantsWithSkus = data.variants.map((variant, index) => ({
@@ -687,8 +691,9 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
           description: data.description,
           category: data.category,
           storeId,
-          imageId: imageId,
-          // imageUrl will be set manually via the site config page
+          imageId: imageInfo.id,
+          imageUrl: imageInfo.imageUrl,
+          imageHint: imageInfo.imageHint,
         };
         batch.set(productRef, productData);
         
@@ -698,22 +703,12 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
             productName: data.name.toLowerCase(),
             variants: variantsWithSkus
         });
-
-        // 3. Add a placeholder to the image catalog for manual update
-        const newImageEntry: ImageInfo = {
-          id: imageId,
-          imageUrl: `https://placehold.co/300x300/E2E8F0/64748B?text=${encodeURIComponent(data.name)}`,
-          imageHint: data.name.toLowerCase(),
-        };
-        
-        const newImageList = [...placeholderImagesData.placeholderImages, newImageEntry];
-        await updateImages(newImageList);
         
         await batch.commit();
         
         toast({
           title: 'Master Product Added!',
-          description: `${data.name} has been added. Go to Site Config to set its image.`,
+          description: `${data.name} has been added with an AI-generated image.`,
         });
         form.reset();
 
@@ -728,7 +723,7 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
     <Card>
       <CardHeader>
         <CardTitle>Add a Master Product</CardTitle>
-        <CardDescription>Add a new product to the platform's master catalog. You can set the image from the "Site Config" page.</CardDescription>
+        <CardDescription>Add a new product to the platform's master catalog. An image will be generated automatically.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>

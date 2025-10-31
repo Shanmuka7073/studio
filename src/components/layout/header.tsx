@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Package2, Menu, UserCircle, Store, ShoppingBag, Truck, LayoutDashboard, Settings } from 'lucide-react';
+import { Package2, Menu, UserCircle, Store, ShoppingBag, Truck, LayoutDashboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -105,12 +105,6 @@ function UserMenu() {
                         <span>Master Store</span>
                     </DropdownMenuItem>
                 </Link>
-                 <Link href="/dashboard/site-config" passHref>
-                    <DropdownMenuItem>
-                        <Settings className="mr-2 h-4 w-4" />
-                        <span>Site Config</span>
-                    </DropdownMenuItem>
-                 </Link>
             </>
         )}
         <DropdownMenuSeparator />
@@ -225,15 +219,6 @@ export function Header() {
                                 >
                                     <Store className="h-4 w-4" />
                                     Master Store
-                                </Link>
-                            </SheetClose>
-                            <SheetClose asChild>
-                                <Link
-                                    href="/dashboard/site-config"
-                                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
-                                >
-                                    <Settings className="h-4 w-4" />
-                                    Site Config
                                 </Link>
                             </SheetClose>
                         </>
