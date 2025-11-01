@@ -71,6 +71,8 @@ import { generateSingleImage } from '@/ai/flows/image-generator-flow';
 
 const ADMIN_EMAIL = 'admin@gmail.com';
 
+const standardWeights = ["100gm", "250gm", "500gm", "1kg", "2kg", "5kg", "1 pack", "1 pc"];
+
 const storeSchema = z.object({
   name: z.string().min(3, 'Store name must be at least 3 characters'),
   description: z
@@ -96,7 +98,7 @@ const productSchema = z.object({
   name: z.string().min(3, 'Product name is required'),
   description: z.string().optional(),
   category: z.string().min(1, "Category is required"),
-  imageUrl: z.string().url("Please enter a valid image URL.").optional().or(z.literal('')),
+  imageUrl: z.string().optional(),
   variants: z.array(variantSchema).min(1, 'At least one price variant is required'),
 });
 
@@ -471,7 +473,16 @@ function EditProductDialog({ storeId, product, isOpen, onOpenChange }: { storeId
                                                 render={({ field }) => (
                                                     <FormItem className="flex-1">
                                                         <FormLabel>Weight</FormLabel>
-                                                        <FormControl><Input {...field} /></FormControl>
+                                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                            <FormControl>
+                                                                <SelectTrigger>
+                                                                    <SelectValue placeholder="Select a weight" />
+                                                                </SelectTrigger>
+                                                            </FormControl>
+                                                            <SelectContent>
+                                                                {standardWeights.map(w => <SelectItem key={w} value={w}>{w}</SelectItem>)}
+                                                            </SelectContent>
+                                                        </Select>
                                                         <FormMessage />
                                                     </FormItem>
                                                 )}
@@ -860,8 +871,17 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
                                 name={`variants.${index}.weight`}
                                 render={({ field }) => (
                                     <FormItem className="flex-1">
-                                        <FormLabel>Weight (e.g., 500gm, 1kg)</FormLabel>
-                                        <FormControl><Input {...field} /></FormControl>
+                                        <FormLabel>Weight</FormLabel>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select a weight" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {standardWeights.map(w => <SelectItem key={w} value={w}>{w}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
                                         <FormMessage />
                                     </FormItem>
                                 )}
