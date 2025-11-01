@@ -71,6 +71,28 @@ export async function getProducts(
   return productList;
 }
 
+/**
+ * Fetches all products from the master "LocalBasket" store.
+ * @param db The Firestore instance.
+ * @returns A list of master Product objects.
+ */
+export async function getMasterProducts(db: Firestore): Promise<Product[]> {
+    const storesQuery = query(collection(db, 'stores'), where('name', '==', 'LocalBasket'));
+    const storeSnapshot = await getDocs(storesQuery);
+
+    if (storeSnapshot.empty) {
+        console.warn("Master 'LocalBasket' store not found.");
+        return [];
+    }
+
+    const masterStoreId = storeSnapshot.docs[0].id;
+    const productsCol = collection(db, 'stores', masterStoreId, 'products');
+    const productSnapshot = await getDocs(productsCol);
+    
+    return productSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
+}
+
+
 export async function getProduct(
   db: Firestore,
   storeId: string,
@@ -110,4 +132,3 @@ export const getStoreImage = async (store: Store) => {
     }
     return await getImage(store.imageId);
 };
-    

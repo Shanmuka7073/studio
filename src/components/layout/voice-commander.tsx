@@ -1,12 +1,14 @@
+
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { useFirebase } from '@/firebase';
-import { getStores } from '@/lib/data';
-import type { Store } from '@/lib/types';
+import { useFirebase, addDocumentNonBlocking } from '@/firebase';
+import { getStores, getMasterProducts } from '@/lib/data';
+import type { Store, Product } from '@/lib/types';
 import { calculateSimilarity } from '@/lib/calculate-similarity';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 export interface Command {
   command: string;
@@ -25,47 +27,23 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
   const { toast } = useToast();
   const { firestore, user } = useFirebase();
   const [allCommands, setAllCommands] = useState<Command[]>([]);
+  const [masterProductList, setMasterProductList] = useState<Product[]>([]);
+  const [myStore, setMyStore] = useState<Store | null>(null);
+
   const listeningRef = useRef(false);
 
   // Fetch stores and build the full command list
   useEffect(() => {
     if (firestore && user) {
+        
       const commandMap: { [key: string]: { display: string, action: () => void, aliases: string[] } } = {
-        home: {
-          display: 'Navigate to Home',
-          action: () => router.push('/'),
-          aliases: ['go home', 'open home', 'back to home', 'show home', 'main page', 'home screen', 'home']
-        },
-        stores: {
-          display: 'Browse All Stores',
-          action: () => router.push('/stores'),
-          aliases: ['go to stores', 'open stores', 'show stores', 'all stores', 'stores', 'browse stores']
-        },
-        orders: {
-          display: 'View My Orders',
-          action: () => router.push('/dashboard/customer/my-orders'),
-          aliases: ['my orders', 'go to my orders', 'open my orders', 'show my orders', 'orders']
-        },
-        cart: {
-          display: 'View Your Cart',
-          action: () => router.push('/cart'),
-          aliases: ['go to cart', 'open cart', 'show cart', 'my cart', 'cart']
-        },
-        dashboard: {
-          display: 'View Dashboard',
-          action: () => router.push('/dashboard'),
-          aliases: ['go to dashboard', 'open dashboard', 'dashboard']
-        },
-        deliveries: {
-          display: 'View Deliveries',
-          action: () => router.push('/dashboard/delivery/deliveries'),
-          aliases: ['deliveries', 'my deliveries', 'go to deliveries', 'open deliveries', 'delivery dashboard']
-        },
-        createStore: {
-          display: 'Create or Manage My Store',
-          action: () => router.push('/dashboard/owner/my-store'),
-          aliases: ['create my store', 'my store', 'manage my store', 'new store', 'register my store']
-        }
+        home: { display: 'Navigate to Home', action: () => router.push('/'), aliases: ['go home', 'open home', 'back to home', 'show home', 'main page', 'home screen', 'home'] },
+        stores: { display: 'Browse All Stores', action: () => router.push('/stores'), aliases: ['go to stores', 'open stores', 'show stores', 'all stores', 'stores', 'browse stores'] },
+        orders: { display: 'View My Orders', action: () => router.push('/dashboard/customer/my-orders'), aliases: ['my orders', 'go to my orders', 'open my orders', 'show my orders', 'orders'] },
+        cart: { display: 'View Your Cart', action: () => router.push('/cart'), aliases: ['go to cart', 'open cart', 'show cart', 'my cart', 'cart'] },
+        dashboard: { display: 'View Dashboard', action: () => router.push('/dashboard'), aliases: ['go to dashboard', 'open dashboard', 'dashboard'] },
+        deliveries: { display: 'View Deliveries', action: () => router.push('/dashboard/delivery/deliveries'), aliases: ['deliveries', 'my deliveries', 'go to deliveries', 'open deliveries', 'delivery dashboard'] },
+        createStore: { display: 'Create or Manage My Store', action: () => router.push('/dashboard/owner/my-store'), aliases: ['create my store', 'my store', 'manage my store', 'new store', 'register my store'] }
       };
 
       const staticNavCommands: Command[] = Object.values(commandMap).flatMap(
@@ -73,8 +51,18 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
           aliases.map(alias => ({ command: alias, display, action }))
       );
 
-      getStores(firestore)
-        .then((stores) => {
+      // Fetch dynamic data: stores, master products, and the user's own store
+      Promise.all([
+          getStores(firestore),
+          getMasterProducts(firestore),
+          query(collection(firestore, 'stores'), where('ownerId', '==', user.uid))
+      ]).then(async ([stores, masterProducts, myStoreSnapshot]) => {
+          
+          if (!myStoreSnapshot.empty) {
+              setMyStore({ id: myStoreSnapshot.docs[0].id, ...myStoreSnapshot.docs[0].data() } as Store);
+          }
+          setMasterProductList(masterProducts);
+
           const storeCommands: Command[] = stores.flatMap((store) => {
             const coreName = store.name
               .toLowerCase()
@@ -129,8 +117,29 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
     recognition.interimResults = false;
 
     const handleCommand = (command: string) => {
-      if (allCommands.length === 0) return;
+      if (!firestore || !user) return;
 
+      // 1. Check for "add product" command
+      if ((command.startsWith('add') || command.startsWith('sell')) && myStore) {
+          const productName = command.replace(/add|sell|to my store/g, '').trim();
+          const productMatch = masterProductList.find(p => p.name.toLowerCase() === productName);
+
+          if (productMatch) {
+              const { id, variants, ...productData } = productMatch;
+              const newProductData = {
+                  ...productData,
+                  storeId: myStore.id,
+              };
+
+              addDocumentNonBlocking(collection(firestore, 'stores', myStore.id, 'products'), newProductData);
+              toast({ title: "Product Added!", description: `${productMatch.name} has been added to your store.` });
+              onSuggestions([]);
+              return; // Command handled
+          }
+      }
+
+
+      // 2. Check for perfect match on other commands
       const perfectMatch = allCommands.find((c) => command === c.command);
       if (perfectMatch) {
         perfectMatch.action();
@@ -139,6 +148,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
         return;
       }
 
+      // 3. Check for close matches if no perfect match found
       const potentialMatches = allCommands
         .map((c) => ({
           ...c,
@@ -207,7 +217,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
       recognition.stop();
       recognition.onend = null; // Prevent restart on component unmount
     };
-  }, [enabled, toast, onStatusUpdate, allCommands, onSuggestions]);
+  }, [enabled, toast, onStatusUpdate, allCommands, onSuggestions, firestore, user, myStore, masterProductList]);
 
   return null;
 }
