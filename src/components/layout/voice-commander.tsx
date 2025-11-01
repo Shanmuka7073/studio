@@ -55,8 +55,8 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
       Promise.all([
           getStores(firestore),
           getMasterProducts(firestore),
-          query(collection(firestore, 'stores'), where('ownerId', '==', user.uid))
-      ]).then(async ([stores, masterProducts, myStoreSnapshot]) => {
+          getDocs(query(collection(firestore, 'stores'), where('ownerId', '==', user.uid)))
+      ]).then(([stores, masterProducts, myStoreSnapshot]) => {
           
           if (!myStoreSnapshot.empty) {
               setMyStore({ id: myStoreSnapshot.docs[0].id, ...myStoreSnapshot.docs[0].data() } as Store);
@@ -189,7 +189,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
 
     recognition.onerror = (event) => {
       console.error('Speech recognition error', event.error);
-      if (event.error !== 'aborted' && event.error !== 'no-speech') {
+       if (event.error !== 'aborted' && event.error !== 'no-speech') {
         onStatusUpdate(`⚠️ Error: ${event.error}`);
       }
     };
@@ -217,7 +217,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
       recognition.stop();
       recognition.onend = null; // Prevent restart on component unmount
     };
-  }, [enabled, toast, onStatusUpdate, allCommands, onSuggestions, firestore, user, myStore, masterProductList]);
+  }, [enabled, toast, onStatusUpdate, allCommands, onSuggestions, firestore, user, myStore, masterProductList, router]);
 
   return null;
 }
