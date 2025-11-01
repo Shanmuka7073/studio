@@ -143,14 +143,18 @@ service cloud.firestore {
      * @path /orders/{orderId}
      * @allow (create) - User can create an order if the userId matches their auth UID.
      * @allow (get, list) - Anyone can get and list orders.
-     * @allow (update) - The customer that received the order can update the order's status to "delivered".
+     * @allow (update) - Allows updates by the customer, the store owner, or the assigned delivery partner.
      * @deny (delete) - No one can delete an order.
      * @principle Allow customer that he recived the order and update the oerder as deliverd
      */
     match /orders/{orderId} {
       allow get, list: if true;
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow update: if isSignedIn() && request.resource.data.userId == resource.data.userId;
+      allow update: if isSignedIn() && (
+            resource.data.userId == request.auth.uid ||
+            get(/databases/$(database)/documents/stores/$(resource.data.storeId)).data.ownerId == request.auth.uid ||
+            resource.data.deliveryPartnerId == request.auth.uid
+      );
       allow delete: if false;
     }
 
