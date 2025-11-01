@@ -300,7 +300,6 @@ export default function CheckoutPage() {
         
         recognition.onstart = () => {
             setIsListening(true);
-            // Only set listening text if not in location prompt
             if (!isLocationPromptOpen) {
                 form.setValue('shoppingList', "🎤 Listening...");
             }
@@ -310,11 +309,11 @@ export default function CheckoutPage() {
             const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
 
             if (isLocationPromptOpen) {
-                if (transcript === 'yes') {
+                if (transcript.includes('yes')) {
                     handleLocationConfirm();
                     return;
                 }
-                if (transcript === 'no') {
+                if (transcript.includes('no')) {
                     handleLocationCancel();
                     return;
                 }
@@ -326,7 +325,7 @@ export default function CheckoutPage() {
             }
 
             form.setValue('shoppingList', transcript);
-            handleUnderstandList(transcript); // Process the result immediately
+            handleUnderstandList(transcript);
         };
 
         recognition.onend = () => {
@@ -341,24 +340,23 @@ export default function CheckoutPage() {
             setIsListening(false);
         };
 
-        // Check for auto-start param or prompt for location
         const autoStart = searchParams.get('action') === 'record';
-        if (autoStart) {
-          handleToggleListening();
-        } else {
-          // Auto-prompt for location on page load
-          setTimeout(() => setIsLocationPromptOpen(true), 1000);
-        }
+        const timeoutId = setTimeout(() => {
+            if (autoStart) {
+                handleToggleListening();
+            } else {
+                setIsLocationPromptOpen(true);
+            }
+        }, 1000);
 
+        return () => {
+          clearTimeout(timeoutId);
+          if (speechRecognitionRef.current) {
+            speechRecognitionRef.current.abort();
+          }
+        }
     } else {
         toast({ variant: 'destructive', title: 'Not Supported', description: 'Voice recognition is not supported by your browser.' });
-    }
-    
-    // Cleanup on unmount
-    return () => {
-      if (speechRecognitionRef.current) {
-        speechRecognitionRef.current.abort();
-      }
     }
   }, [toast, form, searchParams, handleToggleListening, handleUnderstandList, isLocationPromptOpen, handleLocationConfirm, handleLocationCancel]);
 
