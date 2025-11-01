@@ -48,11 +48,10 @@ export function VoiceCommander({ enabled, onStatusUpdate }: VoiceCommanderProps)
 
     const handleCommand = (command: string) => {
       // 1. Check for dynamic store navigation first
-      // Make matching more flexible
       const storeMatch = stores.find(store => {
-          const storeName = store.name.toLowerCase();
           // Get the core name part, removing generic words like "shop" or "store"
-          const coreName = storeName.replace(/shop|store|stores/g, '').trim();
+          const coreName = store.name.toLowerCase().replace(/shop|stores|store/g, '').trim();
+          // Check if the command includes the core name
           return command.includes(coreName);
       });
 
