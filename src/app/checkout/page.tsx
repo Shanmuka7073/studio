@@ -129,19 +129,16 @@ async function matchItemsToCatalog(text: string, db: any): Promise<StructuredLis
 }
 
 interface PassThroughState {
-  placeOrderBtnRef?: RefObject<HTMLButtonElement>;
-  setPlaceOrderBtnRef: (ref: RefObject<HTMLButtonElement>) => void;
-  usePassThrough: () => Omit<PassThroughState, 'setPlaceOrderBtnRef' | 'usePassThrough'>;
+  placeOrderBtnRef: RefObject<HTMLButtonElement> | null;
+  setPlaceOrderBtnRef: (ref: RefObject<HTMLButtonElement> | null) => void;
 }
 
-export const checkoutPassThrough = create<PassThroughState>((set, get) => ({
+const useCheckoutStore = create<PassThroughState>((set) => ({
+  placeOrderBtnRef: null,
   setPlaceOrderBtnRef: (placeOrderBtnRef) => set({ placeOrderBtnRef }),
-  usePassThrough: () => {
-    const state = get();
-    const { setPlaceOrderBtnRef, usePassThrough, ...rest } = state;
-    return rest;
-  },
 }));
+
+export const useCheckoutPassThrough = () => useCheckoutStore((state) => ({ placeOrderBtnRef: state.placeOrderBtnRef }));
 
 
 export default function CheckoutPage() {
@@ -164,10 +161,12 @@ export default function CheckoutPage() {
   const [deliveryCoords, setDeliveryCoords] = useState<{lat: number, lng: number} | null>(null);
   const [images, setImages] = useState({});
   const placeOrderBtnRef = useRef<HTMLButtonElement>(null);
-  const { setPlaceOrderBtnRef } = checkoutPassThrough();
+  const setPlaceOrderBtnRef = useCheckoutStore((state) => state.setPlaceOrderBtnRef);
 
   useEffect(() => {
     setPlaceOrderBtnRef(placeOrderBtnRef);
+    // Cleanup on unmount
+    return () => setPlaceOrderBtnRef(null);
   }, [setPlaceOrderBtnRef]);
 
 

@@ -11,7 +11,7 @@ import { CartProvider } from '@/lib/cart';
 import { FirebaseClientProvider } from '@/firebase';
 import { NotificationPermissionManager } from '@/components/layout/notification-permission-manager';
 import { usePathname } from 'next/navigation';
-import { checkoutPassThrough } from '@/app/checkout/page';
+import { useCheckoutPassThrough } from '@/app/checkout/page';
 
 
 const ptSans = PT_Sans({
@@ -22,7 +22,7 @@ const ptSans = PT_Sans({
 
 function PageSpecificHeader() {
   const pathname = usePathname();
-  const { placeOrderBtnRef } = checkoutPassThrough.usePassThrough() || {};
+  const { placeOrderBtnRef } = useCheckoutPassThrough();
 
   if (pathname === '/checkout') {
     return <Header placeOrderBtnRef={placeOrderBtnRef} />;
