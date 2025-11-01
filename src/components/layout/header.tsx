@@ -119,12 +119,13 @@ function UserMenu() {
 
 export function Header() {
   const pathname = usePathname();
-  const { user, isUserLoading } = useFirebase();
+  const { user } = useFirebase();
   const isAdmin = user && user.email === ADMIN_EMAIL;
   const dashboardHref = isAdmin ? '/dashboard/admin' : '/dashboard';
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
   const { toast } = useToast();
+  const [voiceStatus, setVoiceStatus] = useState('Click the mic to start listening.');
 
   useEffect(() => {
     setHasMounted(true);
@@ -144,7 +145,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 flex h-16 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:px-6">
-      {hasMounted && <VoiceCommander enabled={voiceEnabled} />}
+      <VoiceCommander enabled={voiceEnabled} onStatusUpdate={setVoiceStatus} />
       <nav className="hidden flex-col gap-6 text-lg font-medium md:flex md:flex-row md:items-center md:gap-5 md:text-sm lg:gap-6">
         <Link
           href="/"
@@ -270,6 +271,11 @@ export function Header() {
           </>
         )}
       </div>
+       {hasMounted && voiceEnabled && (
+        <div className="absolute top-16 left-0 w-full bg-secondary text-secondary-foreground text-center py-1 text-sm font-mono z-40">
+            {voiceStatus}
+        </div>
+      )}
     </header>
   );
 }

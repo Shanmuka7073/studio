@@ -6,9 +6,10 @@ import { useToast } from '@/hooks/use-toast';
 
 interface VoiceCommanderProps {
   enabled: boolean;
+  onStatusUpdate: (status: string) => void;
 }
 
-export function VoiceCommander({ enabled }: VoiceCommanderProps) {
+export function VoiceCommander({ enabled, onStatusUpdate }: VoiceCommanderProps) {
   const router = useRouter();
   const { toast } = useToast();
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -19,11 +20,7 @@ export function VoiceCommander({ enabled }: VoiceCommanderProps) {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       if (enabled) {
-        toast({
-          variant: 'destructive',
-          title: 'Voice Not Supported',
-          description: 'Your browser does not support the Web Speech API.',
-        });
+        onStatusUpdate('❌ Voice commands not supported by your browser.');
       }
       return;
     }
@@ -36,19 +33,19 @@ export function VoiceCommander({ enabled }: VoiceCommanderProps) {
       recognitionRef.current = recognition;
 
       recognition.onstart = () => {
-          console.log('Voice recognition started.');
+        onStatusUpdate('🎧 Listening...');
       };
 
       recognition.onresult = (event) => {
         const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
-        console.log('Heard command:', transcript);
+        onStatusUpdate(`Heard: "${transcript}"`);
         handleCommand(transcript);
       };
 
       recognition.onerror = (event) => {
         console.error('Speech recognition error', event.error);
         if (event.error !== 'no-speech' && event.error !== 'aborted') {
-          toast({ variant: 'destructive', title: 'Voice Error', description: `An error occurred: ${event.error}` });
+          onStatusUpdate(`⚠️ Error: ${event.error}`);
         }
       };
       
@@ -60,6 +57,8 @@ export function VoiceCommander({ enabled }: VoiceCommanderProps) {
             } catch(e) {
                 console.error("Could not restart recognition service: ", e);
             }
+        } else {
+            onStatusUpdate('Click the mic to start listening.');
         }
       };
     }
@@ -96,12 +95,10 @@ export function VoiceCommander({ enabled }: VoiceCommanderProps) {
       try {
         recognition.start();
       } catch(e) {
-        // This can happen if it's already started.
         console.log("Could not start recognition, it may already be running.");
       }
     } else {
         recognition.stop();
-        console.log('Voice recognition stopped.');
     }
 
     return () => {
@@ -111,7 +108,7 @@ export function VoiceCommander({ enabled }: VoiceCommanderProps) {
         }
     };
 
-  }, [enabled, router, toast]);
+  }, [enabled, router, toast, onStatusUpdate]);
 
   return null; // This component does not render anything
 }
