@@ -74,44 +74,64 @@ async function parseShoppingListFromText(text: string, db: any): Promise<Structu
     const masterProductList = productSnapshot.docs.map(doc => doc.data() as ProductPrice);
 
     const foundItems: StructuredListItem[] = [];
-    const lowerCaseText = text.toLowerCase();
+    const textWords = text.toLowerCase().split(/\s+/);
 
-    // Iterate through each product in our master catalog
-    for (const product of masterProductList) {
-        const productName = product.productName.toLowerCase();
+    // Create a map for quick lookups of product names
+    const productMap = new Map<string, ProductPrice>();
+    masterProductList.forEach(p => productMap.set(p.productName.toLowerCase(), p));
 
-        // This product is mentioned. Now check for all its specific variants.
-        for (const variant of product.variants) {
-            // Check if this specific variant's weight is mentioned near the product name.
-            // e.g., for "1 kg chicken", check for "1kg" or "1 kg" AND "chicken"
-            const weightNoSpace = variant.weight.toLowerCase().replace(/\s/g, '');
-            const weightWithSpace = variant.weight.toLowerCase();
+    for (let i = 0; i < textWords.length; i++) {
+        const word = textWords[i];
+        
+        // Check if the current word is a product name
+        if (productMap.has(word)) {
+            const product = productMap.get(word)!;
+            let foundVariant: ProductVariant | null = null;
+            let weightMentioned = '';
+
+            // Look for a weight unit before or after the product name
+            const prevWord = (i > 0) ? textWords[i-1] + textWords[i-2] : ''; // e.g. "1 kg" -> "kg1"
+            const nextWord = (i < textWords.length - 1) ? textWords[i+1] : '';
+
+            // Check all variants for this product
+            for (const variant of product.variants) {
+                const variantWeightNormalized = variant.weight.replace(/\s/g, '').toLowerCase();
+
+                // Check for "1 kg chicken" or "chicken 1 kg"
+                 if (prevWord.replace(/\s/g, '').toLowerCase().includes(variantWeightNormalized) || nextWord.replace(/\s/g, '').toLowerCase() === variantWeightNormalized) {
+                    foundVariant = variant;
+                    weightMentioned = variant.weight;
+                    break;
+                }
+            }
             
-            const mentionsProduct = lowerCaseText.includes(productName);
-            const mentionsWeight = lowerCaseText.includes(weightNoSpace) || lowerCaseText.includes(weightWithSpace);
-            
-            // To be more precise, let's create patterns to check if weight and product are close.
-            const pattern1 = new RegExp(`${productName}.*${weightNoSpace}`, 'i');
-            const pattern2 = new RegExp(`${productName}.*${weightWithSpace}`, 'i');
-            const pattern3 = new RegExp(`${weightNoSpace}.*${productName}`, 'i');
-            const pattern4 = new RegExp(`${weightWithSpace}.*${productName}`, 'i');
+             // Look for a combined weight and unit like "1kg"
+            const combinedPrevWord = (i > 0) ? textWords[i-1] : '';
+            if (!foundVariant) {
+                 for (const variant of product.variants) {
+                    const variantWeightNormalized = variant.weight.replace(/\s/g, '').toLowerCase();
+                     if(combinedPrevWord === variantWeightNormalized) {
+                        foundVariant = variant;
+                        weightMentioned = variant.weight;
+                        break;
+                     }
+                 }
+            }
 
-            if (mentionsProduct && mentionsWeight && (pattern1.test(lowerCaseText) || pattern2.test(lowerCaseText) || pattern3.test(lowerCaseText) || pattern4.test(lowerCaseText))) {
-                // This specific variant is mentioned.
-                // To avoid adding duplicates, check if we've already added this exact SKU
-                const alreadyAdded = foundItems.some(item => item.variant.sku === variant.sku);
-                if (!alreadyAdded) {
+            if (foundVariant) {
+                 const alreadyAdded = foundItems.some(item => item.variant.sku === foundVariant!.sku);
+                 if(!alreadyAdded) {
                     foundItems.push({
                         productName: product.productName,
-                        quantity: variant.weight,
-                        price: variant.price,
-                        variant: variant,
+                        quantity: weightMentioned,
+                        price: foundVariant.price,
+                        variant: foundVariant,
                     });
-                }
+                 }
             }
         }
     }
-    
+
     return foundItems;
 }
 
@@ -165,7 +185,7 @@ export default function CheckoutPage() {
         speechRecognitionRef.current = new SpeechRecognition();
         const recognition = speechRecognitionRef.current;
         recognition.lang = 'en-IN';
-        recognition.continuous = true;
+        recognition.continuous = false; // Set to false to end on pause
         recognition.interimResults = true;
         
         recognition.onstart = () => {
@@ -174,16 +194,18 @@ export default function CheckoutPage() {
         
         recognition.onresult = (event) => {
             let interimTranscript = '';
-            let finalTranscript = '';
+            // Use a new variable for final part of current speech event
+            let currentFinalTranscript = '';
 
             for (let i = event.resultIndex; i < event.results.length; ++i) {
                 if (event.results[i].isFinal) {
-                    finalTranscript += event.results[i][0].transcript + ' ';
+                    currentFinalTranscript += event.results[i][0].transcript;
                 } else {
                     interimTranscript += event.results[i][0].transcript;
                 }
             }
-            finalTranscriptRef.current = finalTranscript;
+            // Append the new final transcript to the ref
+            finalTranscriptRef.current += currentFinalTranscript;
             form.setValue('shoppingList', finalTranscriptRef.current + interimTranscript);
         };
 
@@ -208,8 +230,8 @@ export default function CheckoutPage() {
     if (isListening) {
         speechRecognitionRef.current?.stop();
     } else {
-        finalTranscriptRef.current = ''; // Clear previous transcript
-        form.setValue('shoppingList', ''); // Clear previous list
+        finalTranscriptRef.current = ''; // Clear previous final transcript
+        form.setValue('shoppingList', ''); // Clear previous list in UI
         setStructuredList([]);
         speechRecognitionRef.current?.start();
     }
