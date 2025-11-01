@@ -196,14 +196,17 @@ export default function CheckoutPage() {
         
         recognition.onresult = (event) => {
             let interimTranscript = '';
+            let finalTranscript = finalTranscriptRef.current;
+
             for (let i = event.resultIndex; i < event.results.length; ++i) {
                 if (event.results[i].isFinal) {
-                    finalTranscriptRef.current += event.results[i][0].transcript + ' ';
+                    finalTranscript += event.results[i][0].transcript + ' ';
                 } else {
                     interimTranscript += event.results[i][0].transcript;
                 }
             }
-            form.setValue('shoppingList', finalTranscriptRef.current.trim() + ' ' + interimTranscript);
+            finalTranscriptRef.current = finalTranscript;
+            form.setValue('shoppingList', finalTranscript + interimTranscript);
         };
 
         recognition.onerror = (event) => {
