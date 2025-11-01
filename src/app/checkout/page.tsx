@@ -276,6 +276,18 @@ export default function CheckoutPage() {
         }
     }, [toast]);
 
+    const handleLocationConfirm = useCallback(() => {
+        setIsLocationPromptOpen(false);
+        handleGetLocation();
+    }, [handleGetLocation]);
+
+    const handleLocationCancel = useCallback(() => {
+        setIsLocationPromptOpen(false);
+        toast({
+            title: "Location Skipped",
+            description: "Please capture your location manually to proceed.",
+        });
+    }, [toast]);
 
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -288,23 +300,26 @@ export default function CheckoutPage() {
         
         recognition.onstart = () => {
             setIsListening(true);
-            form.setValue('shoppingList', "🎤 Listening...");
+            // Only set listening text if not in location prompt
+            if (!isLocationPromptOpen) {
+                form.setValue('shoppingList', "🎤 Listening...");
+            }
         };
         
         recognition.onresult = (event) => {
-            const transcript = event.results[0][0].transcript.toLowerCase().trim();
-            if (transcript === 'yes') {
-                if (isLocationPromptOpen) {
+            const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
+
+            if (isLocationPromptOpen) {
+                if (transcript === 'yes') {
                     handleLocationConfirm();
+                    return;
                 }
-                return;
-            }
-             if (transcript === 'no') {
-                if (isLocationPromptOpen) {
+                if (transcript === 'no') {
                     handleLocationCancel();
+                    return;
                 }
-                return;
             }
+
             if (transcript.includes('place order')) {
                 placeOrderBtnRef.current?.click();
                 return;
@@ -345,21 +360,8 @@ export default function CheckoutPage() {
         speechRecognitionRef.current.abort();
       }
     }
-  }, [toast, form, searchParams, handleToggleListening, handleUnderstandList, isLocationPromptOpen]);
+  }, [toast, form, searchParams, handleToggleListening, handleUnderstandList, isLocationPromptOpen, handleLocationConfirm, handleLocationCancel]);
 
-
-    const handleLocationConfirm = () => {
-        setIsLocationPromptOpen(false);
-        handleGetLocation();
-    };
-
-    const handleLocationCancel = () => {
-        setIsLocationPromptOpen(false);
-        toast({
-            title: "Location Skipped",
-            description: "Please capture your location manually to proceed.",
-        });
-    };
 
     const handleConfirmVoiceOrder = () => {
         const storeId = form.getValues('storeId');
