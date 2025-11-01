@@ -30,7 +30,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import type { ProductPrice, ProductVariant, Store } from '@/lib/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { getStores } from '@/lib/data';
+import { getStores, getStore } from '@/lib/data';
 
 
 const checkoutSchema = z.object({
@@ -208,12 +208,19 @@ export function VoiceOrderDialog({ isOpen, onClose, orderInfo }: { isOpen: boole
     }
 
     startPlaceOrderTransition(async () => {
+        const storeData = await getStore(firestore, storeId);
+        if (!storeData) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Selected store could not be found.' });
+            return;
+        }
+
         const voiceOrderSubtotal = structuredList.reduce((acc, item) => acc + (item.price || 0), 0);
         const totalAmount = voiceOrderSubtotal + DELIVERY_FEE;
         
         let orderData: any = {
             userId: user.uid,
             storeId: storeId,
+            storeOwnerId: storeData.ownerId, // Denormalized store owner ID
             customerName: data.name,
             deliveryAddress: 'Delivery via captured GPS coordinates',
             deliveryLat: deliveryCoords.lat,
@@ -234,7 +241,7 @@ export function VoiceOrderDialog({ isOpen, onClose, orderInfo }: { isOpen: boole
             })),
         };
 
-        const colRef = collection(firestore, 'voice-orders');
+        const colRef = collection(firestore, 'orders'); // Save to the main 'orders' collection
         addDoc(colRef, orderData).then(() => {
             clearCart();
             setStructuredList([]);
