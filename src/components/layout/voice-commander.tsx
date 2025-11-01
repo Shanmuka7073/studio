@@ -38,7 +38,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
     if (firestore && user) {
         
       const commandMap: { [key: string]: { display: string, action: () => void, aliases: string[] } } = {
-        home: { display: 'Navigate to Home', action: () => router.push('/'), aliases: ['go home', 'open home', 'back to home', 'show home', 'main page', 'home screen', 'home'] },
+        home: { display: 'Navigate to Home', action: () => router.push('/'), aliases: ['go home', 'open home', 'back to home', 'show home', 'main page', 'home screen', 'home', 'localbasket', 'local basket'] },
         stores: { display: 'Browse All Stores', action: () => router.push('/stores'), aliases: ['go to stores', 'open stores', 'show all stores', 'all stores', 'stores', 'browse stores'] },
         orders: { display: 'View My Orders', action: () => router.push('/dashboard/customer/my-orders'), aliases: ['my orders', 'go to my orders', 'open my orders', 'show my orders', 'orders'] },
         cart: { display: 'View Your Cart', action: () => router.push('/cart'), aliases: ['go to cart', 'open cart', 'show cart', 'my cart', 'cart'] },
@@ -175,8 +175,19 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
         onSuggestions([]);
         return;
       }
+      
+      // 4. NEW: Check for match ignoring spaces
+      const sanitizedCommand = command.replace(/\s/g, '');
+      const spaceInsensitiveMatch = allCommands.find(c => c.command.replace(/\s/g, '') === sanitizedCommand);
+      if(spaceInsensitiveMatch) {
+        spaceInsensitiveMatch.action();
+        toast({ title: `Navigating...`, description: `Heard: "${command}"` });
+        onSuggestions([]);
+        return;
+      }
 
-      // 4. Check for close matches if no perfect match found
+
+      // 5. Check for close matches if no perfect match found
       const potentialMatches = allCommands
         .map((c) => ({
           ...c,
