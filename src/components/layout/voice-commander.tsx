@@ -121,8 +121,33 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
 
     const handleCommand = (command: string) => {
       if (!firestore || !user) return;
+        
+      // 1. Handle "order [items] from [store]" command
+      if (command.startsWith('order ')) {
+        const fromIndex = command.lastIndexOf(' from ');
+        if (fromIndex > -1) {
+            const shoppingList = command.substring('order '.length, fromIndex).trim();
+            const storeName = command.substring(fromIndex + ' from '.length).trim();
 
-      // 1. Check for "add product" command for store owners
+            if (shoppingList && storeName) {
+                const targetStore = allStores.find(s => s.name.toLowerCase().includes(storeName));
+
+                if (targetStore) {
+                    toast({ title: "Processing Your Order...", description: `Ordering "${shoppingList}" from ${targetStore.name}.`});
+                    router.push(`/checkout?storeId=${targetStore.id}&list=${encodeURIComponent(shoppingList)}`);
+                    onSuggestions([]);
+                    return; // Command handled
+                } else {
+                     toast({ variant: 'destructive', title: "Store Not Found", description: `Could not find a store named "${storeName}".` });
+                     onSuggestions([]);
+                     return;
+                }
+            }
+        }
+      }
+
+
+      // 2. Check for "add product" command for store owners
       if ((command.startsWith('add') || command.startsWith('sell')) && myStore) {
           const productName = command.replace(/add|sell|to my store/g, '').trim();
           const productMatch = masterProductList.find(p => p.name.toLowerCase() === productName);
@@ -140,26 +165,6 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
               return; // Command handled
           }
       }
-
-      // 2. Check for "order ... from ..." command
-      if (command.startsWith('order ')) {
-        const fromMatch = command.match(/ from (.+)/);
-        if (fromMatch && fromMatch[1]) {
-            const storeName = fromMatch[1].trim();
-            const shoppingList = command.substring('order '.length, fromMatch.index).trim();
-            
-            // Find the store
-            const targetStore = allStores.find(s => s.name.toLowerCase().includes(storeName));
-
-            if (targetStore && shoppingList) {
-                toast({ title: "Processing Your Order...", description: `Ordering "${shoppingList}" from ${targetStore.name}.`});
-                router.push(`/checkout?storeId=${targetStore.id}&list=${encodeURIComponent(shoppingList)}`);
-                onSuggestions([]);
-                return; // Command handled
-            }
-        }
-      }
-
 
       // 3. Check for perfect match on other commands
       const perfectMatch = allCommands.find((c) => command === c.command);
