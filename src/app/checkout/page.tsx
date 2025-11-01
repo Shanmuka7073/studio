@@ -20,21 +20,24 @@ import {
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
-import { getProductImage } from '@/lib/data';
+import { getProductImage, getStores } from '@/lib/data';
 import { useTransition, useState, useRef, useCallback, useEffect } from 'react';
 import { useFirebase, errorEmitter } from '@/firebase';
 import { collection, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { Mic, StopCircle, CheckCircle, MapPin, Loader2, Bot } from 'lucide-react';
+import { Mic, StopCircle, CheckCircle, MapPin, Loader2, Bot, Store as StoreIcon } from 'lucide-react';
 import Link from 'next/link';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import type { ProductPrice, ProductVariant } from '@/lib/types';
+import type { ProductPrice, ProductVariant, Store } from '@/lib/types';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 
 const checkoutSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   phone: z.string().min(10, 'Please enter a valid phone number'),
   shoppingList: z.string().optional(),
+  storeId: z.string().optional(),
 });
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
@@ -134,6 +137,7 @@ export default function CheckoutPage() {
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [structuredList, setStructuredList] = useState<StructuredListItem[]>([]);
+  const [availableStores, setAvailableStores] = useState<Store[]>([]);
   
   const speechRecognitionRef = useRef<SpeechRecognition | null>(null);
 
@@ -146,8 +150,27 @@ export default function CheckoutPage() {
       name: '',
       phone: '',
       shoppingList: '',
+      storeId: '',
     },
   });
+
+  useEffect(() => {
+    async function fetchStores() {
+      if (!firestore) return;
+      try {
+        const stores = await getStores(firestore);
+        setAvailableStores(stores);
+      } catch (err) {
+        console.error(err);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Could not fetch available stores.',
+        });
+      }
+    }
+    fetchStores();
+  }, [firestore, toast]);
 
   useEffect(() => {
     const fetchImages = async () => {
@@ -244,6 +267,7 @@ export default function CheckoutPage() {
     } else {
         setStructuredList([]);
         form.setValue('shoppingList', '');
+        form.setValue('storeId', '');
         speechRecognitionRef.current.start();
     }
   };
@@ -279,13 +303,24 @@ export default function CheckoutPage() {
     }
 
     const isVoiceOrder = cartItems.length === 0 && structuredList.length > 0;
-    const storeId = cartItems[0]?.product.storeId;
+    
+    let storeId: string | undefined;
+
+    if (isVoiceOrder) {
+        storeId = data.storeId;
+        if (!storeId) {
+            toast({ variant: 'destructive', title: 'Store Required', description: 'Please select a store to fulfill your voice order.' });
+            return;
+        }
+    } else {
+        storeId = cartItems[0]?.product.storeId;
+    }
     
     if (cartItems.length === 0 && !isVoiceOrder) {
         toast({ variant: 'destructive', title: 'Error', description: 'Your cart is empty. Please add items or create a shopping list.' });
         return;
     }
-     if (!storeId && !isVoiceOrder) {
+     if (!storeId) {
         toast({ variant: 'destructive', title: 'Error', description: 'Could not determine the store for this order.' });
         return;
     }
@@ -296,6 +331,7 @@ export default function CheckoutPage() {
         
         let orderData: any = {
             userId: user.uid,
+            storeId: storeId,
             customerName: data.name,
             deliveryAddress: 'Delivery via captured GPS coordinates',
             deliveryLat: deliveryCoords.lat,
@@ -318,7 +354,6 @@ export default function CheckoutPage() {
                 quantity: item.quantity,
             }));
         } else {
-            orderData.storeId = storeId;
             orderData.items = cartItems.map(item => ({
                 productId: item.product.id,
                 productName: item.product.name,
@@ -482,6 +517,32 @@ export default function CheckoutPage() {
                                         <span>Understanding your list...</span>
                                     </div>
                                 ) : structuredList.length > 0 ? (
+                                    <>
+                                    <FormField
+                                        control={form.control}
+                                        name="storeId"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                            <FormLabel>Choose a Store to Fulfill Your Order</FormLabel>
+                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                <FormControl>
+                                                <SelectTrigger>
+                                                    <StoreIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                    <SelectValue placeholder="Select a store" />
+                                                </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                {availableStores.map(store => (
+                                                    <SelectItem key={store.id} value={store.id}>
+                                                    {store.name}
+                                                    </SelectItem>
+                                                ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                            </FormItem>
+                                        )}
+                                        />
                                     <Card className="bg-muted/50">
                                         <CardHeader><CardTitle className="text-base">Understood Items</CardTitle></CardHeader>
                                         <CardContent>
@@ -513,6 +574,7 @@ export default function CheckoutPage() {
                                             </Table>
                                         </CardContent>
                                     </Card>
+                                    </>
                                 ) : (
                                      form.getValues('shoppingList') && !isProcessing && !isListening && (
                                         <Button type="button" onClick={() => handleUnderstandList(form.getValues('shoppingList'))} className="w-full">
