@@ -41,10 +41,16 @@ type CheckoutFormValues = z.infer<typeof checkoutSchema>;
 
 type StructuredListItem = {
     productName: string;
-    quantity: string;
+    quantity: number;
     price: number | null;
     variant: ProductVariant;
 };
+
+type ParsedOrderItem = {
+    quantity: number;
+    unit: string;
+    item: string;
+}
 
 const DELIVERY_FEE = 30;
 
@@ -65,45 +71,53 @@ function OrderSummaryItem({ item, image }) {
     );
 }
 
-// Robust function to parse the shopping list from text by iterating through the master catalog.
-async function parseShoppingListFromText(text: string, db: any): Promise<StructuredListItem[]> {
-    if (!text || !db) return [];
+// Parses text like "1 kg chicken and 2 kg apple"
+function parseOrder(text: string): ParsedOrderItem[] {
+    const pattern = /(\d+)\s*kg\s*([a-zA-Z\s]+?)(?=\s*\d+\s*kg|\s*and\s*\d+\s*kg|$)/gi;
+    const items = [];
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+        items.push({
+          quantity: parseInt(match[1], 10),
+          unit: "kg",
+          item: match[2].trim().toLowerCase()
+        });
+    }
+    return items;
+}
 
+// Matches parsed items against the master product catalog
+async function matchItemsToCatalog(parsedList: ParsedOrderItem[], db: any): Promise<StructuredListItem[]> {
+    if (!parsedList.length || !db) return [];
+    
     const productPricesRef = collection(db, 'productPrices');
     const productSnapshot = await getDocs(productPricesRef);
     const masterProductList = productSnapshot.docs.map(doc => doc.data() as ProductPrice);
+    
+    const matchedItems: StructuredListItem[] = [];
 
-    const foundItems: StructuredListItem[] = [];
-    const textLower = text.toLowerCase();
-    const processedSkus = new Set<string>();
+    for (const orderItem of parsedList) {
+        // Find a product in the catalog where the name includes the item spoken by the user
+        const productMatch = masterProductList.find(p => 
+            p.productName.toLowerCase().includes(orderItem.item.toLowerCase())
+        );
 
-    for (const product of masterProductList) {
-        // Check if the product name exists in the text
-        if (textLower.includes(product.productName.toLowerCase())) {
-            // If it does, check for each specific variant
-            for (const variant of product.variants) {
-                // Normalize both the text and variant weight by removing spaces to handle "1 kg" vs "1kg"
-                const textNoSpaces = textLower.replace(/\s/g, '');
-                const variantWeightNoSpaces = variant.weight.replace(/\s/g, '').toLowerCase();
-
-                // Check if the weight is also mentioned.
-                if (textNoSpaces.includes(variantWeightNoSpaces)) {
-                    // Check if we've already added this exact item (product + variant)
-                    if (!processedSkus.has(variant.sku)) {
-                        foundItems.push({
-                            productName: product.productName,
-                            quantity: variant.weight, // Use the original weight string for display
-                            price: variant.price,
-                            variant: variant,
-                        });
-                        processedSkus.add(variant.sku); // Mark this variant as processed
-                    }
-                }
+        if (productMatch) {
+            // Find the specific variant (e.g., "1kg") that matches the quantity
+            const targetWeight = `${orderItem.quantity}${orderItem.unit}`;
+            const variantMatch = productMatch.variants.find(v => v.weight.replace(/\s/g, '') === targetWeight);
+            
+            if (variantMatch) {
+                matchedItems.push({
+                    productName: productMatch.productName,
+                    quantity: orderItem.quantity,
+                    price: variantMatch.price,
+                    variant: variantMatch
+                });
             }
         }
     }
-
-    return foundItems;
+    return matchedItems;
 }
 
 
@@ -156,8 +170,8 @@ export default function CheckoutPage() {
         speechRecognitionRef.current = new SpeechRecognition();
         const recognition = speechRecognitionRef.current;
         recognition.lang = 'en-IN';
-        recognition.continuous = true; // Keep listening until explicitly stopped
         recognition.interimResults = true;
+        recognition.continuous = false; // Ends automatically when user stops speaking
         
         recognition.onstart = () => {
             setIsListening(true);
@@ -165,21 +179,26 @@ export default function CheckoutPage() {
         
         recognition.onresult = (event) => {
             let interimTranscript = '';
-            // Hold the final transcript from this event batch
-            let currentFinalTranscript = ''; 
+            // Loop from the last result index
             for (let i = event.resultIndex; i < event.results.length; ++i) {
+                const transcript = event.results[i][0].transcript;
                 if (event.results[i].isFinal) {
-                    currentFinalTranscript += event.results[i][0].transcript + ' ';
+                    finalTranscriptRef.current += transcript + ' ';
                 } else {
-                    interimTranscript += event.results[i][0].transcript;
+                    interimTranscript += transcript;
                 }
             }
-            // Append only the newly finalized text to our ref
-            finalTranscriptRef.current += currentFinalTranscript;
-            // Update the UI with the full final transcript plus the current interim part
+             // Update the text area with the clean, progressing transcript
             form.setValue('shoppingList', finalTranscriptRef.current + interimTranscript);
         };
 
+        recognition.onend = () => {
+            setIsListening(false);
+            // Trigger understanding after recording is complete
+            if (finalTranscriptRef.current.trim()) {
+                 handleUnderstandList(finalTranscriptRef.current.trim());
+            }
+        };
 
         recognition.onerror = (event) => {
             console.error("Speech recognition error:", event.error);
@@ -189,29 +208,25 @@ export default function CheckoutPage() {
             setIsListening(false);
         };
 
-        recognition.onend = () => {
-            setIsListening(false);
-        };
     } else {
         toast({ variant: 'destructive', title: 'Not Supported', description: 'Voice recognition is not supported by your browser.' });
     }
   }, [toast, form]);
 
 
-  const handleToggleListening = () => {
-    if (isListening) {
-        speechRecognitionRef.current?.stop();
-    } else {
-        // If there's already text, don't clear it. Just start listening.
-        // If it's a fresh start, the ref is already empty.
+  const handleStartListening = () => {
+    if (speechRecognitionRef.current) {
+        // Clear previous results before starting a new recording session
+        finalTranscriptRef.current = "";
+        form.setValue('shoppingList', "🎤 Listening...");
         setStructuredList([]);
-        speechRecognitionRef.current?.start();
+        speechRecognitionRef.current.start();
     }
   };
 
- const handleUnderstandList = async () => {
+ const handleUnderstandList = async (text: string) => {
     if (!firestore) return;
-    const transcribedText = form.getValues('shoppingList');
+    const transcribedText = text || form.getValues('shoppingList');
     if (!transcribedText) {
         toast({ variant: 'destructive', title: 'No list to understand', description: 'Please record or type your shopping list first.' });
         return;
@@ -220,7 +235,12 @@ export default function CheckoutPage() {
     setIsProcessing(true);
     setStructuredList([]);
     try {
-        const items = await parseShoppingListFromText(transcribedText, firestore);
+        const parsedItems = parseOrder(transcribedText);
+        if (parsedItems.length === 0) {
+            throw new Error("I couldn't understand any items in the format '1 kg item'. Please try again.");
+        }
+        
+        const items = await matchItemsToCatalog(parsedItems, firestore);
         
         if (items.length > 0) {
             setStructuredList(items);
@@ -283,7 +303,7 @@ export default function CheckoutPage() {
     }
 
     startPlaceOrderTransition(async () => {
-        const voiceOrderSubtotal = structuredList.reduce((acc, item) => acc + (item.price || 0), 0);
+        const voiceOrderSubtotal = structuredList.reduce((acc, item) => acc + (item.price || 0) * item.quantity, 0);
         const totalAmount = isVoiceOrder ? voiceOrderSubtotal + DELIVERY_FEE : cartTotal + DELIVERY_FEE;
         
         let orderData: any = {
@@ -307,7 +327,7 @@ export default function CheckoutPage() {
                 price: item.price || 0,
                 productId: item.variant.sku, // using sku as a reference
                 variantSku: item.variant.sku,
-                quantity: 1, // Assume quantity of 1 for each line item in voice order
+                quantity: item.quantity,
             }));
         } else {
             orderData.storeId = storeId;
@@ -347,7 +367,7 @@ export default function CheckoutPage() {
   };
 
   const hasItemsInCart = cartItems.length > 0;
-  const voiceOrderSubtotal = structuredList.reduce((acc, item) => acc + (item.price || 0), 0);
+  const voiceOrderSubtotal = structuredList.reduce((acc, item) => acc + (item.price || 0) * item.quantity, 0);
   const finalTotal = hasItemsInCart ? cartTotal + DELIVERY_FEE : voiceOrderSubtotal + DELIVERY_FEE;
 
   return (
@@ -441,13 +461,14 @@ export default function CheckoutPage() {
                                     <CardContent className="flex flex-col items-center justify-center space-y-4">
                                         <Button
                                             type="button"
-                                            onClick={handleToggleListening}
+                                            onClick={handleStartListening}
                                             variant={isListening ? 'destructive' : 'default'}
                                             size="lg"
                                             className="w-48"
+                                            disabled={isListening}
                                         >
-                                            {isListening ? <StopCircle className="mr-2 h-5 w-5" /> : <Mic className="mr-2 h-5 w-5" />}
-                                            {isListening ? 'Stop Listening' : 'Record List'}
+                                            {isListening ? <StopCircle className="mr-2 h-5 w-5 animate-pulse" /> : <Mic className="mr-2 h-5 w-5" />}
+                                            {isListening ? 'Listening...' : 'Record List'}
                                         </Button>
                                         <p className="text-sm text-muted-foreground text-center">
                                             {isListening ? "I'm listening..." : "Click to record your shopping list."}
@@ -489,8 +510,8 @@ export default function CheckoutPage() {
                                                 <TableBody>
                                                     {structuredList.map((item, index) => (
                                                         <TableRow key={index}>
-                                                            <TableCell>{item.productName}</TableCell>
-                                                            <TableCell>{item.quantity}</TableCell>
+                                                            <TableCell className="capitalize">{item.productName}</TableCell>
+                                                            <TableCell>{item.quantity} kg</TableCell>
                                                             <TableCell className="text-right">{item.price ? `₹${item.price.toFixed(2)}` : 'N/A'}</TableCell>
                                                         </TableRow>
                                                     ))}
@@ -505,10 +526,10 @@ export default function CheckoutPage() {
                                         </CardContent>
                                     </Card>
                                 ) : (
-                                     form.getValues('shoppingList') && !isProcessing && (
-                                        <Button type="button" onClick={handleUnderstandList} className="w-full">
+                                     form.getValues('shoppingList') && !isProcessing && !isListening && (
+                                        <Button type="button" onClick={() => handleUnderstandList(form.getValues('shoppingList'))} className="w-full">
                                             <Bot className="mr-2 h-5 w-5" />
-                                            Understand List
+                                            Understand My List
                                         </Button>
                                     )
                                 )}
