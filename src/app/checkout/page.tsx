@@ -193,18 +193,17 @@ export default function CheckoutPage() {
         recognition.onstart = () => {
             setIsListening(true);
         };
-
+        
         recognition.onresult = (event) => {
-            let interim_transcript = '';
-
+            let interimTranscript = '';
             for (let i = event.resultIndex; i < event.results.length; ++i) {
                 if (event.results[i].isFinal) {
                     finalTranscriptRef.current += event.results[i][0].transcript + ' ';
                 } else {
-                    interim_transcript += event.results[i][0].transcript;
+                    interimTranscript += event.results[i][0].transcript;
                 }
             }
-            form.setValue('shoppingList', finalTranscriptRef.current + interim_transcript);
+            form.setValue('shoppingList', finalTranscriptRef.current.trim() + ' ' + interimTranscript);
         };
 
         recognition.onerror = (event) => {
