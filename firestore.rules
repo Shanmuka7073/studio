@@ -95,9 +95,7 @@ service cloud.firestore {
     }
     
     match /voice-orders/{voiceOrderId} {
-      allow get, list, update: if isSignedIn();
-      allow create: if isOwner(request.resource.data.userId);
-      allow delete: if false;
+      allow read, write: if isSignedIn();
     }
 
     match /cachedRecipes/{recipeId} {
@@ -136,3 +134,5 @@ service firebase.storage {
     }
   }
 }
+
+    

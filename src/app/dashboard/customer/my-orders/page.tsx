@@ -41,7 +41,7 @@ export default function MyOrdersPage() {
   const { toast } = useToast();
   const [isUpdating, startUpdateTransition] = useTransition();
   
-  const regularOrdersQuery = useMemoFirebase(() => {
+  const ordersQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
     return query(
         collection(firestore, 'orders'),
@@ -50,33 +50,7 @@ export default function MyOrdersPage() {
     );
   }, [firestore, user?.uid]);
 
-  const voiceOrdersQuery = useMemoFirebase(() => {
-    if (!firestore || !user?.uid) return null;
-    return query(
-        collection(firestore, 'voice-orders'),
-        where('userId', '==', user.uid),
-        orderBy('orderDate', 'desc')
-    );
-  }, [firestore, user?.uid]);
-
-  const { data: regularOrders, isLoading: regularOrdersLoading } = useCollection<Order>(regularOrdersQuery);
-  const { data: voiceOrders, isLoading: voiceOrdersLoading } = useCollection<Order>(voiceOrdersQuery);
-
-  const allOrders = useMemo(() => {
-    if (!regularOrders && !voiceOrders) return [];
-    
-    const combined = [...(regularOrders || []), ...(voiceOrders || [])];
-    
-    return combined.sort((a, b) => {
-        const dateA = a.orderDate as any;
-        const dateB = b.orderDate as any;
-        if (!dateA || !dateB) return 0;
-        const secondsA = dateA.seconds || (dateA.getTime ? dateA.getTime() / 1000 : 0);
-        const secondsB = dateB.seconds || (dateB.getTime ? dateB.getTime() / 1000 : 0);
-        return secondsB - secondsA;
-    });
-
-  }, [regularOrders, voiceOrders]);
+  const { data: allOrders, isLoading: ordersLoading } = useCollection<Order>(ordersQuery);
 
   const prevOrdersRef = useRef<Map<string, Order>>(new Map());
 
@@ -151,7 +125,7 @@ export default function MyOrdersPage() {
     }
   }
 
-  const effectiveLoading = isUserLoading || regularOrdersLoading || voiceOrdersLoading;
+  const effectiveLoading = isUserLoading || ordersLoading;
 
   const formatDate = (date: any) => {
     if (!date) return 'N/A';
@@ -257,10 +231,10 @@ export default function MyOrdersPage() {
                                     </div>
                                 </div>
                             </>
-                        ) : order.voiceMemoUrl ? (
+                        ) : order.translatedList ? (
                              <div className="space-y-4">
                                 <h4 className="font-semibold">Voice Order</h4>
-                                <audio src={order.voiceMemoUrl} controls className="w-full" />
+                                <p className="italic text-muted-foreground">"{order.translatedList}"</p>
                                 <div className="flex justify-end font-bold">
                                   <span>Total (incl. delivery): ₹{order.totalAmount.toFixed(2)}</span>
                                 </div>

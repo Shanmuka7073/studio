@@ -32,6 +32,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import type { ProductPrice, ProductVariant, Store } from '@/lib/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { VoiceOrderDialog, type VoiceOrderInfo } from '@/components/voice-order-dialog';
 
 
 const checkoutSchema = z.object({
@@ -140,6 +141,7 @@ export default function CheckoutPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [structuredList, setStructuredList] = useState<StructuredListItem[]>([]);
   const [availableStores, setAvailableStores] = useState<Store[]>([]);
+  const [voiceOrderInfo, setVoiceOrderInfo] = useState<VoiceOrderInfo | null>(null);
   
   const speechRecognitionRef = useRef<SpeechRecognition | null>(null);
 
@@ -305,6 +307,22 @@ export default function CheckoutPage() {
         }
     };
 
+    const handleConfirmVoiceOrder = () => {
+        const storeId = form.getValues('storeId');
+        const shoppingList = form.getValues('shoppingList');
+
+        if (!storeId) {
+            toast({ variant: 'destructive', title: 'Store Required', description: 'Please select a store to fulfill your voice order.' });
+            return;
+        }
+        if (!shoppingList) {
+            toast({ variant: 'destructive', title: 'List Required', description: 'Your shopping list is empty.' });
+            return;
+        }
+
+        setVoiceOrderInfo({ shoppingList, storeId });
+    };
+
   const onSubmit = (data: CheckoutFormValues) => {
     if (!firestore || !user) {
         toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to place an order.' });
@@ -317,22 +335,17 @@ export default function CheckoutPage() {
 
     const isVoiceOrder = cartItems.length === 0 && structuredList.length > 0;
     
-    let storeId: string | undefined;
-
     if (isVoiceOrder) {
-        storeId = data.storeId;
-        if (!storeId) {
-            toast({ variant: 'destructive', title: 'Store Required', description: 'Please select a store to fulfill your voice order.' });
-            return;
-        }
-    } else {
-        storeId = cartItems[0]?.product.storeId;
+        // This should now be handled by the VoiceOrderDialog
+        handleConfirmVoiceOrder();
+        return;
     }
     
-    if (cartItems.length === 0 && !isVoiceOrder) {
+    if (cartItems.length === 0) {
         toast({ variant: 'destructive', title: 'Error', description: 'Your cart is empty. Please add items or create a shopping list.' });
         return;
     }
+     const storeId = cartItems[0]?.product.storeId;
      if (!storeId) {
         toast({ variant: 'destructive', title: 'Error', description: 'Could not determine the store for this order.' });
         return;
@@ -344,9 +357,8 @@ export default function CheckoutPage() {
             toast({ variant: 'destructive', title: 'Error', description: 'Selected store could not be found.' });
             return;
         }
-
-        const voiceOrderSubtotal = structuredList.reduce((acc, item) => acc + (item.price || 0), 0);
-        const totalAmount = isVoiceOrder ? voiceOrderSubtotal + DELIVERY_FEE : cartTotal + DELIVERY_FEE;
+        
+        const totalAmount = cartTotal + DELIVERY_FEE;
         
         let orderData: any = {
             userId: user.uid,
@@ -361,28 +373,15 @@ export default function CheckoutPage() {
             orderDate: serverTimestamp(),
             status: 'Pending' as 'Pending',
             totalAmount,
-        };
-
-        if (isVoiceOrder) {
-            orderData.translatedList = data.shoppingList;
-            orderData.items = structuredList.map(item => ({
-                productName: item.productName,
-                variantWeight: item.variant.weight,
-                price: item.price || 0,
-                productId: item.variant.sku, // using sku as a reference
-                variantSku: item.variant.sku,
-                quantity: item.quantity,
-            }));
-        } else {
-            orderData.items = cartItems.map(item => ({
+            items: cartItems.map(item => ({
                 productId: item.product.id,
                 productName: item.product.name,
                 variantSku: item.variant.sku,
                 variantWeight: item.variant.weight,
                 quantity: item.quantity,
                 price: item.variant.price,
-            }));
-        }
+            })),
+        };
 
         const colRef = collection(firestore, 'orders');
         addDoc(colRef, orderData).then(() => {
@@ -414,6 +413,13 @@ export default function CheckoutPage() {
 
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
+        {voiceOrderInfo && (
+            <VoiceOrderDialog
+                isOpen={!!voiceOrderInfo}
+                onClose={() => setVoiceOrderInfo(null)}
+                orderInfo={voiceOrderInfo}
+            />
+        )}
         <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid md:grid-cols-2 gap-12">
                 <div>
@@ -623,3 +629,5 @@ export default function CheckoutPage() {
     </div>
   );
 }
+
+    

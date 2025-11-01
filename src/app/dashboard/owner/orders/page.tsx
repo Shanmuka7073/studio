@@ -69,17 +69,17 @@ function OrderDetailsDialog({ order, isOpen, onClose }: { order: Order | null; i
                 </DialogHeader>
                 <ScrollArea className="max-h-[60vh]">
                 <div className="grid gap-4 py-4 pr-6">
-                     {order.voiceMemoUrl && (
+                     {order.translatedList && (
                         <Card>
-                            <CardHeader><CardTitle className="text-lg">Customer Voice Memo</CardTitle></CardHeader>
+                            <CardHeader><CardTitle className="text-lg">Customer's List</CardTitle></CardHeader>
                             <CardContent>
-                                 <audio src={order.voiceMemoUrl} controls className="w-full" />
+                                 <p className="italic text-muted-foreground">"{order.translatedList}"</p>
                             </CardContent>
                         </Card>
                     )}
                     {order.items && order.items.length > 0 && (
                        <Card>
-                            <CardHeader><CardTitle className="text-lg">Items from Cart</CardTitle></CardHeader>
+                            <CardHeader><CardTitle className="text-lg">Items</CardTitle></CardHeader>
                             <CardContent>
                                 <Table>
                                     <TableHeader>
@@ -121,33 +121,15 @@ function OrderDetailsDialog({ order, isOpen, onClose }: { order: Order | null; i
     );
 }
 
-function StatusManager({ order, onStatusChange, onClaim, myStoreId }: { order: Order; onStatusChange: (orderId: string, collection: 'orders' | 'voice-orders', newStatus: Order['status']) => void; onClaim: (orderId: string) => void; myStoreId?: string; }) {
+function StatusManager({ order, onStatusChange }: { order: Order; onStatusChange: (orderId: string, newStatus: Order['status']) => void; }) {
     const [isUpdating, startTransition] = useTransition();
 
     const handleStatusChange = (newStatus: Order['status']) => {
         startTransition(() => {
-            const collectionName = order.voiceMemoUrl ? 'voice-orders' : 'orders';
-            onStatusChange(order.id, collectionName, newStatus);
+            onStatusChange(order.id, newStatus);
         });
     }
 
-    const handleClaim = () => {
-        startTransition(() => {
-            onClaim(order.id);
-        });
-    }
-
-    // This is an unassigned voice order
-    if (order.voiceMemoUrl && !order.storeId) {
-        return (
-            <Button onClick={handleClaim} disabled={isUpdating} variant="outline" size="sm">
-                <Hand className="mr-2 h-4 w-4" />
-                {isUpdating ? 'Claiming...' : 'Claim & Process'}
-            </Button>
-        )
-    }
-
-    // This is an order assigned to this store, or a regular cart order for this store
     return (
         <Select onValueChange={handleStatusChange} defaultValue={order.status} disabled={isUpdating || (order.status === 'Delivered' || order.status === 'Cancelled')}>
             <SelectTrigger className="w-full md:w-[180px]">
@@ -186,58 +168,22 @@ export default function OrdersDashboardPage() {
   const { data: stores, isLoading: isStoreLoading } = useCollection<Store>(storeQuery);
   const myStore = useMemo(() => stores?.[0], [stores]);
 
-  const regularOrdersQuery = useMemoFirebase(() => {
+  const ordersQuery = useMemoFirebase(() => {
       if (!firestore || !myStore) return null;
+      // Now fetching all orders for the store, regardless of type
       return query(
           collection(firestore, 'orders'),
           where('storeId', '==', myStore.id),
           orderBy('orderDate', 'desc')
       );
   }, [firestore, myStore]);
-
-  const pendingVoiceOrdersQuery = useMemoFirebase(() => {
-      if (!firestore || !user) return null; // Guard against no user
-      // Fetch all pending voice orders, as they are unassigned.
-      return query(
-          collection(firestore, 'voice-orders'),
-          where('status', '==', 'Pending')
-      );
-  }, [firestore, user]);
-
-  const assignedVoiceOrdersQuery = useMemoFirebase(() => {
-      if (!firestore || !myStore) return null;
-      return query(
-          collection(firestore, 'voice-orders'),
-          where('storeId', '==', myStore.id)
-      )
-  }, [firestore, myStore]);
   
-  const { data: regularOrders, isLoading: regularOrdersLoading } = useCollection<Order>(regularOrdersQuery);
-  const { data: pendingVoiceOrders, isLoading: voiceOrdersLoading } = useCollection<Order>(pendingVoiceOrdersQuery);
-  const { data: assignedVoiceOrders, isLoading: assignedVoiceOrdersLoading } = useCollection<Order>(assignedVoiceOrdersQuery);
-
-  const allOrders = useMemo(() => {
-      const combined = [
-          ...(regularOrders || []),
-          ...(pendingVoiceOrders || []),
-          ...(assignedVoiceOrders || [])
-      ];
-      
-      const uniqueOrders = Array.from(new Map(combined.map(order => [order.id, order])).values());
-
-      return uniqueOrders.sort((a, b) => {
-        const dateA = a.orderDate as any;
-        const dateB = b.orderDate as any;
-        if (!dateA || !dateB) return 0;
-        const secondsA = dateA.seconds || new Date(dateA).getTime() / 1000;
-        const secondsB = dateB.seconds || new Date(dateB).getTime() / 1000;
-        return secondsB - secondsA;
-      });
-  }, [regularOrders, pendingVoiceOrders, assignedVoiceOrders]);
+  const { data: allOrders, isLoading: ordersLoading } = useCollection<Order>(ordersQuery);
 
   const prevOrdersRef = useRef<Map<string, Order>>(new Map());
 
   useEffect(() => {
+    if (!allOrders) return;
     const currentOrdersMap = new Map(allOrders.map(order => [order.id, order]));
     
     if (prevOrdersRef.current.size > 0) {
@@ -245,11 +191,7 @@ export default function OrdersDashboardPage() {
             const prevOrder = prevOrdersRef.current.get(orderId);
 
             if (!prevOrder && currentOrder.status === 'Pending' && !newOrderAlert) {
-                if (currentOrder.voiceMemoUrl && !currentOrder.storeId) {
-                    setNewOrderAlert(currentOrder);
-                    playAlarm();
-                } 
-                else if (currentOrder.storeId === myStore?.id) {
+                if (currentOrder.storeId === myStore?.id) {
                     setNewOrderAlert(currentOrder);
                     playAlarm();
                 }
@@ -272,17 +214,13 @@ export default function OrdersDashboardPage() {
   }, [allOrders, toast, myStore?.id, newOrderAlert]);
 
 
-  const handleStatusChange = (orderId: string, collectionName: 'orders' | 'voice-orders', newStatus: Order['status']) => {
+  const handleStatusChange = (orderId: string, newStatus: Order['status']) => {
     if (!firestore) return;
     
-    const orderDocRef = doc(firestore, collectionName, orderId);
+    const orderDocRef = doc(firestore, 'orders', orderId);
     
     const updatePayload: any = { status: newStatus };
-    
-    if (collectionName === 'voice-orders' && newStatus !== 'Pending' && myStore && !orderDocRef.id) {
-        updatePayload.storeId = myStore.id;
-    }
-    
+        
     if (newStatus === 'Out for Delivery') {
         updatePayload.deliveryPartnerId = null;
     }
@@ -307,43 +245,11 @@ export default function OrdersDashboardPage() {
         });
   };
   
-  const handleClaimOrder = (orderId: string) => {
-    if (!firestore || !myStore) return;
-
-    const orderDocRef = doc(firestore, 'voice-orders', orderId);
-    const updatePayload = {
-      storeId: myStore.id,
-      status: 'Processing' as const
-    };
-
-    updateDoc(orderDocRef, updatePayload)
-      .then(() => {
-        toast({
-          title: "Order Claimed!",
-          description: `You can now process voice order #${orderId.substring(0, 7)}.`
-        });
-      })
-      .catch((serverError) => {
-        const permissionError = new FirestorePermissionError({
-          path: orderDocRef.path,
-          operation: 'update',
-          requestResourceData: updatePayload,
-        });
-        errorEmitter.emit('permission-error', permissionError);
-      });
-  };
-
   const handleAlertAction = (action: 'accept' | 'reject') => {
     if (!newOrderAlert) return;
     
-    if (newOrderAlert.voiceMemoUrl && !newOrderAlert.storeId && action === 'accept') {
-        handleClaimOrder(newOrderAlert.id);
-        setNewOrderAlert(null);
-    } else {
-        const newStatus = action === 'accept' ? 'Processing' : 'Cancelled';
-        const collectionName = newOrderAlert.voiceMemoUrl ? 'voice-orders' : 'orders';
-        handleStatusChange(newOrderAlert.id, collectionName, newStatus);
-    }
+    const newStatus = action === 'accept' ? 'Processing' : 'Cancelled';
+    handleStatusChange(newOrderAlert.id, newStatus);
   };
 
   const formatDate = (date: any) => {
@@ -358,7 +264,7 @@ export default function OrdersDashboardPage() {
     }
   }
 
-  const finalLoading = isUserLoading || isStoreLoading || regularOrdersLoading || voiceOrdersLoading || assignedVoiceOrdersLoading;
+  const finalLoading = isUserLoading || isStoreLoading || ordersLoading;
 
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
@@ -375,17 +281,17 @@ export default function OrdersDashboardPage() {
               <div className="p-1">
                  <ScrollArea className="max-h-[50vh]">
                     <div className="grid gap-4 py-4 pr-6">
-                         {newOrderAlert?.voiceMemoUrl && (
+                         {newOrderAlert?.translatedList && (
                             <Card>
-                                <CardHeader><CardTitle className="text-lg">Customer Voice Memo</CardTitle></CardHeader>
+                                <CardHeader><CardTitle className="text-lg">Customer's List</CardTitle></CardHeader>
                                 <CardContent>
-                                     <audio src={newOrderAlert.voiceMemoUrl} controls className="w-full" />
+                                     <p className="italic text-muted-foreground">"{newOrderAlert.translatedList}"</p>
                                 </CardContent>
                             </Card>
                         )}
                         {newOrderAlert?.items && newOrderAlert.items.length > 0 && (
                            <Card>
-                                <CardHeader><CardTitle className="text-lg">Items from Cart</CardTitle></CardHeader>
+                                <CardHeader><CardTitle className="text-lg">Items</CardTitle></CardHeader>
                                 <CardContent>
                                     <Table>
                                         <TableHeader>
@@ -425,7 +331,7 @@ export default function OrdersDashboardPage() {
                       <Button variant="destructive" onClick={() => handleAlertAction('reject')}>Reject Order</Button>
                   </AlertDialogAction>
                   <AlertDialogAction asChild>
-                      <Button onClick={() => handleAlertAction('accept')}>{newOrderAlert?.voiceMemoUrl && !newOrderAlert?.storeId ? 'Claim & Process' : 'Accept Order'}</Button>
+                      <Button onClick={() => handleAlertAction('accept')}>Accept Order</Button>
                   </AlertDialogAction>
               </AlertDialogFooter>
           </AlertDialogContent>
@@ -435,7 +341,7 @@ export default function OrdersDashboardPage() {
       <Card>
         <CardHeader>
           <CardTitle>{myStore ? `Incoming Orders for ${myStore.name}` : 'Your Orders'}</CardTitle>
-          <CardDescription>A combined view of orders from your store and available voice orders.</CardDescription>
+          <CardDescription>A combined view of all orders for your store.</CardDescription>
         </CardHeader>
         <CardContent>
           {finalLoading ? (
@@ -454,22 +360,22 @@ export default function OrdersDashboardPage() {
                 <Link href="/dashboard/owner/my-store">Create Store</Link>
               </Button>
             </div>
-          ) : allOrders.length === 0 ? (
+          ) : !allOrders || allOrders.length === 0 ? (
             <p className="text-muted-foreground">No new orders found.</p>
           ) : (
             <>
             {/* Mobile Card View */}
             <div className="md:hidden space-y-4">
                 {allOrders.map(order => (
-                    <Card key={order.id} className={!order.storeId && order.voiceMemoUrl ? 'bg-yellow-50 border-yellow-200' : ''}>
+                    <Card key={order.id}>
                         <CardHeader>
                              <div className="flex justify-between items-start">
                                 <div>
                                     <CardTitle className="text-lg">{order.customerName}</CardTitle>
                                     <p className="text-xs text-muted-foreground">ID: {order.id.substring(0,7)}...</p>
                                 </div>
-                                <Badge variant={order.voiceMemoUrl ? 'outline' : 'secondary'}>
-                                    {order.voiceMemoUrl ? 'Voice' : 'Cart'}
+                                <Badge variant={order.translatedList ? 'outline' : 'secondary'}>
+                                    {order.translatedList ? 'Voice' : 'Cart'}
                                 </Badge>
                              </div>
                         </CardHeader>
@@ -484,7 +390,7 @@ export default function OrdersDashboardPage() {
                             </div>
                              <div className="space-y-2">
                                 <label className="text-sm font-medium text-muted-foreground">Status</label>
-                                <StatusManager order={order} onStatusChange={handleStatusChange} onClaim={handleClaimOrder} myStoreId={myStore?.id} />
+                                <StatusManager order={order} onStatusChange={handleStatusChange} />
                             </div>
                             <Button variant="outline" size="sm" onClick={() => setSelectedOrder(order)} className="w-full">
                                 View Details
@@ -510,10 +416,10 @@ export default function OrdersDashboardPage() {
                 </TableHeader>
                 <TableBody>
                     {allOrders.map((order) => (
-                    <TableRow key={order.id} className={!order.storeId && order.voiceMemoUrl ? 'bg-yellow-50' : ''}>
+                    <TableRow key={order.id}>
                         <TableCell className="font-medium truncate max-w-[100px]">{order.id}</TableCell>
                         <TableCell>
-                        {order.voiceMemoUrl ? (
+                        {order.translatedList ? (
                             <Badge variant="outline">Voice</Badge>
                         ) : (
                             <Badge variant="secondary">Cart</Badge>
@@ -522,7 +428,7 @@ export default function OrdersDashboardPage() {
                         <TableCell>{order.customerName}</TableCell>
                         <TableCell>{formatDate(order.orderDate)}</TableCell>
                         <TableCell>
-                            <StatusManager order={order} onStatusChange={handleStatusChange} onClaim={handleClaimOrder} myStoreId={myStore?.id} />
+                            <StatusManager order={order} onStatusChange={handleStatusChange} />
                         </TableCell>
                         <TableCell className="text-right">₹{order.totalAmount.toFixed(2)}</TableCell>
                         <TableCell className="text-right">
