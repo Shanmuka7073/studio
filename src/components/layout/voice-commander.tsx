@@ -124,27 +124,36 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
       if (!firestore || !user) return;
         
       // 1. Handle "order [items] from [store]" command
-      if (command.startsWith('order ')) {
-        const fromIndex = command.lastIndexOf(' from ');
-        if (fromIndex > -1) {
-            const shoppingList = command.substring('order '.length, fromIndex).trim();
-            const storeName = command.substring(fromIndex + ' from '.length).trim();
+      if (command.startsWith('order ') || command.startsWith('add ')) {
+          let fromKeyword = ' from ';
+          let fromIndex = command.lastIndexOf(fromKeyword);
 
-            if (shoppingList && storeName) {
-                const targetStore = allStores.find(s => s.name.toLowerCase().includes(storeName));
+          // If " from " is not found, try " from shop "
+          if (fromIndex === -1) {
+              fromKeyword = ' from shop ';
+              fromIndex = command.lastIndexOf(fromKeyword);
+          }
+          
+          if (fromIndex > -1) {
+              const actionWord = command.startsWith('order ') ? 'order ' : 'add ';
+              const shoppingList = command.substring(actionWord.length, fromIndex).trim();
+              const storeName = command.substring(fromIndex + fromKeyword.length).trim();
 
-                if (targetStore) {
-                    toast({ title: "Processing Your Order...", description: `Ordering "${shoppingList}" from ${targetStore.name}.`});
-                    router.push(`/checkout?storeId=${targetStore.id}&list=${encodeURIComponent(shoppingList)}`);
-                    onSuggestions([]);
-                    return; // Command handled
-                } else {
-                     toast({ variant: 'destructive', title: "Store Not Found", description: `Could not find a store named "${storeName}".` });
-                     onSuggestions([]);
-                     return;
-                }
-            }
-        }
+              if (shoppingList && storeName) {
+                  const targetStore = allStores.find(s => s.name.toLowerCase().includes(storeName));
+
+                  if (targetStore) {
+                      toast({ title: "Processing Your Order...", description: `Ordering "${shoppingList}" from ${targetStore.name}.`});
+                      router.push(`/checkout?storeId=${targetStore.id}&list=${encodeURIComponent(shoppingList)}`);
+                      onSuggestions([]);
+                      return; // Command handled
+                  } else {
+                      toast({ variant: 'destructive', title: "Store Not Found", description: `Could not find a store named "${storeName}".` });
+                      onSuggestions([]);
+                      return;
+                  }
+              }
+          }
       }
 
 
