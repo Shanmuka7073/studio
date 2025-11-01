@@ -39,7 +39,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
             stores: {
                 display: 'Browse All Stores',
                 action: () => router.push('/stores'),
-                aliases: ['go to stores', 'open stores', 'show stores', 'all stores', 'stores']
+                aliases: ['go to stores', 'open stores', 'show stores', 'all stores', 'stores', 'browse stores']
             },
             orders: {
                 display: 'View My Orders',
@@ -156,7 +156,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
 
     recognition.onerror = (event) => {
       console.error('Speech recognition error', event.error);
-      if (event.error !== 'no-speech' && event.error !== 'aborted') {
+       if (event.error !== 'aborted' && event.error !== 'no-speech') {
         onStatusUpdate(`⚠️ Error: ${event.error}`);
       }
     };
