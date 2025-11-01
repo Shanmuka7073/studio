@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -120,7 +119,7 @@ function UserMenu() {
 
 export function Header() {
   const pathname = usePathname();
-  const { user } = useFirebase();
+  const { user, isUserLoading } = useFirebase();
   const isAdmin = user && user.email === ADMIN_EMAIL;
   const dashboardHref = isAdmin ? '/dashboard/admin' : '/dashboard';
   const [voiceEnabled, setVoiceEnabled] = useState(false);
@@ -268,12 +267,9 @@ export function Header() {
           <>
             <Skeleton className="h-10 w-10 rounded-md" />
             <Skeleton className="h-10 w-10 rounded-full" />
-            <Skeleton className="h-10 w-10 rounded-full" />
           </>
         )}
       </div>
     </header>
   );
 }
-
-    

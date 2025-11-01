@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 
@@ -13,10 +12,10 @@ export function VoiceCommander({ enabled }: VoiceCommanderProps) {
   const router = useRouter();
   const { toast } = useToast();
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  // This ref tracks if we INTEND for it to be listening.
-  const listeningIntentRef = useRef(false);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       if (enabled) {
@@ -36,11 +35,14 @@ export function VoiceCommander({ enabled }: VoiceCommanderProps) {
       recognition.interimResults = false;
       recognitionRef.current = recognition;
 
+      recognition.onstart = () => {
+          console.log('Voice recognition started.');
+      };
+
       recognition.onresult = (event) => {
-        const lastResultIndex = event.results.length - 1;
-        const command = event.results[lastResultIndex][0].transcript.toLowerCase().trim();
-        console.log('Heard command:', command);
-        handleCommand(command);
+        const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
+        console.log('Heard command:', transcript);
+        handleCommand(transcript);
       };
 
       recognition.onerror = (event) => {
@@ -51,11 +53,13 @@ export function VoiceCommander({ enabled }: VoiceCommanderProps) {
       };
       
       recognition.onend = () => {
-        // Only restart if we intend for it to be listening.
-        // This prevents restarting when we manually call .stop().
-        if (listeningIntentRef.current) {
-          console.log('Recognition service ended, restarting...');
-          recognition.start();
+        // Only restart if we are still in the 'enabled' state.
+        // This check is implicitly handled by the dependency array and the main `if(enabled)` block.
+        // If the 'enabled' prop becomes false, the cleanup function runs, stopping recognition.
+        // If it stops for another reason (e.g., network error), this restart logic is essential.
+        if (enabled) {
+            console.log('Recognition service ended, restarting...');
+            recognition.start();
         }
       };
     }
@@ -82,21 +86,14 @@ export function VoiceCommander({ enabled }: VoiceCommanderProps) {
     };
     
     if (enabled) {
-      listeningIntentRef.current = true;
       recognition.start();
-      console.log('Voice recognition started.');
-    } else {
-      listeningIntentRef.current = false;
-      recognition.stop();
-      console.log('Voice recognition stopped.');
     }
 
-    // Cleanup function to stop recognition when the component unmounts
+    // Cleanup function to stop recognition when the component unmounts or is disabled
     return () => {
-        listeningIntentRef.current = false;
         if(recognitionRef.current) {
             recognitionRef.current.stop();
-            console.log('Voice recognition stopped on component unmount.');
+            console.log('Voice recognition stopped.');
         }
     };
 
