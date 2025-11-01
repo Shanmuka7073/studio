@@ -150,11 +150,8 @@ service cloud.firestore {
       allow get, list: if true;
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow update: if isSignedIn() && (
-        // Allow customer to update
-        request.auth.uid == resource.data.userId ||
-        // Allow store owner to update
+        request.auth.uid == resource.data.userId || 
         get(/databases/$(database)/documents/stores/$(resource.data.storeId)).data.ownerId == request.auth.uid ||
-        // Allow assigned delivery partner to update
         (resource.data.deliveryPartnerId != null && request.auth.uid == resource.data.deliveryPartnerId)
       );
       allow delete: if false;
