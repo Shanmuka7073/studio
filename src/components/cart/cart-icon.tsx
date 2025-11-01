@@ -16,7 +16,7 @@ export function CartIcon({ open, onOpenChange }: CartIconProps) {
   const { cartCount } = useCart();
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
       <SheetTrigger asChild>
         <Button variant="outline" size="icon" className="relative">
           <ShoppingCart className="h-5 w-5" />
