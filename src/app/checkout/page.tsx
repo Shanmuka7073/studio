@@ -26,14 +26,13 @@ import { useTransition, useState, useRef, useCallback, useEffect, useMemo } from
 import { useFirebase, errorEmitter, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, addDoc, serverTimestamp, getDocs, doc } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { Mic, StopCircle, CheckCircle, MapPin, Loader2, Bot, Store as StoreIcon } from 'lucide-react';
+import { Mic, StopCircle, CheckCircle, MapPin, Loader2, Bot, Store as StoreIcon, HelpCircle } from 'lucide-react';
 import Link from 'next/link';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import type { ProductPrice, ProductVariant, Store, User as AppUser } from '@/lib/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { VoiceOrderDialog, type VoiceOrderInfo } from '@/components/voice-order-dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 
 const checkoutSchema = z.object({
@@ -143,6 +142,7 @@ export default function CheckoutPage() {
   const [structuredList, setStructuredList] = useState<StructuredListItem[]>([]);
   const [availableStores, setAvailableStores] = useState<Store[]>([]);
   const [voiceOrderInfo, setVoiceOrderInfo] = useState<VoiceOrderInfo | null>(null);
+  const [shouldPromptForLocation, setShouldPromptForLocation] = useState(false);
   
   const speechRecognitionRef = useRef<SpeechRecognition | null>(null);
 
@@ -167,15 +167,18 @@ export default function CheckoutPage() {
     },
   });
 
-   // Effect to pre-fill form with user data
+  // Effect to pre-fill form with user data and decide on location prompt
   useEffect(() => {
     if (userData) {
       form.reset({
         name: `${userData.firstName} ${userData.lastName}`,
         phone: userData.phoneNumber,
       });
+       if (!deliveryCoords) {
+        setShouldPromptForLocation(true);
+      }
     }
-  }, [userData, form]);
+  }, [userData, form, deliveryCoords]);
 
   const handleUnderstandList = useCallback(async (text: string) => {
     if (!firestore) return;
@@ -257,6 +260,7 @@ export default function CheckoutPage() {
   }, [isListening, form]);
   
   const handleGetLocation = useCallback(() => {
+        setShouldPromptForLocation(false);
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 (position) => {
@@ -286,7 +290,6 @@ export default function CheckoutPage() {
         
         recognition.onstart = () => {
             setIsListening(true);
-            form.setValue('shoppingList', "🎤 Listening...");
         };
         
         recognition.onresult = (event) => {
@@ -294,6 +297,10 @@ export default function CheckoutPage() {
 
             if (transcript.includes('place order')) {
                 placeOrderBtnRef.current?.click();
+                return;
+            }
+             if (shouldPromptForLocation && transcript === 'yes') {
+                handleGetLocation();
                 return;
             }
 
@@ -329,7 +336,7 @@ export default function CheckoutPage() {
     } else {
         toast({ variant: 'destructive', title: 'Not Supported', description: 'Voice recognition is not supported by your browser.' });
     }
-  }, [toast, form, searchParams, handleToggleListening, handleUnderstandList]);
+  }, [toast, form, searchParams, handleToggleListening, handleUnderstandList, shouldPromptForLocation, handleGetLocation]);
 
 
     const handleConfirmVoiceOrder = () => {
@@ -468,20 +475,36 @@ export default function CheckoutPage() {
                         />
                         <div className="space-y-2">
                             <FormLabel>Delivery Location</FormLabel>
-                            <FormDescription>
-                                Your precise delivery location will be based on your captured GPS coordinates.
-                            </FormDescription>
-                            <div className="flex items-center gap-4 pt-2">
-                                <Button type="button" variant="outline" onClick={handleGetLocation} className="flex-1">
-                                    <MapPin className="mr-2 h-4 w-4" /> Get Current Location
-                                </Button>
-                                {deliveryCoords && (
-                                    <div className="flex items-center text-green-600">
-                                        <CheckCircle className="mr-2 h-5 w-5" />
-                                        <span>Location captured!</span>
+                             {shouldPromptForLocation ? (
+                                <Card className="bg-muted/50 p-4 text-center">
+                                    <div className="flex items-center justify-center gap-2 mb-2">
+                                         <HelpCircle className="h-5 w-5 text-muted-foreground" />
+                                        <p className="font-semibold">Is this your delivery address?</p>
                                     </div>
-                                )}
-                            </div>
+                                    <p className="text-sm text-muted-foreground mb-4">Click to confirm and share your current location for this order.</p>
+                                    <div className="flex gap-4 justify-center">
+                                        <Button type="button" onClick={handleGetLocation}>Yes, Use Current Location</Button>
+                                        <Button type="button" variant="outline" onClick={() => setShouldPromptForLocation(false)}>No, I'll do it manually</Button>
+                                    </div>
+                                </Card>
+                            ) : (
+                                <>
+                                 <FormDescription>
+                                    Your precise delivery location will be based on your captured GPS coordinates.
+                                </FormDescription>
+                                <div className="flex items-center gap-4 pt-2">
+                                    <Button type="button" variant="outline" onClick={handleGetLocation} className="flex-1">
+                                        <MapPin className="mr-2 h-4 w-4" /> Get Current Location
+                                    </Button>
+                                    {deliveryCoords && (
+                                        <div className="flex items-center text-green-600">
+                                            <CheckCircle className="mr-2 h-5 w-5" />
+                                            <span>Location captured!</span>
+                                        </div>
+                                    )}
+                                </div>
+                                </>
+                            )}
                         </div>
                         <FormField
                             control={form.control}
@@ -654,3 +677,4 @@ export default function CheckoutPage() {
     </div>
   );
 }
+
