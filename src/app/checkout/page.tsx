@@ -165,7 +165,7 @@ export default function CheckoutPage() {
         
         recognition.onresult = (event) => {
             let interimTranscript = '';
-            // Reset the final transcript for this recognition session to avoid accumulation
+            // Hold the final transcript from this event batch
             let currentFinalTranscript = ''; 
             for (let i = event.resultIndex; i < event.results.length; ++i) {
                 if (event.results[i].isFinal) {
@@ -174,7 +174,9 @@ export default function CheckoutPage() {
                     interimTranscript += event.results[i][0].transcript;
                 }
             }
+            // Append only the newly finalized text to our ref
             finalTranscriptRef.current += currentFinalTranscript;
+            // Update the UI with the full final transcript plus the current interim part
             form.setValue('shoppingList', finalTranscriptRef.current + interimTranscript);
         };
 
@@ -200,9 +202,8 @@ export default function CheckoutPage() {
     if (isListening) {
         speechRecognitionRef.current?.stop();
     } else {
-        // Don't clear the transcript, allow appending
-        // finalTranscriptRef.current = ''; 
-        // form.setValue('shoppingList', '');
+        // If there's already text, don't clear it. Just start listening.
+        // If it's a fresh start, the ref is already empty.
         setStructuredList([]);
         speechRecognitionRef.current?.start();
     }
