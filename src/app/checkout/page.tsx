@@ -309,11 +309,11 @@ export default function CheckoutPage() {
             const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
 
             if (isLocationPromptOpen) {
-                if (transcript.includes('yes')) {
+                 if (transcript.includes('yes')) {
                     handleLocationConfirm();
                     return;
                 }
-                if (transcript.includes('no')) {
+                 if (transcript.includes('no')) {
                     handleLocationCancel();
                     return;
                 }
