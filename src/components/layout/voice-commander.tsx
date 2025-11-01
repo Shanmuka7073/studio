@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { useFirebase, addDocumentNonBlocking } from '@/firebase';
+import { useFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { getStores, getMasterProducts } from '@/lib/data';
 import type { Store, Product } from '@/lib/types';
 import { calculateSimilarity } from '@/lib/calculate-similarity';
@@ -38,15 +38,16 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
     if (firestore && user) {
         
       const commandMap: { [key: string]: { display: string, action: () => void, aliases: string[] } } = {
-        home: { display: 'Navigate to Home', action: () => router.push('/'), aliases: ['go home', 'open home', 'back to home', 'show home', 'main page', 'home screen', 'home', 'localbasket', 'local basket'] },
-        stores: { display: 'Browse All Stores', action: () => router.push('/stores'), aliases: ['go to stores', 'open stores', 'show all stores', 'all stores', 'stores', 'browse stores'] },
-        orders: { display: 'View My Orders', action: () => router.push('/dashboard/customer/my-orders'), aliases: ['my orders', 'go to my orders', 'open my orders', 'show my orders', 'orders'] },
-        cart: { display: 'View Your Cart', action: () => router.push('/cart'), aliases: ['go to cart', 'open cart', 'show cart', 'my cart', 'cart'] },
-        dashboard: { display: 'View Dashboard', action: () => router.push('/dashboard'), aliases: ['go to dashboard', 'open dashboard', 'dashboard'] },
-        deliveries: { display: 'View Deliveries', action: () => router.push('/dashboard/delivery/deliveries'), aliases: ['deliveries', 'my deliveries', 'go to deliveries', 'open deliveries', 'delivery dashboard'] },
-        createStore: { display: 'Create or Manage My Store', action: () => router.push('/dashboard/owner/my-store'), aliases: ['create my store', 'my store', 'manage my store', 'new store', 'register my store', 'make a store'] },
-        voiceOrder: { display: 'Create a Shopping List', action: () => router.push('/checkout?action=record'), aliases: ['create a shopping list', 'voice order', 'record my list', 'new shopping list'] },
-        refresh: { display: 'Refresh the page', action: () => window.location.reload(), aliases: ['refresh the page', 'refresh', 'reload the page', 'reload page'] },
+        home: { display: 'Navigate to Home', action: () => router.push('/'), aliases: ['go home', 'home page', 'main screen', 'go to home', 'back to start', 'open homepage', 'return home', 'show home', 'open home', 'localbasket', 'local basket'] },
+        stores: { display: 'Browse All Stores', action: () => router.push('/stores'), aliases: ['go to stores', 'browse stores', 'show all stores', 'open store list', 'find stores', 'explore shops', 'nearby shops', 'shop list', 'view all shops'] },
+        dashboard: { display: 'View Dashboard', action: () => router.push('/dashboard'), aliases: ['go to dashboard', 'open dashboard', 'my dashboard', 'show my stats', 'open my panel', 'go to control panel', 'view dashboard'] },
+        cart: { display: 'View Your Cart', action: () => router.push('/cart'), aliases: ['go to cart', 'open cart', 'show cart', 'view my cart', 'see my basket', 'go to basket', 'open shopping cart', 'my items'] },
+        orders: { display: 'View My Orders', action: () => router.push('/dashboard/customer/my-orders'), aliases: ['my orders', 'go to my orders', 'open my orders', 'show my orders', 'view orders', 'check my orders', 'open order history', 'see past orders', 'my purchases'] },
+        deliveries: { display: 'View Deliveries', action: () => router.push('/dashboard/delivery/deliveries'), aliases: ['deliveries', 'my deliveries', 'go to deliveries', 'open deliveries', 'track deliveries', 'check delivery status', 'see my delivery list', 'delivery updates', 'delivery dashboard'] },
+        myStore: { display: 'Create or Manage My Store', action: () => router.push('/dashboard/owner/my-store'), aliases: ['create my store', 'my store', 'manage my store', 'new store', 'register my store', 'make a store', 'open my shop', 'go to seller page', 'view my products', 'store dashboard', 'my store page'] },
+        voiceOrder: { display: 'Create a Shopping List', action: () => router.push('/checkout?action=record'), aliases: ['create a shopping list', 'voice order', 'record my list', 'new shopping list', 'make a list', 'start my list', 'prepare my list', 'record my order', 'start voice order', 'start list', 'I want to shop', 'start recording', 'take my order', 'start voice shopping', 'record voice list', "I'll say my list", 'speak my order', 'take my list', 'listen to my order', 'record shopping items', 'note down my list'] },
+        refresh: { display: 'Refresh the page', action: () => window.location.reload(), aliases: ['refresh the page', 'reload page', 'reload app', 'refresh screen', 'restart page', 'update screen', 'refresh everything', 'refresh'] },
+        showMyProducts: { display: "Show My Store's Products", action: () => router.push('/dashboard/owner/my-store'), aliases: ["show my products", "list my items", "open inventory", "what am I selling", "see store items", "view my listings"] },
       };
 
       const staticNavCommands: Command[] = Object.values(commandMap).flatMap(
@@ -78,6 +79,10 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
               coreName,
               `go to ${store.name.toLowerCase()}`,
               `open ${store.name.toLowerCase()}`,
+              `visit ${store.name.toLowerCase()}`,
+              `show ${store.name.toLowerCase()}`,
+              `go inside ${store.name.toLowerCase()}`,
+              `open shop ${store.name.toLowerCase()}`,
               `go to ${coreName}`,
               `open ${coreName}`,
             ];
@@ -123,20 +128,24 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
     const handleCommand = (command: string) => {
       if (!firestore || !user) return;
         
-      // 1. Handle "order [items] from [store]" command
-      if (command.startsWith('order ') || command.startsWith('add ')) {
+      const orderTriggers = ['order ', 'add ', 'buy ', 'get ', 'shop ', 'purchase ', 'i want '];
+      const orderTriggerFound = orderTriggers.find(t => command.startsWith(t));
+      
+      if (orderTriggerFound) {
           let fromKeyword = ' from ';
           let fromIndex = command.lastIndexOf(fromKeyword);
 
-          // If " from " is not found, try " from shop "
           if (fromIndex === -1) {
               fromKeyword = ' from shop ';
               fromIndex = command.lastIndexOf(fromKeyword);
           }
+          if (fromIndex === -1) {
+            fromKeyword = ' at ';
+            fromIndex = command.lastIndexOf(fromKeyword);
+          }
           
           if (fromIndex > -1) {
-              const actionWord = command.startsWith('order ') ? 'order ' : 'add ';
-              const shoppingList = command.substring(actionWord.length, fromIndex).trim();
+              const shoppingList = command.substring(orderTriggerFound.length, fromIndex).trim();
               const storeName = command.substring(fromIndex + fromKeyword.length).trim();
 
               if (shoppingList && storeName) {
@@ -156,10 +165,15 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
           }
       }
 
+      const addProductTriggers = ['add product ', 'add new product ', 'list ', 'upload ', 'put ', 'new item ', 'post '];
+      const sellProductTriggers = ['sell ', 'start selling ', 'mark ', 'put on shelf ', 'list for buyers ', 'make available ', 'enable ', 'stock '];
+      
+      const addTriggerFound = addProductTriggers.find(t => command.startsWith(t));
+      const sellTriggerFound = sellProductTriggers.find(t => command.startsWith(t));
 
-      // 2. Check for "add product" command for store owners
-      if ((command.startsWith('add') || command.startsWith('sell')) && myStore) {
-          const productName = command.replace(/add|sell|to my store/g, '').trim();
+      if ((addTriggerFound || sellTriggerFound) && myStore) {
+          const trigger = addTriggerFound || sellTriggerFound;
+          const productName = command.substring(trigger!.length).replace(/to my store|for sale|in my store/g, '').trim();
           const productMatch = masterProductList.find(p => p.name.toLowerCase() === productName);
 
           if (productMatch) {
@@ -175,8 +189,21 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
               return; // Command handled
           }
       }
+      
+      const removeProductTriggers = ['remove ', 'delete ', 'stop selling ', 'hide '];
+      const removeTriggerFound = removeProductTriggers.find(t => command.startsWith(t));
+      
+      if (removeTriggerFound && myStore) {
+          const productName = command.substring(removeTriggerFound.length).replace(/from my store|product/g, '').trim();
+          // This part requires fetching the product from the user's store to get its ID.
+          // For now, we'll just acknowledge the command.
+          toast({ title: "Command Acknowledged", description: `Logic to remove "${productName}" from your store is not yet implemented.` });
+          onSuggestions([]);
+          return;
+      }
 
-      // 3. Check for perfect match on other commands
+
+      // Check for perfect match on other commands
       const perfectMatch = allCommands.find((c) => command === c.command);
       if (perfectMatch) {
         perfectMatch.action();
@@ -185,7 +212,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
         return;
       }
       
-      // 4. NEW: Check for match ignoring spaces
+      // Check for match ignoring spaces
       const sanitizedCommand = command.replace(/\s/g, '');
       const spaceInsensitiveMatch = allCommands.find(c => c.command.replace(/\s/g, '') === sanitizedCommand);
       if(spaceInsensitiveMatch) {
@@ -196,7 +223,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
       }
 
 
-      // 5. Check for close matches if no perfect match found
+      // Check for close matches if no perfect match found
       const potentialMatches = allCommands
         .map((c) => ({
           ...c,
@@ -269,3 +296,5 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
 
   return null;
 }
+
+    
