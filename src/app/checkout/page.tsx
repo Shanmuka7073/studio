@@ -148,7 +148,6 @@ export default function CheckoutPage() {
 
   const [deliveryCoords, setDeliveryCoords] = useState<{lat: number, lng: number} | null>(null);
   const [images, setImages] = useState({});
-  const [isLocationPromptOpen, setIsLocationPromptOpen] = useState(false);
   const placeOrderBtnRef = useRef<HTMLButtonElement>(null);
 
 
@@ -276,19 +275,6 @@ export default function CheckoutPage() {
         }
     }, [toast]);
 
-    const handleLocationConfirm = useCallback(() => {
-        setIsLocationPromptOpen(false);
-        handleGetLocation();
-    }, [handleGetLocation]);
-
-    const handleLocationCancel = useCallback(() => {
-        setIsLocationPromptOpen(false);
-        toast({
-            title: "Location Skipped",
-            description: "Please capture your location manually to proceed.",
-        });
-    }, [toast]);
-
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
@@ -300,24 +286,11 @@ export default function CheckoutPage() {
         
         recognition.onstart = () => {
             setIsListening(true);
-            if (!isLocationPromptOpen) {
-                form.setValue('shoppingList', "🎤 Listening...");
-            }
+            form.setValue('shoppingList', "🎤 Listening...");
         };
         
         recognition.onresult = (event) => {
             const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
-
-            if (isLocationPromptOpen) {
-                 if (transcript.includes('yes')) {
-                    handleLocationConfirm();
-                    return;
-                }
-                 if (transcript.includes('no')) {
-                    handleLocationCancel();
-                    return;
-                }
-            }
 
             if (transcript.includes('place order')) {
                 placeOrderBtnRef.current?.click();
@@ -344,8 +317,6 @@ export default function CheckoutPage() {
         const timeoutId = setTimeout(() => {
             if (autoStart) {
                 handleToggleListening();
-            } else {
-                setIsLocationPromptOpen(true);
             }
         }, 1000);
 
@@ -358,7 +329,7 @@ export default function CheckoutPage() {
     } else {
         toast({ variant: 'destructive', title: 'Not Supported', description: 'Voice recognition is not supported by your browser.' });
     }
-  }, [toast, form, searchParams, handleToggleListening, handleUnderstandList, isLocationPromptOpen, handleLocationConfirm, handleLocationCancel]);
+  }, [toast, form, searchParams, handleToggleListening, handleUnderstandList]);
 
 
     const handleConfirmVoiceOrder = () => {
@@ -473,20 +444,6 @@ export default function CheckoutPage() {
                 orderInfo={voiceOrderInfo}
             />
         )}
-        <AlertDialog open={isLocationPromptOpen} onOpenChange={setIsLocationPromptOpen}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Share Location for Delivery?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        To complete your order, we need your current location for delivery. Say "Yes" to share or "No" to cancel.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel onClick={handleLocationCancel}>Manual Entry</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleLocationConfirm}>Yes, Share Location</AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
 
         <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid md:grid-cols-2 gap-12">
@@ -697,5 +654,3 @@ export default function CheckoutPage() {
     </div>
   );
 }
-
-    
