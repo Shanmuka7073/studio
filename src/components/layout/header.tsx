@@ -29,6 +29,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useState, useEffect } from 'react';
 import { VoiceCommander, type Command } from './voice-commander';
 import { useToast } from '@/hooks/use-toast';
+import { VoiceOrderDialog, type VoiceOrderInfo } from '@/components/voice-order-dialog';
 
 
 const ADMIN_EMAIL = 'admin@gmail.com';
@@ -129,6 +130,8 @@ export function Header() {
   const { toast } = useToast();
   const [voiceStatus, setVoiceStatus] = useState('Click the mic to start listening.');
   const [suggestedCommands, setSuggestedCommands] = useState<Command[]>([]);
+  const [voiceOrderInfo, setVoiceOrderInfo] = useState<VoiceOrderInfo | null>(null);
+
 
   useEffect(() => {
     setHasMounted(true);
@@ -156,8 +159,16 @@ export function Header() {
       <VoiceCommander 
         enabled={voiceEnabled} 
         onStatusUpdate={setVoiceStatus}
-        onSuggestions={setSuggestedCommands} 
+        onSuggestions={setSuggestedCommands}
+        onVoiceOrder={setVoiceOrderInfo}
       />
+       {voiceOrderInfo && (
+        <VoiceOrderDialog
+          isOpen={!!voiceOrderInfo}
+          onClose={() => setVoiceOrderInfo(null)}
+          orderInfo={voiceOrderInfo}
+        />
+      )}
       <nav className="hidden flex-col gap-6 text-lg font-medium md:flex md:flex-row md:items-center md:gap-5 md:text-sm lg:gap-6">
         <Link
           href="/"

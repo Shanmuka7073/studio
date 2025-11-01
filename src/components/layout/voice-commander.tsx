@@ -9,6 +9,7 @@ import { getStores, getMasterProducts } from '@/lib/data';
 import type { Store, Product } from '@/lib/types';
 import { calculateSimilarity } from '@/lib/calculate-similarity';
 import { collection, query, where, getDocs } from 'firebase/firestore';
+import { VoiceOrderInfo } from '@/components/voice-order-dialog';
 
 export interface Command {
   command: string;
@@ -20,9 +21,10 @@ interface VoiceCommanderProps {
   enabled: boolean;
   onStatusUpdate: (status: string) => void;
   onSuggestions: (suggestions: Command[]) => void;
+  onVoiceOrder: (orderInfo: VoiceOrderInfo) => void;
 }
 
-export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: VoiceCommanderProps) {
+export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoiceOrder }: VoiceCommanderProps) {
   const router = useRouter();
   const { toast } = useToast();
   const { firestore, user } = useFirebase();
@@ -45,7 +47,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
         orders: { display: 'View My Orders', action: () => router.push('/dashboard/customer/my-orders'), aliases: ['my orders', 'go to my orders', 'open my orders', 'show my orders', 'view orders', 'check my orders', 'open order history', 'see past orders', 'my purchases'] },
         deliveries: { display: 'View Deliveries', action: () => router.push('/dashboard/delivery/deliveries'), aliases: ['deliveries', 'my deliveries', 'go to deliveries', 'open deliveries', 'track deliveries', 'check delivery status', 'see my delivery list', 'delivery updates', 'delivery dashboard'] },
         myStore: { display: 'Create or Manage My Store', action: () => router.push('/dashboard/owner/my-store'), aliases: ['create my store', 'my store', 'manage my store', 'new store', 'register my store', 'make a store', 'open my shop', 'go to seller page', 'view my products', 'store dashboard', 'my store page'] },
-        voiceOrder: { display: 'Create a Shopping List', action: () => router.push('/checkout?action=record'), aliases: ['create a shopping list', 'voice order', 'record my list', 'new shopping list', 'make a list', 'start my list', 'prepare my list', 'record my order', 'start voice order', 'start list', 'I want to shop', 'start recording', 'take my order', 'start voice shopping', 'record voice list', "I'll say my list", 'speak my order', 'take my list', 'listen to my order', 'record shopping items', 'note down my list'] },
+        voiceOrder: { display: 'Create a Shopping List', action: () => router.push('/checkout?action=record'), aliases: ['create a shopping list', 'make a list', 'new shopping list', 'start my list', 'prepare my list', 'record my order', 'start voice order', 'start list', 'I want to shop', 'start recording', 'take my order', 'start voice shopping', 'record voice list', 'I\'ll say my list', 'speak my order', 'take my list', 'listen to my order', 'record shopping items', 'note down my list'] },
         refresh: { display: 'Refresh the page', action: () => window.location.reload(), aliases: ['refresh the page', 'reload page', 'reload app', 'refresh screen', 'restart page', 'update screen', 'refresh everything', 'refresh'] },
         showMyProducts: { display: "Show My Store's Products", action: () => router.push('/dashboard/owner/my-store'), aliases: ["show my products", "list my items", "open inventory", "what am I selling", "see store items", "view my listings"] },
       };
@@ -132,11 +134,11 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
       const orderTriggerFound = orderTriggers.find(t => command.startsWith(t));
       
       if (orderTriggerFound) {
-          let fromKeyword = ' from ';
+          let fromKeyword = ' from shop ';
           let fromIndex = command.lastIndexOf(fromKeyword);
 
           if (fromIndex === -1) {
-              fromKeyword = ' from shop ';
+              fromKeyword = ' from ';
               fromIndex = command.lastIndexOf(fromKeyword);
           }
           if (fromIndex === -1) {
@@ -153,7 +155,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
 
                   if (targetStore) {
                       toast({ title: "Processing Your Order...", description: `Ordering "${shoppingList}" from ${targetStore.name}.`});
-                      router.push(`/checkout?storeId=${targetStore.id}&list=${encodeURIComponent(shoppingList)}`);
+                      onVoiceOrder({ shoppingList, storeId: targetStore.id });
                       onSuggestions([]);
                       return; // Command handled
                   } else {
@@ -292,9 +294,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
       recognition.stop();
       recognition.onend = null; // Prevent restart on component unmount
     };
-  }, [enabled, toast, onStatusUpdate, allCommands, onSuggestions, firestore, user, myStore, masterProductList, router, allStores]);
+  }, [enabled, toast, onStatusUpdate, allCommands, onSuggestions, firestore, user, myStore, masterProductList, router, allStores, onVoiceOrder]);
 
   return null;
 }
-
-    

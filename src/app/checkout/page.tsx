@@ -193,17 +193,6 @@ export default function CheckoutPage() {
       try {
         const stores = await getStores(firestore);
         setAvailableStores(stores);
-
-         // Handle direct order from voice command
-        const storeIdParam = searchParams.get('storeId');
-        const listParam = searchParams.get('list');
-
-        if (storeIdParam && listParam) {
-            form.setValue('storeId', storeIdParam);
-            form.setValue('shoppingList', listParam);
-            handleUnderstandList(listParam);
-        }
-
       } catch (err) {
         console.error(err);
         toast({
@@ -214,7 +203,7 @@ export default function CheckoutPage() {
       }
     }
     fetchStores();
-  }, [firestore, toast, searchParams, form, handleUnderstandList]);
+  }, [firestore, toast]);
 
   useEffect(() => {
     const fetchImages = async () => {
