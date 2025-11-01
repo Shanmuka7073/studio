@@ -196,7 +196,7 @@ export default function CheckoutPage() {
         
         recognition.onresult = (event) => {
             let interimTranscript = '';
-            let finalTranscript = finalTranscriptRef.current;
+            let finalTranscript = '';
 
             for (let i = event.resultIndex; i < event.results.length; ++i) {
                 if (event.results[i].isFinal) {
@@ -206,7 +206,7 @@ export default function CheckoutPage() {
                 }
             }
             finalTranscriptRef.current = finalTranscript;
-            form.setValue('shoppingList', finalTranscript + interimTranscript);
+            form.setValue('shoppingList', finalTranscriptRef.current + interimTranscript);
         };
 
         recognition.onerror = (event) => {
