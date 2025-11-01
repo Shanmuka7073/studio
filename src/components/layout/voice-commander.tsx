@@ -26,6 +26,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
   const router = useRouter();
   const { toast } = useToast();
   const { firestore, user } = useFirebase();
+  const [allStores, setAllStores] = useState<Store[]>([]);
   const [allCommands, setAllCommands] = useState<Command[]>([]);
   const [masterProductList, setMasterProductList] = useState<Product[]>([]);
   const [myStore, setMyStore] = useState<Store | null>(null);
@@ -58,6 +59,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
           getMasterProducts(firestore),
           getDocs(query(collection(firestore, 'stores'), where('ownerId', '==', user.uid)))
       ]).then(([stores, masterProducts, myStoreSnapshot]) => {
+          setAllStores(stores);
           
           if (!myStoreSnapshot.empty) {
               setMyStore({ id: myStoreSnapshot.docs[0].id, ...myStoreSnapshot.docs[0].data() } as Store);
@@ -120,7 +122,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
     const handleCommand = (command: string) => {
       if (!firestore || !user) return;
 
-      // 1. Check for "add product" command
+      // 1. Check for "add product" command for store owners
       if ((command.startsWith('add') || command.startsWith('sell')) && myStore) {
           const productName = command.replace(/add|sell|to my store/g, '').trim();
           const productMatch = masterProductList.find(p => p.name.toLowerCase() === productName);
@@ -139,8 +141,27 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
           }
       }
 
+      // 2. Check for "order ... from ..." command
+      if (command.startsWith('order ')) {
+        const fromMatch = command.match(/ from (.+)/);
+        if (fromMatch && fromMatch[1]) {
+            const storeName = fromMatch[1].trim();
+            const shoppingList = command.substring('order '.length, fromMatch.index).trim();
+            
+            // Find the store
+            const targetStore = allStores.find(s => s.name.toLowerCase().includes(storeName));
 
-      // 2. Check for perfect match on other commands
+            if (targetStore && shoppingList) {
+                toast({ title: "Processing Your Order...", description: `Ordering "${shoppingList}" from ${targetStore.name}.`});
+                router.push(`/checkout?storeId=${targetStore.id}&list=${encodeURIComponent(shoppingList)}`);
+                onSuggestions([]);
+                return; // Command handled
+            }
+        }
+      }
+
+
+      // 3. Check for perfect match on other commands
       const perfectMatch = allCommands.find((c) => command === c.command);
       if (perfectMatch) {
         perfectMatch.action();
@@ -149,7 +170,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
         return;
       }
 
-      // 3. Check for close matches if no perfect match found
+      // 4. Check for close matches if no perfect match found
       const potentialMatches = allCommands
         .map((c) => ({
           ...c,
@@ -218,7 +239,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
       recognition.stop();
       recognition.onend = null; // Prevent restart on component unmount
     };
-  }, [enabled, toast, onStatusUpdate, allCommands, onSuggestions, firestore, user, myStore, masterProductList, router]);
+  }, [enabled, toast, onStatusUpdate, allCommands, onSuggestions, firestore, user, myStore, masterProductList, router, allStores]);
 
   return null;
 }

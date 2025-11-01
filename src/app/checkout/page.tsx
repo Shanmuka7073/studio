@@ -155,42 +155,7 @@ export default function CheckoutPage() {
     },
   });
 
-  useEffect(() => {
-    async function fetchStores() {
-      if (!firestore) return;
-      try {
-        const stores = await getStores(firestore);
-        setAvailableStores(stores);
-      } catch (err) {
-        console.error(err);
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'Could not fetch available stores.',
-        });
-      }
-    }
-    fetchStores();
-  }, [firestore, toast]);
-
-  useEffect(() => {
-    const fetchImages = async () => {
-        if (cartItems.length === 0) return;
-        const imagePromises = cartItems.map(item => getProductImage(item.product.imageId));
-        const resolvedImages = await Promise.all(imagePromises);
-        const imageMap = cartItems.reduce((acc, item, index) => {
-            acc[item.variant.sku] = resolvedImages[index];
-            return acc;
-        }, {});
-        setImages(imageMap);
-    };
-
-    if (cartItems.length > 0) {
-        fetchImages();
-    }
-  }, [cartItems]);
-
-  const handleUnderstandList = async (text: string) => {
+  const handleUnderstandList = useCallback(async (text: string) => {
     if (!firestore) return;
     const transcribedText = text || form.getValues('shoppingList');
     if (!transcribedText) {
@@ -219,8 +184,53 @@ export default function CheckoutPage() {
     } finally {
         setIsProcessing(false);
     }
-  };
+  }, [firestore, form, toast]);
 
+  useEffect(() => {
+    async function fetchStores() {
+      if (!firestore) return;
+      try {
+        const stores = await getStores(firestore);
+        setAvailableStores(stores);
+
+         // Handle direct order from voice command
+        const storeIdParam = searchParams.get('storeId');
+        const listParam = searchParams.get('list');
+
+        if (storeIdParam && listParam) {
+            form.setValue('storeId', storeIdParam);
+            form.setValue('shoppingList', listParam);
+            handleUnderstandList(listParam);
+        }
+
+      } catch (err) {
+        console.error(err);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Could not fetch available stores.',
+        });
+      }
+    }
+    fetchStores();
+  }, [firestore, toast, searchParams, form, handleUnderstandList]);
+
+  useEffect(() => {
+    const fetchImages = async () => {
+        if (cartItems.length === 0) return;
+        const imagePromises = cartItems.map(item => getProductImage(item.product.imageId));
+        const resolvedImages = await Promise.all(imagePromises);
+        const imageMap = cartItems.reduce((acc, item, index) => {
+            acc[item.variant.sku] = resolvedImages[index];
+            return acc;
+        }, {});
+        setImages(imageMap);
+    };
+
+    if (cartItems.length > 0) {
+        fetchImages();
+    }
+  }, [cartItems]);
 
   const handleToggleListening = useCallback(() => {
     if (!speechRecognitionRef.current) return;
@@ -283,7 +293,7 @@ export default function CheckoutPage() {
         speechRecognitionRef.current.abort();
       }
     }
-  }, [toast, form, searchParams, handleToggleListening]);
+  }, [toast, form, searchParams, handleToggleListening, handleUnderstandList]);
 
 
    const handleGetLocation = () => {
@@ -616,5 +626,3 @@ export default function CheckoutPage() {
     </div>
   );
 }
-
-    
