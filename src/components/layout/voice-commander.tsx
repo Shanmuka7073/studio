@@ -38,79 +38,77 @@ export function VoiceCommander({ enabled, onStatusUpdate }: VoiceCommanderProps)
     }
 
     if (!recognitionRef.current) {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.lang = 'en-IN';
-      recognition.interimResults = false;
-      recognitionRef.current = recognition;
-
-      recognition.onstart = () => {
-        onStatusUpdate('🎧 Listening...');
-      };
-
-      recognition.onresult = (event) => {
-        const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
-        onStatusUpdate(`Heard: "${transcript}"`);
-        handleCommand(transcript);
-      };
-
-      recognition.onerror = (event) => {
-        console.error('Speech recognition error', event.error);
-        if (event.error !== 'no-speech' && event.error !== 'aborted') {
-          onStatusUpdate(`⚠️ Error: ${event.error}`);
-        }
-      };
-      
-      recognition.onend = () => {
-        if (enabled && recognitionRef.current) {
-            try {
-                recognitionRef.current.start();
-            } catch(e) {
-                console.error("Could not restart recognition service: ", e);
-            }
-        } else {
-            onStatusUpdate('Click the mic to start listening.');
-        }
-      };
+      recognitionRef.current = new SpeechRecognition();
     }
     
     const recognition = recognitionRef.current;
+    recognition.continuous = true;
+    recognition.lang = 'en-IN';
+    recognition.interimResults = false;
 
     const handleCommand = (command: string) => {
-      const showToast = (title: string, description?: string) => {
-        toast({
-            title: title,
-            description: description || `Heard: "${command}"`
-        });
-      }
-
-      // Dynamic store navigation
+      // 1. Check for dynamic store navigation first
       const matchedStore = stores.find(store => command.includes(store.name.toLowerCase()));
       if (matchedStore) {
         router.push(`/stores/${matchedStore.id}`);
-        showToast(`Navigating to ${matchedStore.name}`);
-        return;
+        toast({
+          title: `Navigating to ${matchedStore.name}`,
+          description: `Heard: "${command}"`
+        });
+        return; // IMPORTANT: Stop processing after a match is found
       }
 
-      // Static navigation as a fallback
+      // 2. Check for static navigation commands if no store was found
       if (command.includes('go to home')) {
         router.push('/');
-        showToast('Navigating to Home');
+        toast({ title: 'Navigating to Home', description: `Heard: "${command}"` });
       } else if (command.includes('go to stores')) {
         router.push('/stores');
-        showToast('Navigating to Stores');
+        toast({ title: 'Navigating to Stores', description: `Heard: "${command}"` });
       } else if (command.includes('go to my orders')) {
         router.push('/dashboard/customer/my-orders');
-        showToast('Navigating to My Orders');
+        toast({ title: 'Navigating to My Orders', description: `Heard: "${command}"` });
       } else if (command.includes('go to cart')) {
         router.push('/cart');
-        showToast('Navigating to Cart');
+        toast({ title: 'Navigating to Cart', description: `Heard: "${command}"` });
       } else if (command.includes('go to dashboard')) {
         router.push('/dashboard');
-        showToast('Navigating to Dashboard');
+        toast({ title: 'Navigating to Dashboard', description: `Heard: "${command}"` });
       }
     };
     
+    recognition.onstart = () => {
+      onStatusUpdate('🎧 Listening...');
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
+      onStatusUpdate(`Heard: "${transcript}"`);
+      handleCommand(transcript);
+    };
+
+    recognition.onerror = (event) => {
+      console.error('Speech recognition error', event.error);
+      if (event.error !== 'no-speech' && event.error !== 'aborted') {
+        onStatusUpdate(`⚠️ Error: ${event.error}`);
+      }
+    };
+    
+    recognition.onend = () => {
+      // Only restart if the service is supposed to be enabled.
+      // This prevents restarting when we manually call .stop()
+      if (enabled) {
+          try {
+            recognition.start();
+          } catch(e) {
+            console.error("Could not restart recognition service: ", e);
+            onStatusUpdate('⚠️ Mic error, please toggle off and on.');
+          }
+      } else {
+        onStatusUpdate('Click the mic to start listening.');
+      }
+    };
+
     if (enabled) {
       try {
         recognition.start();
@@ -118,17 +116,16 @@ export function VoiceCommander({ enabled, onStatusUpdate }: VoiceCommanderProps)
         console.log("Could not start recognition, it may already be running.");
       }
     } else {
-        if (recognitionRef.current) {
-            recognitionRef.current.onend = null; // Prevent restart on manual stop
-            recognitionRef.current.stop();
-        }
+      // When disabled, stop recognition and nullify the onend handler
+      // to prevent it from restarting.
+      recognition.onend = null; 
+      recognition.stop();
     }
 
+    // Cleanup function to stop recognition when the component unmounts or `enabled` changes to false
     return () => {
-        if(recognitionRef.current) {
-            recognitionRef.current.onend = null; // Prevent restart on cleanup
-            recognitionRef.current.stop();
-        }
+      recognition.onend = null;
+      recognition.stop();
     };
 
   }, [enabled, router, toast, onStatusUpdate, stores]);
