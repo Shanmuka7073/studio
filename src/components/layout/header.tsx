@@ -263,7 +263,7 @@ export function Header() {
             <span className="sr-only">{voiceEnabled ? 'Stop voice commands' : 'Start voice commands'}</span>
           </Button>
         )}
-        <CartIcon />
+        {isClient && <CartIcon />}
         <UserMenu />
       </div>
     </header>
