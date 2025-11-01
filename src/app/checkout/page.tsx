@@ -384,7 +384,7 @@ export default function CheckoutPage() {
             }));
         }
 
-        const colRef = collection(firestore, isVoiceOrder ? 'voice-orders' : 'orders');
+        const colRef = collection(firestore, 'orders');
         addDoc(colRef, orderData).then(() => {
             clearCart();
             setStructuredList([]);
