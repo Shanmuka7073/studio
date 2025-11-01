@@ -60,6 +60,11 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
           display: 'View Deliveries',
           action: () => router.push('/dashboard/delivery/deliveries'),
           aliases: ['deliveries', 'my deliveries', 'go to deliveries', 'open deliveries', 'delivery dashboard']
+        },
+        createStore: {
+          display: 'Create or Manage My Store',
+          action: () => router.push('/dashboard/owner/my-store'),
+          aliases: ['create my store', 'my store', 'manage my store', 'new store', 'register my store']
         }
       };
 
@@ -71,22 +76,20 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
       getStores(firestore)
         .then((stores) => {
           const storeCommands: Command[] = stores.flatMap((store) => {
-            // "Chandra Shop" -> "chandra"
             const coreName = store.name
               .toLowerCase()
               .replace(/shop|store|kirana/g, '')
               .trim();
 
             const variations: string[] = [
-              store.name.toLowerCase(), // "chandra shop"
-              coreName, // "chandra"
-              `go to ${store.name.toLowerCase()}`, // "go to chandra shop"
-              `open ${store.name.toLowerCase()}`, // "open chandra shop"
-              `go to ${coreName}`, // "go to chandra"
-              `open ${coreName}`, // "open chandra"
+              store.name.toLowerCase(),
+              coreName,
+              `go to ${store.name.toLowerCase()}`,
+              `open ${store.name.toLowerCase()}`,
+              `go to ${coreName}`,
+              `open ${coreName}`,
             ];
             
-            // Deduplicate variations
             const uniqueVariations = [...new Set(variations)];
 
             return uniqueVariations.map((variation) => ({
@@ -141,9 +144,8 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
           ...c,
           similarity: calculateSimilarity(command, c.command),
         }))
-        .filter((c) => c.similarity > 0.6) // Use a slightly higher threshold for suggestions
+        .filter((c) => c.similarity > 0.6)
         .sort((a, b) => b.similarity - a.similarity)
-        // Deduplicate suggestions based on the action they perform
         .filter(
           (value, index, self) =>
             self.findIndex((v) => v.action.toString() === value.action.toString()) ===
