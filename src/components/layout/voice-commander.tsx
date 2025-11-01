@@ -46,6 +46,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
         deliveries: { display: 'View Deliveries', action: () => router.push('/dashboard/delivery/deliveries'), aliases: ['deliveries', 'my deliveries', 'go to deliveries', 'open deliveries', 'delivery dashboard'] },
         createStore: { display: 'Create or Manage My Store', action: () => router.push('/dashboard/owner/my-store'), aliases: ['create my store', 'my store', 'manage my store', 'new store', 'register my store', 'make a store'] },
         voiceOrder: { display: 'Create a Shopping List', action: () => router.push('/checkout?action=record'), aliases: ['create a shopping list', 'voice order', 'record my list', 'new shopping list'] },
+        refresh: { display: 'Refresh the page', action: () => window.location.reload(), aliases: ['refresh the page', 'refresh', 'reload the page', 'reload page'] },
       };
 
       const staticNavCommands: Command[] = Object.values(commandMap).flatMap(
