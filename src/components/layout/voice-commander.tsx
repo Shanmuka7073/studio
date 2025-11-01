@@ -62,8 +62,7 @@ export function VoiceCommander({ enabled, onStatusUpdate }: VoiceCommanderProps)
       };
       
       recognition.onend = () => {
-        if (enabled && recognitionRef.current) { // Check ref exists
-            console.log('Recognition service ended, restarting...');
+        if (enabled && recognitionRef.current) {
             try {
                 recognitionRef.current.start();
             } catch(e) {
@@ -116,11 +115,13 @@ export function VoiceCommander({ enabled, onStatusUpdate }: VoiceCommanderProps)
       try {
         recognition.start();
       } catch(e) {
-        // This can happen if it's already running, which is fine.
         console.log("Could not start recognition, it may already be running.");
       }
     } else {
-        recognition.stop();
+        if (recognitionRef.current) {
+            recognitionRef.current.onend = null; // Prevent restart on manual stop
+            recognitionRef.current.stop();
+        }
     }
 
     return () => {
