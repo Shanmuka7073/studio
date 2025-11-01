@@ -125,12 +125,6 @@ export function Header() {
   const dashboardHref = isAdmin ? '/dashboard/admin' : '/dashboard';
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const { toast } = useToast();
-  const [isClient, setIsClient] = useState(false);
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-
 
   const handleToggleVoice = () => {
     // Only allow listening for logged-in users
@@ -147,7 +141,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 flex h-16 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:px-6">
-      {isClient && <VoiceCommander enabled={voiceEnabled} />}
+      <VoiceCommander enabled={voiceEnabled} />
       <nav className="hidden flex-col gap-6 text-lg font-medium md:flex md:flex-row md:items-center md:gap-5 md:text-sm lg:gap-6">
         <Link
           href="/"
@@ -256,14 +250,12 @@ export function Header() {
       </Sheet>
       
       <div className="flex w-full items-center justify-end gap-4 md:ml-auto md:gap-2 lg:gap-4">
-        {isClient && (
-          <Button variant={voiceEnabled ? 'secondary' : 'outline'} size="icon" onClick={handleToggleVoice} className="relative">
-            {voiceEnabled ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-            {voiceEnabled && <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-red-500 animate-pulse"></span>}
-            <span className="sr-only">{voiceEnabled ? 'Stop voice commands' : 'Start voice commands'}</span>
-          </Button>
-        )}
-        {isClient && <CartIcon />}
+        <Button variant={voiceEnabled ? 'secondary' : 'outline'} size="icon" onClick={handleToggleVoice} className="relative">
+          {voiceEnabled ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+          {voiceEnabled && <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-red-500 animate-pulse"></span>}
+          <span className="sr-only">{voiceEnabled ? 'Stop voice commands' : 'Start voice commands'}</span>
+        </Button>
+        <CartIcon />
         <UserMenu />
       </div>
     </header>
