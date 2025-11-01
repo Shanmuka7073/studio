@@ -71,41 +71,50 @@ function OrderSummaryItem({ item, image }) {
     );
 }
 
-// Parses text like "1 kg chicken and 2 kg apple"
-function parseOrder(text: string): ParsedOrderItem[] {
-    const pattern = /(\d+)\s*kg\s*([a-zA-Z\s]+?)(?=\s*\d+\s*kg|\s*and\s*\d+\s*kg|$)/gi;
-    const items = [];
+
+// New, robust function based on user feedback
+async function matchItemsToCatalog(text: string, db: any): Promise<StructuredListItem[]> {
+    if (!text || !db) return [];
+
+    // 1. Fetch the entire product price catalog
+    const productPricesRef = collection(db, 'productPrices');
+    const productSnapshot = await getDocs(productPricesRef);
+    const masterProductList = productSnapshot.docs.map(doc => doc.data() as ProductPrice);
+
+    if (masterProductList.length === 0) {
+        console.warn("Master product catalog is empty.");
+        return [];
+    }
+
+    const matchedItems: StructuredListItem[] = [];
+
+    // 2. Use a regex to parse all "X kg item" phrases from the text
+    const pattern = /(\d+)\s*kg\s*([a-zA-Z\s]+?)(?=\s+\d+\s*kg|\s+and\s+\d+\s*kg|$)/gi;
+    const parsedList: ParsedOrderItem[] = [];
     let match;
     while ((match = pattern.exec(text)) !== null) {
-        items.push({
+        parsedList.push({
           quantity: parseInt(match[1], 10),
           unit: "kg",
           item: match[2].trim().toLowerCase()
         });
     }
-    return items;
-}
 
-// Matches parsed items against the master product catalog
-async function matchItemsToCatalog(parsedList: ParsedOrderItem[], db: any): Promise<StructuredListItem[]> {
-    if (!parsedList.length || !db) return [];
-    
-    const productPricesRef = collection(db, 'productPrices');
-    const productSnapshot = await getDocs(productPricesRef);
-    const masterProductList = productSnapshot.docs.map(doc => doc.data() as ProductPrice);
-    
-    const matchedItems: StructuredListItem[] = [];
-
-    for (const orderItem of parsedList) {
+    // 3. For each parsed item, find a match in the catalog
+    parsedList.forEach(orderItem => {
+        const itemName = orderItem.item;
+        
         // Find a product in the catalog where the name includes the item spoken by the user
         const productMatch = masterProductList.find(p => 
-            p.productName.toLowerCase().includes(orderItem.item.toLowerCase())
+            p.productName.toLowerCase().includes(itemName)
         );
 
         if (productMatch) {
             // Find the specific variant (e.g., "1kg") that matches the quantity
-            const targetWeight = `${orderItem.quantity}${orderItem.unit}`;
-            const variantMatch = productMatch.variants.find(v => v.weight.replace(/\s/g, '') === targetWeight);
+            const targetWeight = `${orderItem.quantity}${orderItem.unit}`; // e.g., "1kg"
+            const variantMatch = productMatch.variants.find(v => 
+                v.weight.replace(/\s/g, '') === targetWeight
+            );
             
             if (variantMatch) {
                 matchedItems.push({
@@ -116,7 +125,8 @@ async function matchItemsToCatalog(parsedList: ParsedOrderItem[], db: any): Prom
                 });
             }
         }
-    }
+    });
+
     return matchedItems;
 }
 
@@ -171,7 +181,7 @@ export default function CheckoutPage() {
         const recognition = speechRecognitionRef.current;
         recognition.lang = 'en-IN';
         recognition.interimResults = true;
-        recognition.continuous = false; // Ends automatically when user stops speaking
+        recognition.continuous = true;
         
         recognition.onstart = () => {
             setIsListening(true);
@@ -179,22 +189,21 @@ export default function CheckoutPage() {
         
         recognition.onresult = (event) => {
             let interimTranscript = '';
-            // Loop from the last result index
+            let currentFinalTranscript = '';
             for (let i = event.resultIndex; i < event.results.length; ++i) {
                 const transcript = event.results[i][0].transcript;
                 if (event.results[i].isFinal) {
-                    finalTranscriptRef.current += transcript + ' ';
+                    currentFinalTranscript += transcript + ' ';
                 } else {
                     interimTranscript += transcript;
                 }
             }
-             // Update the text area with the clean, progressing transcript
+            finalTranscriptRef.current += currentFinalTranscript;
             form.setValue('shoppingList', finalTranscriptRef.current + interimTranscript);
         };
 
         recognition.onend = () => {
             setIsListening(false);
-            // Trigger understanding after recording is complete
             if (finalTranscriptRef.current.trim()) {
                  handleUnderstandList(finalTranscriptRef.current.trim());
             }
@@ -214,11 +223,15 @@ export default function CheckoutPage() {
   }, [toast, form]);
 
 
-  const handleStartListening = () => {
-    if (speechRecognitionRef.current) {
-        // Clear previous results before starting a new recording session
-        finalTranscriptRef.current = "";
-        form.setValue('shoppingList', "🎤 Listening...");
+  const handleToggleListening = () => {
+    if (!speechRecognitionRef.current) return;
+    
+    if (isListening) {
+        speechRecognitionRef.current.stop();
+    } else {
+        // Don't clear previous results if user wants to continue
+        // finalTranscriptRef.current = "";
+        form.setValue('shoppingList', finalTranscriptRef.current || "🎤 Listening...");
         setStructuredList([]);
         speechRecognitionRef.current.start();
     }
@@ -235,12 +248,7 @@ export default function CheckoutPage() {
     setIsProcessing(true);
     setStructuredList([]);
     try {
-        const parsedItems = parseOrder(transcribedText);
-        if (parsedItems.length === 0) {
-            throw new Error("I couldn't understand any items in the format '1 kg item'. Please try again.");
-        }
-        
-        const items = await matchItemsToCatalog(parsedItems, firestore);
+        const items = await matchItemsToCatalog(transcribedText, firestore);
         
         if (items.length > 0) {
             setStructuredList(items);
@@ -461,17 +469,16 @@ export default function CheckoutPage() {
                                     <CardContent className="flex flex-col items-center justify-center space-y-4">
                                         <Button
                                             type="button"
-                                            onClick={handleStartListening}
+                                            onClick={handleToggleListening}
                                             variant={isListening ? 'destructive' : 'default'}
                                             size="lg"
                                             className="w-48"
-                                            disabled={isListening}
                                         >
                                             {isListening ? <StopCircle className="mr-2 h-5 w-5 animate-pulse" /> : <Mic className="mr-2 h-5 w-5" />}
-                                            {isListening ? 'Listening...' : 'Record List'}
+                                            {isListening ? 'Stop Listening' : 'Record List'}
                                         </Button>
                                         <p className="text-sm text-muted-foreground text-center">
-                                            {isListening ? "I'm listening..." : "Click to record your shopping list."}
+                                            {isListening ? "I'm listening... Click to stop." : "Click to record your shopping list."}
                                         </p>
                                     </CardContent>
                                 </Card>
