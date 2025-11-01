@@ -48,15 +48,23 @@ export function VoiceCommander({ enabled, onStatusUpdate }: VoiceCommanderProps)
 
     const handleCommand = (command: string) => {
       // 1. Check for dynamic store navigation first
-      const matchedStore = stores.find(store => command.includes(store.name.toLowerCase()));
-      if (matchedStore) {
-        router.push(`/stores/${matchedStore.id}`);
-        toast({
-          title: `Navigating to ${matchedStore.name}`,
-          description: `Heard: "${command}"`
-        });
-        return; // IMPORTANT: Stop processing after a match is found
+      // Make matching more flexible
+      const storeMatch = stores.find(store => {
+          const storeName = store.name.toLowerCase();
+          // Get the core name part, removing generic words like "shop" or "store"
+          const coreName = storeName.replace(/shop|store|stores/g, '').trim();
+          return command.includes(coreName);
+      });
+
+      if (storeMatch) {
+          router.push(`/stores/${storeMatch.id}`);
+          toast({
+              title: `Navigating to ${storeMatch.name}`,
+              description: `Heard: "${command}"`
+          });
+          return; // IMPORTANT: Stop processing after a match is found
       }
+
 
       // 2. Check for static navigation commands if no store was found
       if (command.includes('go to home')) {
@@ -124,8 +132,10 @@ export function VoiceCommander({ enabled, onStatusUpdate }: VoiceCommanderProps)
 
     // Cleanup function to stop recognition when the component unmounts or `enabled` changes to false
     return () => {
-      recognition.onend = null;
-      recognition.stop();
+      if(recognitionRef.current) {
+        recognitionRef.current.onend = null;
+        recognitionRef.current.stop();
+      }
     };
 
   }, [enabled, router, toast, onStatusUpdate, stores]);
