@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -38,6 +39,7 @@ const navLinks = [
 ];
 
 const dashboardLinks = [
+    { href: '/dashboard/customer/my-profile', label: 'My Profile', icon: UserCircle },
     { href: '/dashboard/customer/my-orders', label: 'My Orders', icon: ShoppingBag},
     { href: '/dashboard/owner/my-store', label: 'My Store', icon: Store },
     { href: '/dashboard/owner/orders', label: 'Store Orders', icon: ShoppingBag },
