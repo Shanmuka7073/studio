@@ -6,12 +6,17 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetTrigger, SheetContent } from '@/components/ui/sheet';
 import { CartSheetContent } from './cart-sheet';
 import { useCart } from '@/lib/cart';
+import type * as SheetPrimitive from "@radix-ui/react-dialog"
 
-export function CartIcon() {
+
+interface CartIconProps extends React.ComponentProps<typeof SheetPrimitive.Root> {}
+
+
+export function CartIcon({ open, onOpenChange }: CartIconProps) {
   const { cartCount } = useCart();
 
   return (
-    <Sheet>
+    <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetTrigger asChild>
         <Button variant="outline" size="icon" className="relative">
           <ShoppingCart className="h-5 w-5" />
@@ -29,5 +34,3 @@ export function CartIcon() {
     </Sheet>
   );
 }
-
-    

@@ -1,15 +1,16 @@
 
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { useFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
-import { getStores, getMasterProducts } from '@/lib/data';
-import type { Store, Product } from '@/lib/types';
+import { getStores, getMasterProducts, getProductPrice } from '@/lib/data';
+import type { Store, Product, ProductPrice, ProductVariant } from '@/lib/types';
 import { calculateSimilarity } from '@/lib/calculate-similarity';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { VoiceOrderInfo } from '@/components/voice-order-dialog';
+import { useCart } from '@/lib/cart';
 
 export interface Command {
   command: string;
@@ -22,9 +23,32 @@ interface VoiceCommanderProps {
   onStatusUpdate: (status: string) => void;
   onSuggestions: (suggestions: Command[]) => void;
   onVoiceOrder: (orderInfo: VoiceOrderInfo) => void;
+  onOpenCart: () => void;
 }
 
-export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoiceOrder }: VoiceCommanderProps) {
+type ParsedShoppingListItem = {
+    quantity: number;
+    unit: string;
+    itemName: string;
+};
+
+// This function now lives here to be used by the voice commander
+async function parseShoppingList(text: string): Promise<ParsedShoppingListItem[]> {
+    const items: ParsedShoppingListItem[] = [];
+    const pattern = /(\d+)\s*(kg|g|grams|kilogram|kilo)?\s*([a-zA-Z\s]+)/gi;
+    let match;
+
+    while ((match = pattern.exec(text)) !== null) {
+        const quantity = parseInt(match[1], 10);
+        const unit = match[2] ? match[2].toLowerCase() : 'pc'; // Default to 'piece' if no unit
+        const itemName = match[3].trim().toLowerCase();
+
+        items.push({ quantity, unit, itemName });
+    }
+    return items;
+}
+
+export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoiceOrder, onOpenCart }: VoiceCommanderProps) {
   const router = useRouter();
   const { toast } = useToast();
   const { firestore, user } = useFirebase();
@@ -32,6 +56,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
   const [allCommands, setAllCommands] = useState<Command[]>([]);
   const [masterProductList, setMasterProductList] = useState<Product[]>([]);
   const [myStore, setMyStore] = useState<Store | null>(null);
+  const { addItem: addItemToCart } = useCart();
 
   const listeningRef = useRef(false);
 
@@ -110,6 +135,33 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
     }
   }, [enabled, onSuggestions]);
 
+
+    const findProductAndVariant = useCallback(async (parsedItem: ParsedShoppingListItem): Promise<{ product: Product | null, variant: ProductVariant | null }> => {
+        if (!firestore) return { product: null, variant: null };
+        
+        // Find a master product that matches the item name
+        const masterProductMatch = masterProductList.find(p => parsedItem.itemName.includes(p.name.toLowerCase()));
+
+        if (masterProductMatch) {
+            // If we have a product match, fetch its specific price variants
+            const priceData = await getProductPrice(firestore, masterProductMatch.name);
+            if (priceData && priceData.variants) {
+                // Now find the variant that matches the spoken weight
+                // e.g., "1kg" should match "1kg", "1 kg" etc.
+                const targetWeight = `${parsedItem.quantity}${parsedItem.unit === 'pc' ? '' : parsedItem.unit}`.replace(/gram/g, 'g').replace(/kilogram|kilo/g, 'kg').replace(/\s/g, '');
+                
+                const variantMatch = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === targetWeight);
+
+                if (variantMatch) {
+                    return { product: masterProductMatch, variant: variantMatch };
+                }
+            }
+        }
+        
+        return { product: null, variant: null };
+
+    }, [masterProductList, firestore]);
+
   useEffect(() => {
     if (typeof window === 'undefined' || !enabled) return;
 
@@ -127,44 +179,59 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
     recognition.lang = 'en-IN';
     recognition.interimResults = false;
 
-    const handleCommand = (command: string) => {
+    const handleCommand = async (command: string) => {
       if (!firestore || !user) return;
         
       const orderTriggers = ['order ', 'add ', 'buy ', 'get ', 'shop ', 'purchase ', 'i want '];
       const orderTriggerFound = orderTriggers.find(t => command.startsWith(t));
       
-      if (orderTriggerFound) {
-          let fromKeyword = ' from shop ';
-          let fromIndex = command.lastIndexOf(fromKeyword);
+      let fromKeyword = ' from shop ';
+      let fromIndex = command.lastIndexOf(fromKeyword);
+      if (fromIndex === -1) {
+          fromKeyword = ' from ';
+          fromIndex = command.lastIndexOf(fromKeyword);
+      }
+      if (fromIndex === -1) {
+        fromKeyword = ' at ';
+        fromIndex = command.lastIndexOf(fromKeyword);
+      }
 
-          if (fromIndex === -1) {
-              fromKeyword = ' from ';
-              fromIndex = command.lastIndexOf(fromKeyword);
-          }
-          if (fromIndex === -1) {
-            fromKeyword = ' at ';
-            fromIndex = command.lastIndexOf(fromKeyword);
-          }
-          
-          if (fromIndex > -1) {
-              const shoppingList = command.substring(orderTriggerFound.length, fromIndex).trim();
-              const storeName = command.substring(fromIndex + fromKeyword.length).trim();
+      // SCENARIO 1: Full order command with store ("order 1kg chicken from local basket")
+      if (orderTriggerFound && fromIndex > -1) {
+          const shoppingList = command.substring(orderTriggerFound.length, fromIndex).trim();
+          const storeName = command.substring(fromIndex + fromKeyword.length).trim();
 
-              if (shoppingList && storeName) {
-                  const targetStore = allStores.find(s => s.name.toLowerCase().includes(storeName));
+          if (shoppingList && storeName) {
+              const targetStore = allStores.find(s => s.name.toLowerCase().includes(storeName));
 
-                  if (targetStore) {
-                      toast({ title: "Processing Your Order...", description: `Ordering "${shoppingList}" from ${targetStore.name}.`});
-                      onVoiceOrder({ shoppingList, storeId: targetStore.id });
-                      onSuggestions([]);
-                      return; // Command handled
-                  } else {
-                      toast({ variant: 'destructive', title: "Store Not Found", description: `Could not find a store named "${storeName}".` });
-                      onSuggestions([]);
-                      return;
-                  }
+              if (targetStore) {
+                  onVoiceOrder({ shoppingList, storeId: targetStore.id });
+                  onSuggestions([]);
+                  return; // Command handled
+              } else {
+                  toast({ variant: 'destructive', title: "Store Not Found", description: `Could not find a store named "${storeName}".` });
+                  onSuggestions([]);
+                  return;
               }
           }
+      }
+      
+      // SCENARIO 2: Iterative list building ("1 kg chicken and 2 kg tomatoes")
+      const parsedItems = await parseShoppingList(command);
+      if (parsedItems.length > 0 && fromIndex === -1 && !orderTriggerFound) {
+          onOpenCart(); // Open the cart side panel
+          onSuggestions([]);
+          toast({ title: "Building your cart...", description: `Heard: "${command}"`});
+          
+          for (const item of parsedItems) {
+              const { product, variant } = await findProductAndVariant(item);
+              if (product && variant) {
+                  addItemToCart(product, variant, 1); // quantity is implicitly 1 of the variant (e.g. 1 x 1kg pack)
+              } else {
+                  toast({ variant: 'destructive', title: "Item not found", description: `Could not find "${item.quantity}${item.unit} ${item.itemName}" in the catalog.`});
+              }
+          }
+          return; // Command handled
       }
 
       const addProductTriggers = ['add product ', 'add new product ', 'list ', 'upload ', 'put ', 'new item ', 'post '];
@@ -197,8 +264,6 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
       
       if (removeTriggerFound && myStore) {
           const productName = command.substring(removeTriggerFound.length).replace(/from my store|product/g, '').trim();
-          // This part requires fetching the product from the user's store to get its ID.
-          // For now, we'll just acknowledge the command.
           toast({ title: "Command Acknowledged", description: `Logic to remove "${productName}" from your store is not yet implemented.` });
           onSuggestions([]);
           return;
@@ -294,7 +359,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
       recognition.stop();
       recognition.onend = null; // Prevent restart on component unmount
     };
-  }, [enabled, toast, onStatusUpdate, allCommands, onSuggestions, firestore, user, myStore, masterProductList, router, allStores, onVoiceOrder]);
+  }, [enabled, toast, onStatusUpdate, allCommands, onSuggestions, firestore, user, myStore, masterProductList, router, allStores, onVoiceOrder, findProductAndVariant, addItemToCart, onOpenCart]);
 
   return null;
 }

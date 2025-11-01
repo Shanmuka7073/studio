@@ -131,6 +131,7 @@ export function Header() {
   const [voiceStatus, setVoiceStatus] = useState('Click the mic to start listening.');
   const [suggestedCommands, setSuggestedCommands] = useState<Command[]>([]);
   const [voiceOrderInfo, setVoiceOrderInfo] = useState<VoiceOrderInfo | null>(null);
+  const [isCartOpen, setIsCartOpen] = useState(false);
 
 
   useEffect(() => {
@@ -161,6 +162,7 @@ export function Header() {
         onStatusUpdate={setVoiceStatus}
         onSuggestions={setSuggestedCommands}
         onVoiceOrder={setVoiceOrderInfo}
+        onOpenCart={() => setIsCartOpen(true)}
       />
        {voiceOrderInfo && (
         <VoiceOrderDialog
@@ -284,7 +286,7 @@ export function Header() {
               {voiceEnabled && <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-red-500 animate-pulse"></span>}
               <span className="sr-only">{voiceEnabled ? 'Stop voice commands' : 'Start voice commands'}</span>
             </Button>
-            <CartIcon />
+            <CartIcon open={isCartOpen} onOpenChange={setIsCartOpen} />
             <UserMenu />
           </>
         ) : (
