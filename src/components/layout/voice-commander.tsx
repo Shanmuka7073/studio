@@ -53,13 +53,13 @@ export function VoiceCommander({ enabled }: VoiceCommanderProps) {
       };
       
       recognition.onend = () => {
-        // Only restart if we are still in the 'enabled' state.
-        // This check is implicitly handled by the dependency array and the main `if(enabled)` block.
-        // If the 'enabled' prop becomes false, the cleanup function runs, stopping recognition.
-        // If it stops for another reason (e.g., network error), this restart logic is essential.
         if (enabled) {
             console.log('Recognition service ended, restarting...');
-            recognition.start();
+            try {
+                recognition.start();
+            } catch(e) {
+                console.error("Could not restart recognition service: ", e);
+            }
         }
       };
     }
@@ -67,33 +67,47 @@ export function VoiceCommander({ enabled }: VoiceCommanderProps) {
     const recognition = recognitionRef.current;
 
     const handleCommand = (command: string) => {
+      const showToast = (title: string) => {
+        toast({
+            title: title,
+            description: `Heard: "${command}"`
+        });
+      }
+
       if (command.includes('go to home')) {
         router.push('/');
-        toast({ title: 'Navigating to Home' });
+        showToast('Navigating to Home');
       } else if (command.includes('go to stores')) {
         router.push('/stores');
-        toast({ title: 'Navigating to Stores' });
+        showToast('Navigating to Stores');
       } else if (command.includes('go to my orders')) {
         router.push('/dashboard/customer/my-orders');
-        toast({ title: 'Navigating to My Orders' });
+        showToast('Navigating to My Orders');
       } else if (command.includes('go to cart')) {
         router.push('/cart');
-        toast({ title: 'Navigating to Cart' });
+        showToast('Navigating to Cart');
       } else if (command.includes('go to dashboard')) {
         router.push('/dashboard');
-        toast({ title: 'Navigating to Dashboard' });
+        showToast('Navigating to Dashboard');
       }
     };
     
     if (enabled) {
-      recognition.start();
+      try {
+        recognition.start();
+      } catch(e) {
+        // This can happen if it's already started.
+        console.log("Could not start recognition, it may already be running.");
+      }
+    } else {
+        recognition.stop();
+        console.log('Voice recognition stopped.');
     }
 
-    // Cleanup function to stop recognition when the component unmounts or is disabled
     return () => {
         if(recognitionRef.current) {
+            recognitionRef.current.onend = null; // Prevent restart on cleanup
             recognitionRef.current.stop();
-            console.log('Voice recognition stopped.');
         }
     };
 
