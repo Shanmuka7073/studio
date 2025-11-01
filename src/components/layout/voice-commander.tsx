@@ -20,24 +20,6 @@ interface VoiceCommanderProps {
   onSuggestions: (suggestions: Command[]) => void;
 }
 
-const STATIC_COMMANDS: Omit<Command, 'action'>[] = [
-  { command: 'go home', display: 'Go to Home' },
-  { command: 'open home', display: 'Go to Home' },
-  { command: 'home', display: 'Go to Home' },
-  { command: 'go to stores', display: 'Browse All Stores' },
-  { command: 'open stores', display: 'Browse All Stores' },
-  { command: 'stores', display: 'Browse All Stores' },
-  { command: 'go to my orders', display: 'View My Orders' },
-  { command: 'open my orders', display: 'View My Orders' },
-  { command: 'my orders', display: 'View My Orders' },
-  { command: 'go to cart', display: 'View Cart' },
-  { command: 'open cart', display: 'View Cart' },
-  { command: 'cart', display: 'View Cart' },
-  { command: 'go to dashboard', display: 'Go to Dashboard' },
-  { command: 'open dashboard', display: 'Go to Dashboard' },
-  { command: 'dashboard', display: 'Go to Dashboard' },
-];
-
 export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: VoiceCommanderProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -48,23 +30,44 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
   // Fetch stores and build the full command list
   useEffect(() => {
     if (firestore && user) {
-        const staticNavCommands: Command[] = [
-            { command: 'go home', display: 'Navigate to Home', action: () => router.push('/') },
-            { command: 'open home', display: 'Navigate to Home', action: () => router.push('/') },
-            { command: 'home', display: 'Navigate to Home', action: () => router.push('/') },
-            { command: 'go to stores', display: 'Browse All Stores', action: () => router.push('/stores') },
-            { command: 'open stores', display: 'Browse All Stores', action: () => router.push('/stores') },
-            { command: 'stores', display: 'Browse All Stores', action: () => router.push('/stores') },
-            { command: 'go to my orders', display: 'View My Orders', action: () => router.push('/dashboard/customer/my-orders') },
-            { command: 'open my orders', display: 'View My Orders', action: () => router.push('/dashboard/customer/my-orders') },
-            { command: 'my orders', display: 'View My Orders', action: () => router.push('/dashboard/customer/my-orders') },
-            { command: 'go to cart', display: 'View Your Cart', action: () => router.push('/cart') },
-            { command: 'open cart', display: 'View Your Cart', action: () => router.push('/cart') },
-            { command: 'cart', display: 'View Your Cart', action: () => router.push('/cart') },
-            { command: 'go to dashboard', display: 'View Dashboard', action: () => router.push('/dashboard') },
-            { command: 'open dashboard', display: 'View Dashboard', action: () => router.push('/dashboard') },
-            { command: 'dashboard', display: 'View Dashboard', action: () => router.push('/dashboard') },
-        ];
+        const commandMap: { [key: string]: { display: string, action: () => void, aliases: string[] } } = {
+            home: {
+                display: 'Navigate to Home',
+                action: () => router.push('/'),
+                aliases: ['go home', 'open home', 'back to home', 'show home', 'main page', 'home screen', 'home']
+            },
+            stores: {
+                display: 'Browse All Stores',
+                action: () => router.push('/stores'),
+                aliases: ['go to stores', 'open stores', 'show stores', 'all stores', 'stores']
+            },
+            orders: {
+                display: 'View My Orders',
+                action: () => router.push('/dashboard/customer/my-orders'),
+                aliases: ['my orders', 'go to my orders', 'open my orders', 'show my orders', 'orders']
+            },
+            cart: {
+                display: 'View Your Cart',
+                action: () => router.push('/cart'),
+                aliases: ['go to cart', 'open cart', 'show cart', 'my cart', 'cart']
+            },
+            dashboard: {
+                display: 'View Dashboard',
+                action: () => router.push('/dashboard'),
+                aliases: ['go to dashboard', 'open dashboard', 'dashboard']
+            },
+            deliveries: {
+                display: 'View Deliveries',
+                action: () => router.push('/dashboard/delivery/deliveries'),
+                aliases: ['deliveries', 'my deliveries', 'go to deliveries', 'open deliveries', 'delivery dashboard']
+            }
+        };
+
+        const staticNavCommands: Command[] = Object.values(commandMap).flatMap(
+            ({ display, action, aliases }) =>
+                aliases.map(alias => ({ command: alias, display, action }))
+        );
+
 
       getStores(firestore).then(stores => {
         const storeCommands: Command[] = stores.flatMap(store => {
@@ -73,7 +76,9 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
                 `go to ${coreName}`,
                 `open ${coreName}`,
                 coreName,
-                store.name.toLowerCase()
+                store.name.toLowerCase(),
+                `go to ${store.name.toLowerCase()}`,
+                `open ${store.name.toLowerCase()}`,
             ];
             return variations.map(variation => ({
                 command: variation,
@@ -125,8 +130,10 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
                 ...c,
                 similarity: calculateSimilarity(command, c.command),
             }))
-            .filter(c => c.similarity > 0.5) // Threshold for suggestions
+            .filter(c => c.similarity > 0.6) // Use a slightly higher threshold for suggestions
             .sort((a, b) => b.similarity - a.similarity)
+            // Deduplicate suggestions based on the action they perform
+            .filter((value, index, self) => self.findIndex(v => v.action.toString() === value.action.toString()) === index)
             .slice(0, 3);
 
         if (potentialMatches.length > 0) {
