@@ -17,6 +17,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useRouter } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { Check, Hand } from 'lucide-react';
 
 const playAlarm = () => {
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -120,7 +121,7 @@ function OrderDetailsDialog({ order, isOpen, onClose }: { order: Order | null; i
     );
 }
 
-function StatusManager({ order, onStatusChange }: { order: Order; onStatusChange: (orderId: string, collection: 'orders' | 'voice-orders', newStatus: Order['status']) => void; }) {
+function StatusManager({ order, onStatusChange, onClaim, myStoreId }: { order: Order; onStatusChange: (orderId: string, collection: 'orders' | 'voice-orders', newStatus: Order['status']) => void; onClaim: (orderId: string) => void; myStoreId?: string; }) {
     const [isUpdating, startTransition] = useTransition();
 
     const handleStatusChange = (newStatus: Order['status']) => {
@@ -130,8 +131,25 @@ function StatusManager({ order, onStatusChange }: { order: Order; onStatusChange
         });
     }
 
+    const handleClaim = () => {
+        startTransition(() => {
+            onClaim(order.id);
+        });
+    }
+
+    // This is an unassigned voice order
+    if (order.voiceMemoUrl && !order.storeId) {
+        return (
+            <Button onClick={handleClaim} disabled={isUpdating} variant="outline" size="sm">
+                <Hand className="mr-2 h-4 w-4" />
+                {isUpdating ? 'Claiming...' : 'Claim & Process'}
+            </Button>
+        )
+    }
+
+    // This is an order assigned to this store, or a regular cart order for this store
     return (
-        <Select onValueChange={handleStatusChange} defaultValue={order.status} disabled={isUpdating}>
+        <Select onValueChange={handleStatusChange} defaultValue={order.status} disabled={isUpdating || (order.status === 'Delivered' || order.status === 'Cancelled')}>
             <SelectTrigger className="w-full md:w-[180px]">
                 <SelectValue placeholder="Update status" />
             </SelectTrigger>
@@ -222,25 +240,20 @@ export default function OrdersDashboardPage() {
   useEffect(() => {
     const currentOrdersMap = new Map(allOrders.map(order => [order.id, order]));
     
-    // Don't run on the very first load of data
     if (prevOrdersRef.current.size > 0) {
         currentOrdersMap.forEach((currentOrder, orderId) => {
             const prevOrder = prevOrdersRef.current.get(orderId);
 
-            // A new order with "Pending" status appeared
             if (!prevOrder && currentOrder.status === 'Pending' && !newOrderAlert) {
-                // If it's a voice order, only alert if storeId is missing (unclaimed)
                 if (currentOrder.voiceMemoUrl && !currentOrder.storeId) {
                     setNewOrderAlert(currentOrder);
                     playAlarm();
                 } 
-                // If it's a regular cart order, alert if it belongs to my store
                 else if (currentOrder.storeId === myStore?.id) {
                     setNewOrderAlert(currentOrder);
                     playAlarm();
                 }
             }
-            // An existing order changed status
             else if (prevOrder && prevOrder.status !== currentOrder.status) {
               const toastMessage = `Order #${currentOrder.id.substring(0, 7)} for ${currentOrder.customerName} is now "${currentOrder.status}".`;
               toast({
@@ -266,7 +279,7 @@ export default function OrdersDashboardPage() {
     
     const updatePayload: any = { status: newStatus };
     
-    if (collectionName === 'voice-orders' && newStatus !== 'Pending' && myStore) {
+    if (collectionName === 'voice-orders' && newStatus !== 'Pending' && myStore && !orderDocRef.id) {
         updatePayload.storeId = myStore.id;
     }
     
@@ -293,12 +306,44 @@ export default function OrdersDashboardPage() {
             errorEmitter.emit('permission-error', permissionError);
         });
   };
+  
+  const handleClaimOrder = (orderId: string) => {
+    if (!firestore || !myStore) return;
+
+    const orderDocRef = doc(firestore, 'voice-orders', orderId);
+    const updatePayload = {
+      storeId: myStore.id,
+      status: 'Processing' as const
+    };
+
+    updateDoc(orderDocRef, updatePayload)
+      .then(() => {
+        toast({
+          title: "Order Claimed!",
+          description: `You can now process voice order #${orderId.substring(0, 7)}.`
+        });
+      })
+      .catch((serverError) => {
+        const permissionError = new FirestorePermissionError({
+          path: orderDocRef.path,
+          operation: 'update',
+          requestResourceData: updatePayload,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      });
+  };
 
   const handleAlertAction = (action: 'accept' | 'reject') => {
     if (!newOrderAlert) return;
-    const newStatus = action === 'accept' ? 'Processing' : 'Cancelled';
-    const collectionName = newOrderAlert.voiceMemoUrl ? 'voice-orders' : 'orders';
-    handleStatusChange(newOrderAlert.id, collectionName, newStatus);
+    
+    if (newOrderAlert.voiceMemoUrl && !newOrderAlert.storeId && action === 'accept') {
+        handleClaimOrder(newOrderAlert.id);
+        setNewOrderAlert(null);
+    } else {
+        const newStatus = action === 'accept' ? 'Processing' : 'Cancelled';
+        const collectionName = newOrderAlert.voiceMemoUrl ? 'voice-orders' : 'orders';
+        handleStatusChange(newOrderAlert.id, collectionName, newStatus);
+    }
   };
 
   const formatDate = (date: any) => {
@@ -380,7 +425,7 @@ export default function OrdersDashboardPage() {
                       <Button variant="destructive" onClick={() => handleAlertAction('reject')}>Reject Order</Button>
                   </AlertDialogAction>
                   <AlertDialogAction asChild>
-                      <Button onClick={() => handleAlertAction('accept')}>Accept Order</Button>
+                      <Button onClick={() => handleAlertAction('accept')}>{newOrderAlert?.voiceMemoUrl && !newOrderAlert?.storeId ? 'Claim & Process' : 'Accept Order'}</Button>
                   </AlertDialogAction>
               </AlertDialogFooter>
           </AlertDialogContent>
@@ -416,7 +461,7 @@ export default function OrdersDashboardPage() {
             {/* Mobile Card View */}
             <div className="md:hidden space-y-4">
                 {allOrders.map(order => (
-                    <Card key={order.id}>
+                    <Card key={order.id} className={!order.storeId && order.voiceMemoUrl ? 'bg-yellow-50 border-yellow-200' : ''}>
                         <CardHeader>
                              <div className="flex justify-between items-start">
                                 <div>
@@ -439,7 +484,7 @@ export default function OrdersDashboardPage() {
                             </div>
                              <div className="space-y-2">
                                 <label className="text-sm font-medium text-muted-foreground">Status</label>
-                                <StatusManager order={order} onStatusChange={handleStatusChange} />
+                                <StatusManager order={order} onStatusChange={handleStatusChange} onClaim={handleClaimOrder} myStoreId={myStore?.id} />
                             </div>
                             <Button variant="outline" size="sm" onClick={() => setSelectedOrder(order)} className="w-full">
                                 View Details
@@ -465,7 +510,7 @@ export default function OrdersDashboardPage() {
                 </TableHeader>
                 <TableBody>
                     {allOrders.map((order) => (
-                    <TableRow key={order.id}>
+                    <TableRow key={order.id} className={!order.storeId && order.voiceMemoUrl ? 'bg-yellow-50' : ''}>
                         <TableCell className="font-medium truncate max-w-[100px]">{order.id}</TableCell>
                         <TableCell>
                         {order.voiceMemoUrl ? (
@@ -477,7 +522,7 @@ export default function OrdersDashboardPage() {
                         <TableCell>{order.customerName}</TableCell>
                         <TableCell>{formatDate(order.orderDate)}</TableCell>
                         <TableCell>
-                        <StatusManager order={order} onStatusChange={handleStatusChange} />
+                            <StatusManager order={order} onStatusChange={handleStatusChange} onClaim={handleClaimOrder} myStoreId={myStore?.id} />
                         </TableCell>
                         <TableCell className="text-right">₹{order.totalAmount.toFixed(2)}</TableCell>
                         <TableCell className="text-right">
