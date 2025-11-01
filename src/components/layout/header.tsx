@@ -163,6 +163,7 @@ export function Header() {
         onSuggestions={setSuggestedCommands}
         onVoiceOrder={setVoiceOrderInfo}
         onOpenCart={() => setIsCartOpen(true)}
+        isCartOpen={isCartOpen}
       />
        {voiceOrderInfo && (
         <VoiceOrderDialog

@@ -24,6 +24,7 @@ interface VoiceCommanderProps {
   onSuggestions: (suggestions: Command[]) => void;
   onVoiceOrder: (orderInfo: VoiceOrderInfo) => void;
   onOpenCart: () => void;
+  isCartOpen: boolean;
 }
 
 type ParsedShoppingListItem = {
@@ -54,7 +55,7 @@ async function parseShoppingList(text: string): Promise<ParsedShoppingListItem[]
 }
 
 
-export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoiceOrder, onOpenCart }: VoiceCommanderProps) {
+export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoiceOrder, onOpenCart, isCartOpen }: VoiceCommanderProps) {
   const router = useRouter();
   const { toast } = useToast();
   const { firestore, user } = useFirebase();
@@ -232,15 +233,23 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
           }
       }
       
+      const listText = addTriggerFound
+        ? command.substring(addTriggerFound.length)
+        : orderTriggerFound && fromIndex === -1
+        ? command.substring(orderTriggerFound.length)
+        : isCartOpen // If cart is open, the whole command is the item
+        ? command
+        : null;
+
       // SCENARIO 2: Iterative list building ("add 1 kg chicken and 2 kg tomatoes")
-      if (addTriggerFound || (orderTriggerFound && fromIndex === -1)) {
-          const listText = addTriggerFound ? command.substring(addTriggerFound.length) : command.substring(orderTriggerFound!.length);
+      // OR SCENARIO 3: Cart is open, just say item ("1 kg chicken")
+      if (listText) {
           const parsedItems = await parseShoppingList(listText);
 
           if (parsedItems.length > 0) {
               onOpenCart(); // Open the cart side panel
               onSuggestions([]);
-              toast({ title: "Building your cart...", description: `Heard: "${command}"`});
+              toast({ title: "Adding to cart...", description: `Heard: "${command}"`});
               
               for (const item of parsedItems) {
                   const { product, variant } = await findProductAndVariant(item);
@@ -379,7 +388,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
       recognition.stop();
       recognition.onend = null; // Prevent restart on component unmount
     };
-  }, [enabled, toast, onStatusUpdate, allCommands, onSuggestions, firestore, user, myStore, masterProductList, router, allStores, onVoiceOrder, findProductAndVariant, addItemToCart, onOpenCart]);
+  }, [enabled, toast, onStatusUpdate, allCommands, onSuggestions, firestore, user, myStore, masterProductList, router, allStores, onVoiceOrder, findProductAndVariant, addItemToCart, onOpenCart, isCartOpen]);
 
   return null;
 }
