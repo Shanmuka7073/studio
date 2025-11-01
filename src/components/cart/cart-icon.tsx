@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetTrigger, SheetContent } from '@/components/ui/sheet';
 import { CartSheetContent } from './cart-sheet';
 import type * as SheetPrimitive from "@radix-ui/react-dialog"
+import { useCart } from '@/lib/cart';
 
 
 interface CartIconProps extends React.ComponentProps<typeof SheetPrimitive.Root> {}
