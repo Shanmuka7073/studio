@@ -72,7 +72,7 @@ function OrderSummaryItem({ item, image }) {
 }
 
 
-// New, robust function based on user feedback
+// New, robust function based on user's working demo
 async function matchItemsToCatalog(text: string, db: any): Promise<StructuredListItem[]> {
     if (!text || !db) return [];
 
@@ -85,33 +85,26 @@ async function matchItemsToCatalog(text: string, db: any): Promise<StructuredLis
         console.warn("Master product catalog is empty.");
         return [];
     }
+    
+    // Clean duplicates like "1 kg 1 kg chicken" -> "1 kg chicken"
+    let cleanedText = text.replace(/(\d+\s*kg\s*)\1+/gi, '$1');
 
     const matchedItems: StructuredListItem[] = [];
-
-    // 2. Use a regex to parse all "X kg item" phrases from the text
-    const pattern = /(\d+)\s*kg\s*([a-zA-Z\s]+?)(?=\s+\d+\s*kg|\s+and\s+\d+\s*kg|$)/gi;
-    const parsedList: ParsedOrderItem[] = [];
+    const pattern = /(\d+)\s*(kg|kilogram|kilo)?\s*([a-zA-Z\s]+)/gi;
     let match;
-    while ((match = pattern.exec(text)) !== null) {
-        parsedList.push({
-          quantity: parseInt(match[1], 10),
-          unit: "kg",
-          item: match[2].trim().toLowerCase()
-        });
-    }
 
-    // 3. For each parsed item, find a match in the catalog
-    parsedList.forEach(orderItem => {
-        const itemName = orderItem.item;
+    while ((match = pattern.exec(cleanedText)) !== null) {
+        const quantity = parseInt(match[1], 10);
+        const itemName = match[3].trim().toLowerCase();
+        const targetWeight = `${quantity}kg`;
         
-        // Find a product in the catalog where the name includes the item spoken by the user
+        // Find a product in the catalog where the name is included in the spoken item
         const productMatch = masterProductList.find(p => 
-            p.productName.toLowerCase().includes(itemName)
+            itemName.includes(p.productName.toLowerCase())
         );
 
         if (productMatch) {
             // Find the specific variant (e.g., "1kg") that matches the quantity
-            const targetWeight = `${orderItem.quantity}${orderItem.unit}`; // e.g., "1kg"
             const variantMatch = productMatch.variants.find(v => 
                 v.weight.replace(/\s/g, '') === targetWeight
             );
@@ -119,13 +112,13 @@ async function matchItemsToCatalog(text: string, db: any): Promise<StructuredLis
             if (variantMatch) {
                 matchedItems.push({
                     productName: productMatch.productName,
-                    quantity: orderItem.quantity,
+                    quantity: quantity, // The quantity is part of the variant
                     price: variantMatch.price,
                     variant: variantMatch
                 });
             }
         }
-    });
+    }
 
     return matchedItems;
 }
@@ -143,7 +136,6 @@ export default function CheckoutPage() {
   const [structuredList, setStructuredList] = useState<StructuredListItem[]>([]);
   
   const speechRecognitionRef = useRef<SpeechRecognition | null>(null);
-  const finalTranscriptRef = useRef<string>('');
 
   const [deliveryCoords, setDeliveryCoords] = useState<{lat: number, lng: number} | null>(null);
   const [images, setImages] = useState({});
@@ -174,70 +166,7 @@ export default function CheckoutPage() {
     }
   }, [cartItems]);
 
-  useEffect(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-        speechRecognitionRef.current = new SpeechRecognition();
-        const recognition = speechRecognitionRef.current;
-        recognition.lang = 'en-IN';
-        recognition.interimResults = true;
-        recognition.continuous = true;
-        
-        recognition.onstart = () => {
-            setIsListening(true);
-        };
-        
-        recognition.onresult = (event) => {
-            let interimTranscript = '';
-            let currentFinalTranscript = '';
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-                const transcript = event.results[i][0].transcript;
-                if (event.results[i].isFinal) {
-                    currentFinalTranscript += transcript + ' ';
-                } else {
-                    interimTranscript += transcript;
-                }
-            }
-            finalTranscriptRef.current += currentFinalTranscript;
-            form.setValue('shoppingList', finalTranscriptRef.current + interimTranscript);
-        };
-
-        recognition.onend = () => {
-            setIsListening(false);
-            if (finalTranscriptRef.current.trim()) {
-                 handleUnderstandList(finalTranscriptRef.current.trim());
-            }
-        };
-
-        recognition.onerror = (event) => {
-            console.error("Speech recognition error:", event.error);
-            if (event.error !== 'aborted' && event.error !== 'no-speech') {
-              toast({ variant: 'destructive', title: 'Voice Error', description: `An error occurred: ${event.error}` });
-            }
-            setIsListening(false);
-        };
-
-    } else {
-        toast({ variant: 'destructive', title: 'Not Supported', description: 'Voice recognition is not supported by your browser.' });
-    }
-  }, [toast, form]);
-
-
-  const handleToggleListening = () => {
-    if (!speechRecognitionRef.current) return;
-    
-    if (isListening) {
-        speechRecognitionRef.current.stop();
-    } else {
-        // Don't clear previous results if user wants to continue
-        // finalTranscriptRef.current = "";
-        form.setValue('shoppingList', finalTranscriptRef.current || "🎤 Listening...");
-        setStructuredList([]);
-        speechRecognitionRef.current.start();
-    }
-  };
-
- const handleUnderstandList = async (text: string) => {
+  const handleUnderstandList = async (text: string) => {
     if (!firestore) return;
     const transcribedText = text || form.getValues('shoppingList');
     if (!transcribedText) {
@@ -265,6 +194,57 @@ export default function CheckoutPage() {
         });
     } finally {
         setIsProcessing(false);
+    }
+  };
+
+
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+        speechRecognitionRef.current = new SpeechRecognition();
+        const recognition = speechRecognitionRef.current;
+        recognition.lang = 'en-IN';
+        recognition.interimResults = false; // We only need the final result
+        recognition.continuous = false; // Stops automatically after a pause
+        
+        recognition.onstart = () => {
+            setIsListening(true);
+            form.setValue('shoppingList', "🎤 Listening...");
+        };
+        
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            form.setValue('shoppingList', transcript);
+            handleUnderstandList(transcript); // Process the result immediately
+        };
+
+        recognition.onend = () => {
+            setIsListening(false);
+        };
+
+        recognition.onerror = (event) => {
+            console.error("Speech recognition error:", event.error);
+            if (event.error !== 'aborted' && event.error !== 'no-speech') {
+              toast({ variant: 'destructive', title: 'Voice Error', description: `An error occurred: ${event.error}` });
+            }
+            setIsListening(false);
+        };
+
+    } else {
+        toast({ variant: 'destructive', title: 'Not Supported', description: 'Voice recognition is not supported by your browser.' });
+    }
+  }, [toast, form, firestore]); // Added firestore to dependencies
+
+
+  const handleToggleListening = () => {
+    if (!speechRecognitionRef.current) return;
+    
+    if (isListening) {
+        speechRecognitionRef.current.stop();
+    } else {
+        setStructuredList([]);
+        form.setValue('shoppingList', '');
+        speechRecognitionRef.current.start();
     }
   };
 
@@ -311,7 +291,7 @@ export default function CheckoutPage() {
     }
 
     startPlaceOrderTransition(async () => {
-        const voiceOrderSubtotal = structuredList.reduce((acc, item) => acc + (item.price || 0) * item.quantity, 0);
+        const voiceOrderSubtotal = structuredList.reduce((acc, item) => acc + (item.price || 0), 0);
         const totalAmount = isVoiceOrder ? voiceOrderSubtotal + DELIVERY_FEE : cartTotal + DELIVERY_FEE;
         
         let orderData: any = {
@@ -355,7 +335,6 @@ export default function CheckoutPage() {
             setStructuredList([]);
             setDeliveryCoords(null);
             form.reset();
-            finalTranscriptRef.current = '';
 
             toast({
                 title: "Order Placed!",
@@ -375,7 +354,7 @@ export default function CheckoutPage() {
   };
 
   const hasItemsInCart = cartItems.length > 0;
-  const voiceOrderSubtotal = structuredList.reduce((acc, item) => acc + (item.price || 0) * item.quantity, 0);
+  const voiceOrderSubtotal = structuredList.reduce((acc, item) => acc + ((item.price || 0) * item.quantity), 0);
   const finalTotal = hasItemsInCart ? cartTotal + DELIVERY_FEE : voiceOrderSubtotal + DELIVERY_FEE;
 
   return (
@@ -475,10 +454,10 @@ export default function CheckoutPage() {
                                             className="w-48"
                                         >
                                             {isListening ? <StopCircle className="mr-2 h-5 w-5 animate-pulse" /> : <Mic className="mr-2 h-5 w-5" />}
-                                            {isListening ? 'Stop Listening' : 'Record List'}
+                                            {isListening ? 'Listening...' : 'Record List'}
                                         </Button>
                                         <p className="text-sm text-muted-foreground text-center">
-                                            {isListening ? "I'm listening... Click to stop." : "Click to record your shopping list."}
+                                            {isListening ? "I'm listening..." : "Click to record your shopping list."}
                                         </p>
                                     </CardContent>
                                 </Card>
@@ -490,7 +469,7 @@ export default function CheckoutPage() {
                                         <FormItem>
                                         <FormLabel>Your Transcribed List</FormLabel>
                                         <FormControl>
-                                            <Textarea placeholder="Your transcribed list will appear here." {...field} rows={4}/>
+                                            <Textarea placeholder="Your transcribed list will appear here." {...field} rows={4} readOnly/>
                                         </FormControl>
                                         <FormMessage />
                                         </FormItem>
@@ -512,20 +491,22 @@ export default function CheckoutPage() {
                                                         <TableHead>Item</TableHead>
                                                         <TableHead>Quantity</TableHead>
                                                         <TableHead className="text-right">Price</TableHead>
+                                                        <TableHead className="text-right">Subtotal</TableHead>
                                                     </TableRow>
                                                 </TableHeader>
                                                 <TableBody>
                                                     {structuredList.map((item, index) => (
                                                         <TableRow key={index}>
                                                             <TableCell className="capitalize">{item.productName}</TableCell>
-                                                            <TableCell>{item.quantity} kg</TableCell>
+                                                            <TableCell>{item.variant.weight}</TableCell>
                                                             <TableCell className="text-right">{item.price ? `₹${item.price.toFixed(2)}` : 'N/A'}</TableCell>
+                                                             <TableCell className="text-right font-medium">{item.price ? `₹${(item.price * item.quantity).toFixed(2)}` : 'N/A'}</TableCell>
                                                         </TableRow>
                                                     ))}
                                                 </TableBody>
                                                 <TableFooter>
                                                     <TableRow>
-                                                        <TableCell colSpan={2} className="text-right">Subtotal</TableCell>
+                                                        <TableCell colSpan={3} className="text-right font-bold">Subtotal</TableCell>
                                                         <TableCell className="text-right font-bold">₹{voiceOrderSubtotal.toFixed(2)}</TableCell>
                                                     </TableRow>
                                                 </TableFooter>
