@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Package2, Menu, UserCircle, Store, ShoppingBag, Truck, LayoutDashboard } from 'lucide-react';
+import { Package2, Menu, UserCircle, Store, ShoppingBag, Truck, LayoutDashboard, Mic, MicOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -26,6 +26,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { getAuth, signOut } from 'firebase/auth';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useState } from 'react';
+import { VoiceCommander } from './voice-commander';
+import { useToast } from '@/hooks/use-toast';
+
 
 const ADMIN_EMAIL = 'admin@gmail.com';
 
@@ -119,9 +123,25 @@ export function Header() {
   const { user } = useFirebase();
   const isAdmin = user && user.email === ADMIN_EMAIL;
   const dashboardHref = isAdmin ? '/dashboard/admin' : '/dashboard';
+  const [isListening, setIsListening] = useState(false);
+  const { toast } = useToast();
+
+  const handleToggleListen = () => {
+    // Only allow listening for logged-in users
+    if (!user) {
+      toast({
+        variant: 'destructive',
+        title: 'Login Required',
+        description: 'You must be logged in to use voice commands.',
+      });
+      return;
+    }
+    setIsListening(prevState => !prevState);
+  };
 
   return (
     <header className="sticky top-0 z-50 flex h-16 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:px-6">
+      <VoiceCommander isListening={isListening} onToggleListen={handleToggleListen} />
       <nav className="hidden flex-col gap-6 text-lg font-medium md:flex md:flex-row md:items-center md:gap-5 md:text-sm lg:gap-6">
         <Link
           href="/"
@@ -230,6 +250,11 @@ export function Header() {
       </Sheet>
       
       <div className="flex w-full items-center justify-end gap-4 md:ml-auto md:gap-2 lg:gap-4">
+        <Button variant={isListening ? 'secondary' : 'outline'} size="icon" onClick={handleToggleListen} className="relative">
+          {isListening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+          {isListening && <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-red-500 animate-pulse"></span>}
+          <span className="sr-only">{isListening ? 'Stop listening' : 'Start listening'}</span>
+        </Button>
         <CartIcon />
         <UserMenu />
       </div>
