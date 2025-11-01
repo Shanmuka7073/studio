@@ -75,8 +75,6 @@ service cloud.firestore {
         request.auth.uid == resource.data.userId ||
         request.auth.uid == resource.data.storeOwnerId ||
         request.auth.uid == resource.data.deliveryPartnerId ||
-        (exists(/databases/$(database)/documents/stores/$(resource.data.storeId)) &&
-         get(/databases/$(database)/documents/stores/$(resource.data.storeId)).data.ownerId == request.auth.uid) ||
         isAdmin()
       );
 
