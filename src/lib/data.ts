@@ -50,9 +50,8 @@ export async function getStore(
   const storeSnap = await getDoc(storeDocRef);
   if (storeSnap.exists()) {
     const storeData = { id: storeSnap.id, ...storeSnap.data() } as Store;
-    if (storeData.isClosed) {
-        return undefined; // Treat closed stores as not found for public viewing
-    }
+    // For internal use (like creating an order), we should return the store even if closed.
+    // The getStores function for public listing already filters out closed stores.
     return storeData;
   }
   return undefined;

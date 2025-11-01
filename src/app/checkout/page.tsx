@@ -21,7 +21,7 @@ import {
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
-import { getProductImage, getStores } from '@/lib/data';
+import { getProductImage, getStores, getStore } from '@/lib/data';
 import { useTransition, useState, useRef, useCallback, useEffect } from 'react';
 import { useFirebase, errorEmitter } from '@/firebase';
 import { collection, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
@@ -339,12 +339,19 @@ export default function CheckoutPage() {
     }
 
     startPlaceOrderTransition(async () => {
+        const storeData = await getStore(firestore, storeId!);
+        if (!storeData) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Selected store could not be found.' });
+            return;
+        }
+
         const voiceOrderSubtotal = structuredList.reduce((acc, item) => acc + (item.price || 0), 0);
         const totalAmount = isVoiceOrder ? voiceOrderSubtotal + DELIVERY_FEE : cartTotal + DELIVERY_FEE;
         
         let orderData: any = {
             userId: user.uid,
             storeId: storeId,
+            storeOwnerId: storeData.ownerId, // Denormalized store owner ID
             customerName: data.name,
             deliveryAddress: 'Delivery via captured GPS coordinates',
             deliveryLat: deliveryCoords.lat,

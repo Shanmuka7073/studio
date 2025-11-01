@@ -54,6 +54,7 @@ export type Order = {
   id:string;
   userId: string;
   storeId: string;
+  storeOwnerId?: string; // Denormalized for security rules
   customerName: string;
   deliveryAddress: string;
   deliveryLat: number;
