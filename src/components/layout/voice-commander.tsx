@@ -1,8 +1,11 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState }from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
+import { useFirebase } from '@/firebase';
+import { getStores } from '@/lib/data';
+import type { Store } from '@/lib/types';
 
 interface VoiceCommanderProps {
   enabled: boolean;
@@ -12,7 +15,16 @@ interface VoiceCommanderProps {
 export function VoiceCommander({ enabled, onStatusUpdate }: VoiceCommanderProps) {
   const router = useRouter();
   const { toast } = useToast();
+  const { firestore } = useFirebase();
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const [stores, setStores] = useState<Store[]>([]);
+
+  // Fetch stores once when the component mounts and firestore is available
+  useEffect(() => {
+    if (firestore) {
+      getStores(firestore).then(setStores).catch(console.error);
+    }
+  }, [firestore]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -50,10 +62,10 @@ export function VoiceCommander({ enabled, onStatusUpdate }: VoiceCommanderProps)
       };
       
       recognition.onend = () => {
-        if (enabled) {
+        if (enabled && recognitionRef.current) { // Check ref exists
             console.log('Recognition service ended, restarting...');
             try {
-                recognition.start();
+                recognitionRef.current.start();
             } catch(e) {
                 console.error("Could not restart recognition service: ", e);
             }
@@ -66,13 +78,22 @@ export function VoiceCommander({ enabled, onStatusUpdate }: VoiceCommanderProps)
     const recognition = recognitionRef.current;
 
     const handleCommand = (command: string) => {
-      const showToast = (title: string) => {
+      const showToast = (title: string, description?: string) => {
         toast({
             title: title,
-            description: `Heard: "${command}"`
+            description: description || `Heard: "${command}"`
         });
       }
 
+      // Dynamic store navigation
+      const matchedStore = stores.find(store => command.includes(store.name.toLowerCase()));
+      if (matchedStore) {
+        router.push(`/stores/${matchedStore.id}`);
+        showToast(`Navigating to ${matchedStore.name}`);
+        return;
+      }
+
+      // Static navigation as a fallback
       if (command.includes('go to home')) {
         router.push('/');
         showToast('Navigating to Home');
@@ -95,6 +116,7 @@ export function VoiceCommander({ enabled, onStatusUpdate }: VoiceCommanderProps)
       try {
         recognition.start();
       } catch(e) {
+        // This can happen if it's already running, which is fine.
         console.log("Could not start recognition, it may already be running.");
       }
     } else {
@@ -108,7 +130,7 @@ export function VoiceCommander({ enabled, onStatusUpdate }: VoiceCommanderProps)
         }
     };
 
-  }, [enabled, router, toast, onStatusUpdate]);
+  }, [enabled, router, toast, onStatusUpdate, stores]);
 
   return null; // This component does not render anything
 }
