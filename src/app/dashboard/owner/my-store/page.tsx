@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useTransition, useEffect, useMemo, useRef } from 'react';
@@ -34,7 +33,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import type { Store, Product, ProductPrice } from '@/lib/types';
+import type { Store, Product, ProductPrice, User as AppUser } from '@/lib/types';
 import { useFirebase, useDoc, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, query, where, addDoc, writeBatch, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -67,6 +66,7 @@ import { Share2, MapPin, Trash2, AlertCircle, Upload, Image as ImageIcon, Loader
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { generateSingleImage } from '@/ai/flows/image-generator-flow';
+import Link from 'next/link';
 
 
 const ADMIN_EMAIL = 'admin@gmail.com';
@@ -1511,256 +1511,297 @@ function ManageStoreView({ store, isAdmin, adminStoreId }: { store: Store; isAdm
     )
 }
 
-function CreateStoreForm({ user, isAdmin }: { user: any; isAdmin: boolean; }) {
-  const { toast } = useToast();
-  const [isPending, startTransition] = useTransition();
-  const { firestore } = useFirebase();
-  
-  const form = useForm<StoreFormValues>({
-    resolver: zodResolver(storeSchema),
-    defaultValues: {
-      name: isAdmin ? 'LocalBasket' : '',
-      description: isAdmin ? 'The master store for setting canonical product prices.' : '',
-      address: isAdmin ? 'Platform-wide' : '',
-      latitude: 0,
-      longitude: 0,
-    },
-  });
+function CreateStoreForm({ user, isAdmin, profile, onAutoCreate }: { user: any; isAdmin: boolean; profile?: AppUser | null; onAutoCreate: (coords: { lat: number; lng: number }) => void; }) {
+    const { toast } = useToast();
+    const [isPending, startTransition] = useTransition();
+    const { firestore } = useFirebase();
+    const [isLocationConfirmOpen, setIsLocationConfirmOpen] = useState(false);
+    const [capturedCoords, setCapturedCoords] = useState<{ lat: number; lng: number } | null>(null);
 
-  const handleGetLocation = () => {
-    if (navigator.geolocation) {
+    const form = useForm<StoreFormValues>({
+        resolver: zodResolver(storeSchema),
+        defaultValues: {
+            name: isAdmin ? 'LocalBasket' : (profile ? `${profile.firstName}'s Store` : ''),
+            description: isAdmin ? 'The master store for setting canonical product prices.' : (profile ? `Groceries and goods from ${profile.firstName}'s Store.` : ''),
+            address: isAdmin ? 'Platform-wide' : (profile?.address || ''),
+            latitude: 0,
+            longitude: 0,
+        },
+    });
+
+    // Auto-create flow
+    useEffect(() => {
+        if (!isAdmin && profile) {
+            handleGetLocation(true); // true indicates it's an auto-flow
+        }
+    }, [isAdmin, profile]);
+    
+    const handleGetLocation = (isAuto = false) => {
+        if (!navigator.geolocation) {
+            toast({ variant: "destructive", title: "Not Supported", description: "Geolocation is not supported by your browser." });
+            return;
+        }
+
         navigator.geolocation.getCurrentPosition(
             (position) => {
-                form.setValue('latitude', position.coords.latitude);
-                form.setValue('longitude', position.coords.longitude);
-                toast({ title: "Location Fetched!", description: "Your current location has been filled in." });
+                const coords = { lat: position.coords.latitude, lng: position.coords.longitude };
+                if (isAuto) {
+                    setCapturedCoords(coords);
+                    setIsLocationConfirmOpen(true);
+                } else {
+                    form.setValue('latitude', coords.lat);
+                    form.setValue('longitude', coords.lng);
+                    toast({ title: "Location Fetched!", description: "Your current location has been filled in." });
+                }
             },
             () => {
-                 toast({ variant: 'destructive', title: "Location Error", description: "Could not retrieve your location. Please enable permissions and try again." });
+                if (isAuto) {
+                    toast({ variant: 'destructive', title: "Automatic Creation Failed", description: "Could not retrieve your location. Please create your store manually." });
+                } else {
+                    toast({ variant: 'destructive', title: "Location Error", description: "Could not retrieve your location. Please enter it manually." });
+                }
             }
         );
-    } else {
-        toast({ variant: 'destructive', title: "Not Supported", description: "Geolocation is not supported by your browser." });
-    }
-  };
+    };
 
-
-  const onSubmit = (data: StoreFormValues) => {
-    if (!user || !firestore) {
-        toast({
-            variant: 'destructive',
-            title: 'Authentication Error',
-            description: 'You must be logged in to create a store.',
-        });
-        return;
-    }
-     if (!isAdmin && (data.latitude === 0 || data.longitude === 0)) {
-        toast({
-            variant: 'destructive',
-            title: 'Location Required',
-            description: 'Please provide your store\'s location using the GPS button or by entering it manually.',
-        });
-        return;
-    }
-
-    startTransition(async () => {
-        const storeData = {
-            ...data,
-            ownerId: user.uid,
-            imageId: `store-${Math.floor(Math.random() * 3) + 1}`,
-            isClosed: false,
-        };
-        const storesCol = collection(firestore, 'stores');
-        
-        try {
-            await addDoc(storesCol, storeData);
-            toast({
-                title: 'Store Created!',
-                description: `Your store "${data.name}" has been successfully created. You can now add products.`,
-            });
-        } catch (serverError) {
-            console.error("Failed to create store:", serverError);
-            const permissionError = new FirestorePermissionError({
-                path: 'stores',
-                operation: 'create',
-                requestResourceData: storeData,
-            });
-            errorEmitter.emit('permission-error', permissionError);
+    const handleConfirmLocation = (confirmed: boolean) => {
+        setIsLocationConfirmOpen(false);
+        if (confirmed && capturedCoords) {
+            onAutoCreate(capturedCoords);
+        } else {
+            toast({ title: 'Automatic Creation Cancelled', description: 'Please create your store manually from your store location.' });
         }
-    });
-  };
+    };
 
-  return (
-      <Card className="max-w-3xl mx-auto">
-        <CardHeader>
-          <CardTitle className="text-3xl font-headline">
-            {isAdmin ? 'Create Master Store' : 'Create Your Store'}
-          </CardTitle>
-          <CardDescription>
-            {isAdmin 
-                ? "This will be the master store for the entire platform. Add products here to set their official prices." 
-                : "Fill out the details below to get your shop listed. Once created, you can add products to your inventory."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Store Name</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="e.g., Patel Kirana Store"
-                        {...field}
-                        disabled={isAdmin}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Store Description</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Describe what makes your store special."
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="address"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Full Store Address</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="123 Market Street, Mumbai"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              {!isAdmin && (
-               <div className="space-y-2">
-                    <FormLabel>Store Location (GPS)</FormLabel>
-                    <div className="flex items-end gap-4">
-                        <div className="grid grid-cols-2 gap-4 flex-1">
-                            <FormField control={form.control} name="latitude" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel className="text-xs text-muted-foreground">Latitude</FormLabel>
-                                    <FormControl><Input type="number" placeholder="e.g., 19.0760" {...field} /></FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-                            <FormField control={form.control} name="longitude" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel className="text-xs text-muted-foreground">Longitude</FormLabel>
-                                    <FormControl><Input type="number" placeholder="e.g., 72.8777" {...field} /></FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-                        </div>
-                        <Button type="button" variant="outline" onClick={handleGetLocation}>
-                            <MapPin className="mr-2 h-4 w-4" /> Get Current Location
-                        </Button>
-                    </div>
-               </div>
-              )}
+    const onSubmit = (data: StoreFormValues) => {
+        if (!user || !firestore) {
+            toast({ variant: 'destructive', title: 'Authentication Error', description: 'You must be logged in.' });
+            return;
+        }
+        if (!isAdmin && (data.latitude === 0 || data.longitude === 0)) {
+            toast({ variant: 'destructive', title: 'Location Required', description: 'Please provide your store\'s GPS location.' });
+            return;
+        }
 
-              <Button
-                type="submit"
-                className="w-full bg-accent hover:bg-accent/90 text-accent-foreground"
-                disabled={isPending || !user}
-              >
-                {isPending ? 'Creating...' : 'Create Store'}
-              </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
-  );
+        startTransition(async () => {
+            const storeData = { ...data, ownerId: user.uid, imageId: `store-${Math.floor(Math.random() * 3) + 1}`, isClosed: false };
+            try {
+                await addDoc(collection(firestore, 'stores'), storeData);
+                toast({ title: 'Store Created!', description: `Your store "${data.name}" is now live.` });
+            } catch (serverError) {
+                const permissionError = new FirestorePermissionError({ path: 'stores', operation: 'create', requestResourceData: storeData });
+                errorEmitter.emit('permission-error', permissionError);
+            }
+        });
+    };
+
+    if (profile && !isAdmin) {
+        return (
+            <div className="text-center">
+                 <AlertDialog open={isLocationConfirmOpen} onOpenChange={setIsLocationConfirmOpen}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Confirm Store Location</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                We've detected your location. Is this the physical location of your store? This is required for deliveries.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel onClick={() => handleConfirmLocation(false)}>No, I'll do it later</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleConfirmLocation(true)}>Yes, Create My Store Here</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+                <p className="text-lg">Attempting to create your store automatically...</p>
+                <Loader2 className="mx-auto mt-4 h-8 w-8 animate-spin" />
+                 <p className="text-sm text-muted-foreground mt-4">If this fails, you can create your store manually.</p>
+            </div>
+        );
+    }
+
+    return (
+        <Card className="max-w-3xl mx-auto">
+            <CardHeader>
+                <CardTitle className="text-3xl font-headline">{isAdmin ? 'Create Master Store' : 'Create Your Store'}</CardTitle>
+                <CardDescription>
+                    {isAdmin ? "This is the master store for the platform." : "Fill out the details to get your shop listed."}
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                        {/* Form Fields... */}
+                         <FormField
+                            control={form.control}
+                            name="name"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Store Name</FormLabel>
+                                <FormControl>
+                                <Input placeholder="e.g., Patel Kirana Store" {...field} disabled={isAdmin} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="description"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Store Description</FormLabel>
+                                <FormControl><Textarea placeholder="Describe what makes your store special." {...field} /></FormControl>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="address"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Full Store Address</FormLabel>
+                                <FormControl><Input placeholder="123 Market Street, Mumbai" {...field} /></FormControl>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                         {!isAdmin && (
+                            <div className="space-y-2">
+                                    <FormLabel>Store Location (GPS)</FormLabel>
+                                    <div className="flex items-end gap-4">
+                                        <div className="grid grid-cols-2 gap-4 flex-1">
+                                            <FormField control={form.control} name="latitude" render={({ field }) => (
+                                                <FormItem><FormLabel className="text-xs text-muted-foreground">Latitude</FormLabel><FormControl><Input type="number" placeholder="e.g., 19.0760" {...field} /></FormControl><FormMessage /></FormItem>
+                                            )} />
+                                            <FormField control={form.control} name="longitude" render={({ field }) => (
+                                                <FormItem><FormLabel className="text-xs text-muted-foreground">Longitude</FormLabel><FormControl><Input type="number" placeholder="e.g., 72.8777" {...field} /></FormControl><FormMessage /></FormItem>
+                                            )} />
+                                        </div>
+                                        <Button type="button" variant="outline" onClick={() => handleGetLocation(false)}>
+                                            <MapPin className="mr-2 h-4 w-4" /> Get Current Location
+                                        </Button>
+                                    </div>
+                            </div>
+                            )}
+                        <Button type="submit" className="w-full" disabled={isPending || !user}>{isPending ? 'Creating...' : 'Create Store'}</Button>
+                    </form>
+                </Form>
+            </CardContent>
+        </Card>
+    );
 }
 
-
 export default function MyStorePage() {
-  const { user, isUserLoading } = useFirebase();
-  const router = useRouter();
-  const { firestore } = useFirebase();
+    const { user, isUserLoading, firestore } = useFirebase();
+    const router = useRouter();
+    const { toast } = useToast();
+    const [isCreating, startCreationTransition] = useTransition();
 
-  const isAdmin = useMemo(() => user?.email === ADMIN_EMAIL, [user]);
+    const isAdmin = useMemo(() => user?.email === ADMIN_EMAIL, [user]);
 
-  const ownerStoreQuery = useMemoFirebase(() => {
-      if (!firestore || !user || isAdmin) return null;
-      return query(collection(firestore, 'stores'), where('ownerId', '==', user.uid));
-  }, [firestore, user, isAdmin]);
+    const ownerStoreQuery = useMemoFirebase(() => {
+        if (!firestore || !user || isAdmin) return null;
+        return query(collection(firestore, 'stores'), where('ownerId', '==', user.uid));
+    }, [firestore, user, isAdmin]);
 
-  const { data: ownerStores, isLoading: isOwnerStoreLoading } = useCollection<Store>(ownerStoreQuery);
-  const myStore = ownerStores?.[0];
+    const adminStoreQuery = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return query(collection(firestore, 'stores'), where('name', '==', 'LocalBasket'));
+    }, [firestore]);
 
-  const adminStoreQuery = useMemoFirebase(() => {
-      if (!firestore) return null; // Always run this query to find the admin store
-      return query(collection(firestore, 'stores'), where('name', '==', 'LocalBasket'));
-  }, [firestore]);
+    const userProfileQuery = useMemoFirebase(() => {
+        if (!firestore || !user) return null;
+        return doc(firestore, 'users', user.uid);
+    }, [firestore, user]);
 
-  const { data: adminStores, isLoading: isAdminStoreLoading } = useCollection<Store>(adminStoreQuery);
-  const adminStore = adminStores?.[0];
+    const { data: ownerStores, isLoading: isOwnerStoreLoading } = useCollection<Store>(ownerStoreQuery);
+    const { data: adminStores, isLoading: isAdminStoreLoading } = useCollection<Store>(adminStoreQuery);
+    const { data: userProfile, isLoading: isProfileLoading } = useDoc<AppUser>(userProfileQuery);
+    
+    const myStore = ownerStores?.[0];
+    const adminStore = adminStores?.[0];
 
-  useEffect(() => {
-    if (!isUserLoading && !user) {
-      router.push('/login?redirectTo=/dashboard/owner/my-store');
+    useEffect(() => {
+        if (!isUserLoading && !user) {
+            router.push('/login?redirectTo=/dashboard/owner/my-store');
+        }
+    }, [isUserLoading, user, router]);
+
+    const handleAutoCreateStore = (coords: { lat: number; lng: number }) => {
+        if (!user || !firestore || !userProfile) {
+             toast({ variant: 'destructive', title: 'Error', description: 'User profile not found.' });
+             return;
+        }
+
+        startCreationTransition(async () => {
+             const storeData = {
+                name: `${userProfile.firstName}'s Store`,
+                description: `Groceries and goods from ${userProfile.firstName}'s Store.`,
+                address: userProfile.address,
+                latitude: coords.lat,
+                longitude: coords.lng,
+                ownerId: user.uid,
+                imageId: `store-${Math.floor(Math.random() * 3) + 1}`,
+                isClosed: false,
+            };
+            try {
+                await addDoc(collection(firestore, 'stores'), storeData);
+                toast({ title: 'Store Created!', description: `Your store "${storeData.name}" is now live.` });
+            } catch (serverError) {
+                const permissionError = new FirestorePermissionError({ path: 'stores', operation: 'create', requestResourceData: storeData });
+                errorEmitter.emit('permission-error', permissionError);
+            }
+        });
+    };
+
+    const isLoading = isUserLoading || isOwnerStoreLoading || isAdminStoreLoading || isProfileLoading;
+
+    if (isLoading) {
+        return <div className="container mx-auto py-12 px-4 md:px-6">Loading your store...</div>
     }
-  }, [isUserLoading, user, router]);
 
-  const isLoading = isUserLoading || isOwnerStoreLoading || isAdminStoreLoading;
+    const renderContent = () => {
+        if (!user) return null;
 
-  if (isLoading) {
-    return <div className="container mx-auto py-12 px-4 md:px-6">Loading your store...</div>
-  }
-  
-  const renderContent = () => {
-    if (!user) {
-      return null; // Or a login prompt, but the useEffect will redirect
-    }
+        if (isAdmin) {
+            return adminStore ? <ManageStoreView store={adminStore} isAdmin={true} /> : <CreateStoreForm user={user} isAdmin={true} onAutoCreate={() => {}} />;
+        }
 
-    if (isAdmin) {
-      if (adminStore) {
-        return <ManageStoreView store={adminStore} isAdmin={true} />;
-      } else {
-        return <CreateStoreForm user={user} isAdmin={true} />;
-      }
-    } else { // Regular user
-      if (myStore) {
-        return <ManageStoreView store={myStore} isAdmin={false} adminStoreId={adminStore?.id} />;
-      } else {
-        return <CreateStoreForm user={user} isAdmin={false} />;
-      }
-    }
-  };
-  
-  const pageTitle = isAdmin
-    ? (adminStore ? `Master Catalog: ${adminStore.name}` : 'Create Master Store')
-    : (myStore ? `Dashboard: ${myStore.name}` : 'Create Your Store');
+        if (myStore) {
+            return <ManageStoreView store={myStore} isAdmin={false} adminStoreId={adminStore?.id} />;
+        }
+        
+        // New user without a store
+        if (!userProfile) {
+            return (
+                 <Card className="max-w-3xl mx-auto">
+                    <CardHeader>
+                        <CardTitle className="text-3xl font-headline">Complete Your Profile First</CardTitle>
+                        <CardDescription>
+                            To automatically create your store, we need some details from you. Please complete your profile, then come back here.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                         <Button asChild>
+                            <Link href="/dashboard/customer/my-profile">Go to My Profile</Link>
+                        </Button>
+                    </CardContent>
+                </Card>
+            )
+        }
 
-  return (
-    <div className="container mx-auto py-12 px-4 md:px-6">
-      <h1 className="text-4xl font-bold font-headline mb-8">
-        {pageTitle}
-      </h1>
-      {renderContent()}
-    </div>
-  );
+        return <CreateStoreForm user={user} isAdmin={false} profile={userProfile} onAutoCreate={handleAutoCreateStore} />;
+    };
+    
+    const pageTitle = isAdmin
+        ? (adminStore ? `Master Catalog: ${adminStore.name}` : 'Create Master Store')
+        : (myStore ? `Dashboard: ${myStore.name}` : 'Create Your Store');
+
+    return (
+        <div className="container mx-auto py-12 px-4 md:px-6">
+            <h1 className="text-4xl font-bold font-headline mb-8">{pageTitle}</h1>
+            {renderContent()}
+        </div>
+    );
 }
