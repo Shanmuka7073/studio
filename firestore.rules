@@ -28,10 +28,7 @@ service cloud.firestore {
      * - User listing is disallowed, except for the admin.
      * - Stores are owned by a user, and only the owner can modify them.
      * - Products are managed within the scope of a store, by the store owner.
-     * - Orders include the userId and storeId, for simpler authorization.
-     *
-     * Denormalization for Authorization:
-     * - Orders include 'userId', 'storeId', and 'storeOwnerId' to avoid costly `get()` calls in rules.
+     * - Orders include the userId, storeId, and storeOwnerId for simpler authorization.
      */
     function isSignedIn() {
       return request.auth != null;
@@ -78,6 +75,8 @@ service cloud.firestore {
         request.auth.uid == resource.data.userId ||
         request.auth.uid == resource.data.storeOwnerId ||
         request.auth.uid == resource.data.deliveryPartnerId ||
+        (exists(/databases/$(database)/documents/stores/$(resource.data.storeId)) &&
+         get(/databases/$(database)/documents/stores/$(resource.data.storeId)).data.ownerId == request.auth.uid) ||
         isAdmin()
       );
 
