@@ -18,6 +18,7 @@ export function VoiceCommander({ enabled, onStatusUpdate }: VoiceCommanderProps)
   const { firestore } = useFirebase();
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const [stores, setStores] = useState<Store[]>([]);
+  const listeningRef = useRef(false);
 
   // Fetch stores once when the component mounts and firestore is available
   useEffect(() => {
@@ -25,6 +26,10 @@ export function VoiceCommander({ enabled, onStatusUpdate }: VoiceCommanderProps)
       getStores(firestore).then(setStores).catch(console.error);
     }
   }, [firestore]);
+  
+  useEffect(() => {
+    listeningRef.current = enabled;
+  }, [enabled]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -47,7 +52,7 @@ export function VoiceCommander({ enabled, onStatusUpdate }: VoiceCommanderProps)
     recognition.interimResults = false;
 
     const handleCommand = (command: string) => {
-      // 1. Check for dynamic store navigation first
+       // 1. Check for dynamic store navigation first
       const storeMatch = stores.find(store => {
           // Get the core name part, removing generic words like "shop" or "store"
           const coreName = store.name.toLowerCase().replace(/shop|stores|store/g, '').trim();
@@ -66,19 +71,19 @@ export function VoiceCommander({ enabled, onStatusUpdate }: VoiceCommanderProps)
 
 
       // 2. Check for static navigation commands if no store was found
-      if (command.includes('go to home')) {
+      if (['go to home', 'open home', 'home'].some(c => command.includes(c))) {
         router.push('/');
         toast({ title: 'Navigating to Home', description: `Heard: "${command}"` });
-      } else if (command.includes('go to stores')) {
+      } else if (['go to stores', 'open stores', 'stores'].some(c => command.includes(c))) {
         router.push('/stores');
         toast({ title: 'Navigating to Stores', description: `Heard: "${command}"` });
-      } else if (command.includes('go to my orders')) {
+      } else if (['go to my orders', 'open my orders', 'my orders'].some(c => command.includes(c))) {
         router.push('/dashboard/customer/my-orders');
         toast({ title: 'Navigating to My Orders', description: `Heard: "${command}"` });
-      } else if (command.includes('go to cart')) {
+      } else if (['go to cart', 'open cart', 'cart'].some(c => command.includes(c))) {
         router.push('/cart');
         toast({ title: 'Navigating to Cart', description: `Heard: "${command}"` });
-      } else if (command.includes('go to dashboard')) {
+      } else if (['go to dashboard', 'open dashboard', 'dashboard'].some(c => command.includes(c))) {
         router.push('/dashboard');
         toast({ title: 'Navigating to Dashboard', description: `Heard: "${command}"` });
       }
@@ -104,7 +109,7 @@ export function VoiceCommander({ enabled, onStatusUpdate }: VoiceCommanderProps)
     recognition.onend = () => {
       // Only restart if the service is supposed to be enabled.
       // This prevents restarting when we manually call .stop()
-      if (enabled) {
+      if (listeningRef.current) {
           try {
             recognition.start();
           } catch(e) {
