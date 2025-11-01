@@ -35,6 +35,15 @@ export type Store = {
   isClosed?: boolean;
 };
 
+export type User = {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    address: string;
+    phoneNumber: string;
+}
+
 export type CartItem = {
   product: Product; // The base product
   variant: ProductVariant; // The specific variant chosen
@@ -54,7 +63,7 @@ export type Order = {
   id:string;
   userId: string;
   storeId: string;
-  storeOwnerId: string; // Denormalized for security rules
+  storeOwnerId?: string; // Denormalized for security rules, optional for backwards compatibility
   customerName: string;
   deliveryAddress: string;
   deliveryLat: number;

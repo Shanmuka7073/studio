@@ -22,17 +22,18 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 import { getProductImage, getStores, getStore } from '@/lib/data';
-import { useTransition, useState, useRef, useCallback, useEffect } from 'react';
-import { useFirebase, errorEmitter } from '@/firebase';
-import { collection, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
+import { useTransition, useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useFirebase, errorEmitter, useDoc, useMemoFirebase } from '@/firebase';
+import { collection, addDoc, serverTimestamp, getDocs, doc } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Mic, StopCircle, CheckCircle, MapPin, Loader2, Bot, Store as StoreIcon } from 'lucide-react';
 import Link from 'next/link';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import type { ProductPrice, ProductVariant, Store } from '@/lib/types';
+import type { ProductPrice, ProductVariant, Store, User as AppUser } from '@/lib/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { VoiceOrderDialog, type VoiceOrderInfo } from '@/components/voice-order-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 
 const checkoutSchema = z.object({
@@ -147,6 +148,15 @@ export default function CheckoutPage() {
 
   const [deliveryCoords, setDeliveryCoords] = useState<{lat: number, lng: number} | null>(null);
   const [images, setImages] = useState({});
+  const [isLocationPromptOpen, setIsLocationPromptOpen] = useState(false);
+  const placeOrderBtnRef = useRef<HTMLButtonElement>(null);
+
+
+   const userDocRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user]);
+  const { data: userData, isLoading: isProfileLoading } = useDoc<AppUser>(userDocRef);
 
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
@@ -157,6 +167,16 @@ export default function CheckoutPage() {
       storeId: '',
     },
   });
+
+   // Effect to pre-fill form with user data
+  useEffect(() => {
+    if (userData) {
+      form.reset({
+        name: `${userData.firstName} ${userData.lastName}`,
+        phone: userData.phoneNumber,
+      });
+    }
+  }, [userData, form]);
 
   const handleUnderstandList = useCallback(async (text: string) => {
     if (!firestore) return;
@@ -236,59 +256,8 @@ export default function CheckoutPage() {
         speechRecognitionRef.current.start();
     }
   }, [isListening, form]);
-
-  useEffect(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-        speechRecognitionRef.current = new SpeechRecognition();
-        const recognition = speechRecognitionRef.current;
-        recognition.lang = 'en-IN';
-        recognition.interimResults = false;
-        recognition.continuous = false;
-        
-        recognition.onstart = () => {
-            setIsListening(true);
-            form.setValue('shoppingList', "🎤 Listening...");
-        };
-        
-        recognition.onresult = (event) => {
-            const transcript = event.results[0][0].transcript;
-            form.setValue('shoppingList', transcript);
-            handleUnderstandList(transcript); // Process the result immediately
-        };
-
-        recognition.onend = () => {
-            setIsListening(false);
-        };
-
-        recognition.onerror = (event) => {
-            console.error("Speech recognition error:", event.error);
-            if (event.error !== 'aborted' && event.error !== 'no-speech') {
-              toast({ variant: 'destructive', title: 'Voice Error', description: `An error occurred: ${event.error}` });
-            }
-            setIsListening(false);
-        };
-
-        // Check for auto-start param
-        const autoStart = searchParams.get('action') === 'record';
-        if (autoStart) {
-          handleToggleListening();
-        }
-
-    } else {
-        toast({ variant: 'destructive', title: 'Not Supported', description: 'Voice recognition is not supported by your browser.' });
-    }
-    
-    // Cleanup on unmount
-    return () => {
-      if (speechRecognitionRef.current) {
-        speechRecognitionRef.current.abort();
-      }
-    }
-  }, [toast, form, searchParams, handleToggleListening, handleUnderstandList]);
-
-
-   const handleGetLocation = () => {
+  
+  const handleGetLocation = useCallback(() => {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 (position) => {
@@ -305,6 +274,91 @@ export default function CheckoutPage() {
         } else {
             toast({ variant: 'destructive', title: "Not Supported", description: "Geolocation is not supported by your browser." });
         }
+    }, [toast]);
+
+
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+        speechRecognitionRef.current = new SpeechRecognition();
+        const recognition = speechRecognitionRef.current;
+        recognition.lang = 'en-IN';
+        recognition.interimResults = false;
+        recognition.continuous = false;
+        
+        recognition.onstart = () => {
+            setIsListening(true);
+            form.setValue('shoppingList', "🎤 Listening...");
+        };
+        
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript.toLowerCase().trim();
+            if (transcript === 'yes') {
+                if (isLocationPromptOpen) {
+                    handleLocationConfirm();
+                }
+                return;
+            }
+             if (transcript === 'no') {
+                if (isLocationPromptOpen) {
+                    handleLocationCancel();
+                }
+                return;
+            }
+            if (transcript.includes('place order')) {
+                placeOrderBtnRef.current?.click();
+                return;
+            }
+
+            form.setValue('shoppingList', transcript);
+            handleUnderstandList(transcript); // Process the result immediately
+        };
+
+        recognition.onend = () => {
+            setIsListening(false);
+        };
+
+        recognition.onerror = (event) => {
+            console.error("Speech recognition error:", event.error);
+            if (event.error !== 'aborted' && event.error !== 'no-speech') {
+              toast({ variant: 'destructive', title: 'Voice Error', description: `An error occurred: ${event.error}` });
+            }
+            setIsListening(false);
+        };
+
+        // Check for auto-start param or prompt for location
+        const autoStart = searchParams.get('action') === 'record';
+        if (autoStart) {
+          handleToggleListening();
+        } else {
+          // Auto-prompt for location on page load
+          setTimeout(() => setIsLocationPromptOpen(true), 1000);
+        }
+
+    } else {
+        toast({ variant: 'destructive', title: 'Not Supported', description: 'Voice recognition is not supported by your browser.' });
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      if (speechRecognitionRef.current) {
+        speechRecognitionRef.current.abort();
+      }
+    }
+  }, [toast, form, searchParams, handleToggleListening, handleUnderstandList, isLocationPromptOpen]);
+
+
+    const handleLocationConfirm = () => {
+        setIsLocationPromptOpen(false);
+        handleGetLocation();
+    };
+
+    const handleLocationCancel = () => {
+        setIsLocationPromptOpen(false);
+        toast({
+            title: "Location Skipped",
+            description: "Please capture your location manually to proceed.",
+        });
     };
 
     const handleConfirmVoiceOrder = () => {
@@ -336,7 +390,6 @@ export default function CheckoutPage() {
     const isVoiceOrder = cartItems.length === 0 && structuredList.length > 0;
     
     if (isVoiceOrder) {
-        // This should now be handled by the VoiceOrderDialog
         handleConfirmVoiceOrder();
         return;
     }
@@ -420,6 +473,21 @@ export default function CheckoutPage() {
                 orderInfo={voiceOrderInfo}
             />
         )}
+        <AlertDialog open={isLocationPromptOpen} onOpenChange={setIsLocationPromptOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Share Location for Delivery?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        To complete your order, we need your current location for delivery. Say "Yes" to share or "No" to cancel.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel onClick={handleLocationCancel}>Manual Entry</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleLocationConfirm}>Yes, Share Location</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
         <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid md:grid-cols-2 gap-12">
                 <div>
@@ -472,7 +540,7 @@ export default function CheckoutPage() {
                             )}
                         />
                         
-                        <Button type="submit" disabled={isPlacingOrder} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
+                        <Button ref={placeOrderBtnRef} type="submit" disabled={isPlacingOrder} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
                             {isPlacingOrder ? 'Placing Order...' : 'Place Order'}
                         </Button>
                     </CardContent>
