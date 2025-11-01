@@ -5,7 +5,6 @@ import { ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetTrigger, SheetContent } from '@/components/ui/sheet';
 import { CartSheetContent } from './cart-sheet';
-import { useCart } from '@/lib/cart';
 import type * as SheetPrimitive from "@radix-ui/react-dialog"
 
 
@@ -28,7 +27,7 @@ export function CartIcon({ open, onOpenChange }: CartIconProps) {
           <span className="sr-only">Open cart</span>
         </Button>
       </SheetTrigger>
-      <SheetContent className="w-[400px] sm:w-[540px]">
+      <SheetContent className="w-[90vw] sm:w-[540px]">
         <CartSheetContent />
       </SheetContent>
     </Sheet>

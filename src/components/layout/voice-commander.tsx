@@ -330,8 +330,8 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
     };
 
     recognition.onerror = (event) => {
-      console.error('Speech recognition error', event.error);
-       if (event.error !== 'aborted' && event.error !== 'no-speech') {
+      if (event.error !== 'aborted' && event.error !== 'no-speech') {
+        console.error('Speech recognition error', event.error);
         onStatusUpdate(`⚠️ Error: ${event.error}`);
       }
     };
