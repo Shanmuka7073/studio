@@ -35,18 +35,24 @@ type ParsedShoppingListItem = {
 // This function now lives here to be used by the voice commander
 async function parseShoppingList(text: string): Promise<ParsedShoppingListItem[]> {
     const items: ParsedShoppingListItem[] = [];
-    const pattern = /(\d+)\s*(kg|g|grams|kilogram|kilo)?\s*([a-zA-Z\s]+)/gi;
+    // Updated pattern to be more flexible with units
+    const pattern = /(\d+)\s*(kg|g|grams|kilogram|kilo|pc|piece|pieces)?\s*([a-zA-Z\s]+)/gi;
     let match;
 
     while ((match = pattern.exec(text)) !== null) {
         const quantity = parseInt(match[1], 10);
-        const unit = match[2] ? match[2].toLowerCase() : 'pc'; // Default to 'piece' if no unit
+        let unit = match[2] ? match[2].toLowerCase() : 'pc'; // Default to 'piece' if no unit
+        if (unit === 'grams') unit = 'g';
+        if (unit === 'kilogram' || unit === 'kilo') unit = 'kg';
+        if (unit === 'piece' || unit === 'pieces') unit = 'pc';
+
         const itemName = match[3].trim().toLowerCase();
 
         items.push({ quantity, unit, itemName });
     }
     return items;
 }
+
 
 export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoiceOrder, onOpenCart }: VoiceCommanderProps) {
   const router = useRouter();
@@ -72,7 +78,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
         orders: { display: 'View My Orders', action: () => router.push('/dashboard/customer/my-orders'), aliases: ['my orders', 'go to my orders', 'open my orders', 'show my orders', 'view orders', 'check my orders', 'open order history', 'see past orders', 'my purchases'] },
         deliveries: { display: 'View Deliveries', action: () => router.push('/dashboard/delivery/deliveries'), aliases: ['deliveries', 'my deliveries', 'go to deliveries', 'open deliveries', 'track deliveries', 'check delivery status', 'see my delivery list', 'delivery updates', 'delivery dashboard'] },
         myStore: { display: 'Create or Manage My Store', action: () => router.push('/dashboard/owner/my-store'), aliases: ['create my store', 'my store', 'manage my store', 'new store', 'register my store', 'make a store', 'open my shop', 'go to seller page', 'view my products', 'store dashboard', 'my store page'] },
-        voiceOrder: { display: 'Create a Shopping List', action: () => router.push('/checkout?action=record'), aliases: ['create a shopping list', 'make a list', 'new shopping list', 'start my list', 'prepare my list', 'record my order', 'start voice order', 'start list', 'I want to shop', 'start recording', 'take my order', 'start voice shopping', 'record voice list', 'I\'ll say my list', 'speak my order', 'take my list', 'listen to my order', 'record shopping items', 'note down my list'] },
+        voiceOrder: { display: 'Create a Shopping List', action: () => router.push('/checkout?action=record'), aliases: ['create a shopping list', 'make a list', 'new shopping list', 'start my list', 'prepare my list', 'record my order', 'start voice order', 'start list', 'i want to shop', 'start recording', 'take my order', 'start voice shopping', 'record voice list', 'I\'ll say my list', 'speak my order', 'take my list', 'listen to my order', 'record shopping items', 'note down my list'] },
         refresh: { display: 'Refresh the page', action: () => window.location.reload(), aliases: ['refresh the page', 'reload page', 'reload app', 'refresh screen', 'restart page', 'update screen', 'refresh everything', 'refresh'] },
         showMyProducts: { display: "Show My Store's Products", action: () => router.push('/dashboard/owner/my-store'), aliases: ["show my products", "list my items", "open inventory", "what am I selling", "see store items", "view my listings"] },
       };
@@ -148,9 +154,16 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
             if (priceData && priceData.variants) {
                 // Now find the variant that matches the spoken weight
                 // e.g., "1kg" should match "1kg", "1 kg" etc.
-                const targetWeight = `${parsedItem.quantity}${parsedItem.unit === 'pc' ? '' : parsedItem.unit}`.replace(/gram/g, 'g').replace(/kilogram|kilo/g, 'kg').replace(/\s/g, '');
-                
-                const variantMatch = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === targetWeight);
+                 const targetWeight = (parsedItem.quantity + (parsedItem.unit === 'pc' ? 'pc' : parsedItem.unit)).replace(/\s/g, '').toLowerCase();
+
+                const variantMatch = priceData.variants.find(v => {
+                    const variantWeight = v.weight.replace(/\s/g, '').toLowerCase();
+                    // Handle cases like "1kg" matching "1 kg"
+                    if (variantWeight === targetWeight) return true;
+                    // Handle cases where unit is implied, e.g. "1 chicken" -> "1pc"
+                    if (parsedItem.unit === 'pc' && variantWeight === (parsedItem.quantity + 'pc')) return true;
+                    return false;
+                });
 
                 if (variantMatch) {
                     return { product: masterProductMatch, variant: variantMatch };
@@ -182,8 +195,11 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
     const handleCommand = async (command: string) => {
       if (!firestore || !user) return;
         
-      const orderTriggers = ['order ', 'add ', 'buy ', 'get ', 'shop ', 'purchase ', 'i want '];
+      const orderTriggers = ['order ', 'buy ', 'get ', 'shop ', 'purchase ', 'i want '];
+      const addToCartTriggers = ['add '];
+
       const orderTriggerFound = orderTriggers.find(t => command.startsWith(t));
+      const addTriggerFound = addToCartTriggers.find(t => command.startsWith(t));
       
       let fromKeyword = ' from shop ';
       let fromIndex = command.lastIndexOf(fromKeyword);
@@ -216,32 +232,36 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
           }
       }
       
-      // SCENARIO 2: Iterative list building ("1 kg chicken and 2 kg tomatoes")
-      const parsedItems = await parseShoppingList(command);
-      if (parsedItems.length > 0 && fromIndex === -1 && !orderTriggerFound) {
-          onOpenCart(); // Open the cart side panel
-          onSuggestions([]);
-          toast({ title: "Building your cart...", description: `Heard: "${command}"`});
-          
-          for (const item of parsedItems) {
-              const { product, variant } = await findProductAndVariant(item);
-              if (product && variant) {
-                  addItemToCart(product, variant, 1); // quantity is implicitly 1 of the variant (e.g. 1 x 1kg pack)
-              } else {
-                  toast({ variant: 'destructive', title: "Item not found", description: `Could not find "${item.quantity}${item.unit} ${item.itemName}" in the catalog.`});
+      // SCENARIO 2: Iterative list building ("add 1 kg chicken and 2 kg tomatoes")
+      if (addTriggerFound || (orderTriggerFound && fromIndex === -1)) {
+          const listText = addTriggerFound ? command.substring(addTriggerFound.length) : command.substring(orderTriggerFound!.length);
+          const parsedItems = await parseShoppingList(listText);
+
+          if (parsedItems.length > 0) {
+              onOpenCart(); // Open the cart side panel
+              onSuggestions([]);
+              toast({ title: "Building your cart...", description: `Heard: "${command}"`});
+              
+              for (const item of parsedItems) {
+                  const { product, variant } = await findProductAndVariant(item);
+                  if (product && variant) {
+                      addItemToCart(product, variant, 1); // quantity is implicitly 1 of the variant (e.g. 1 x 1kg pack)
+                  } else {
+                      toast({ variant: 'destructive', title: "Item not found", description: `Could not find "${item.quantity}${item.unit} ${item.itemName}" in the catalog.`});
+                  }
               }
+              return; // Command handled
           }
-          return; // Command handled
       }
 
       const addProductTriggers = ['add product ', 'add new product ', 'list ', 'upload ', 'put ', 'new item ', 'post '];
       const sellProductTriggers = ['sell ', 'start selling ', 'mark ', 'put on shelf ', 'list for buyers ', 'make available ', 'enable ', 'stock '];
       
-      const addTriggerFound = addProductTriggers.find(t => command.startsWith(t));
+      const addProdTriggerFound = addProductTriggers.find(t => command.startsWith(t));
       const sellTriggerFound = sellProductTriggers.find(t => command.startsWith(t));
 
-      if ((addTriggerFound || sellTriggerFound) && myStore) {
-          const trigger = addTriggerFound || sellTriggerFound;
+      if ((addProdTriggerFound || sellTriggerFound) && myStore) {
+          const trigger = addProdTriggerFound || sellTriggerFound;
           const productName = command.substring(trigger!.length).replace(/to my store|for sale|in my store/g, '').trim();
           const productMatch = masterProductList.find(p => p.name.toLowerCase() === productName);
 
