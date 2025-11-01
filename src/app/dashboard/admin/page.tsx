@@ -1,8 +1,7 @@
-
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Users, Store, Truck, ShoppingBag, AlertCircle, ArrowRight } from 'lucide-react';
+import { Users, Store, Truck, ShoppingBag, AlertCircle, ArrowRight, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
@@ -44,6 +43,24 @@ function CreateMasterStoreCard() {
             </AlertDescription>
         </Alert>
     )
+}
+
+function AdminActionCard({ title, description, href, icon: Icon }: { title: string, description: string, href: string, icon: React.ElementType }) {
+    return (
+        <Link href={href} className="block hover:shadow-lg transition-shadow rounded-lg">
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center gap-4">
+                        <Icon className="h-8 w-8 text-primary" />
+                        <CardTitle>{title}</CardTitle>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <CardDescription>{description}</CardDescription>
+                </CardContent>
+            </Card>
+        </Link>
+    );
 }
 
 export default function AdminDashboardPage() {
@@ -115,6 +132,24 @@ export default function AdminDashboardPage() {
                         loading={statsLoading}
                     />
                 ))}
+            </div>
+
+            <div className="mt-16">
+                 <h2 className="text-2xl font-bold text-center mb-8 font-headline">Admin Tools</h2>
+                <div className="grid gap-8 md:grid-cols-2 max-w-4xl mx-auto">
+                    <AdminActionCard 
+                        title="Manage Master Store & Products"
+                        description="Add or edit products in the master catalog and set canonical prices."
+                        href="/dashboard/owner/my-store"
+                        icon={Store}
+                    />
+                    <AdminActionCard 
+                        title="Site Configuration"
+                        description="Index the site's content to generate and manage voice commands."
+                        href="/dashboard/site-config"
+                        icon={Settings}
+                    />
+                </div>
             </div>
         </div>
     );
