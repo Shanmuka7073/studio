@@ -80,60 +80,38 @@ async function parseShoppingListFromText(text: string, db: any): Promise<Structu
     for (const product of masterProductList) {
         const productName = product.productName.toLowerCase();
 
-        // Check if the product name is even mentioned in the transcript
-        if (lowerCaseText.includes(productName)) {
-            // This product is mentioned. Now check for all its specific variants.
-            for (const variant of product.variants) {
-                // Check if this specific variant's weight is mentioned.
-                // e.g., for "1 kg", check for "1kg" or "1 kg"
-                const weightNoSpace = variant.weight.toLowerCase().replace(/\s/g, '');
-                const weightWithSpace = variant.weight.toLowerCase();
+        // This product is mentioned. Now check for all its specific variants.
+        for (const variant of product.variants) {
+            // Check if this specific variant's weight is mentioned near the product name.
+            // e.g., for "1 kg chicken", check for "1kg" or "1 kg" AND "chicken"
+            const weightNoSpace = variant.weight.toLowerCase().replace(/\s/g, '');
+            const weightWithSpace = variant.weight.toLowerCase();
+            
+            const mentionsProduct = lowerCaseText.includes(productName);
+            const mentionsWeight = lowerCaseText.includes(weightNoSpace) || lowerCaseText.includes(weightWithSpace);
+            
+            // To be more precise, let's create patterns to check if weight and product are close.
+            const pattern1 = new RegExp(`${productName}.*${weightNoSpace}`, 'i');
+            const pattern2 = new RegExp(`${productName}.*${weightWithSpace}`, 'i');
+            const pattern3 = new RegExp(`${weightNoSpace}.*${productName}`, 'i');
+            const pattern4 = new RegExp(`${weightWithSpace}.*${productName}`, 'i');
 
-                if (lowerCaseText.includes(weightNoSpace) || lowerCaseText.includes(weightWithSpace)) {
-                    // This specific variant is mentioned.
-                    // To avoid adding duplicates, check if we've already added this exact SKU
-                    const alreadyAdded = foundItems.some(item => item.variant.sku === variant.sku);
-                    if (!alreadyAdded) {
-                        foundItems.push({
-                            productName: product.productName,
-                            quantity: variant.weight,
-                            price: variant.price,
-                            variant: variant,
-                        });
-                    }
+            if (mentionsProduct && mentionsWeight && (pattern1.test(lowerCaseText) || pattern2.test(lowerCaseText) || pattern3.test(lowerCaseText) || pattern4.test(lowerCaseText))) {
+                // This specific variant is mentioned.
+                // To avoid adding duplicates, check if we've already added this exact SKU
+                const alreadyAdded = foundItems.some(item => item.variant.sku === variant.sku);
+                if (!alreadyAdded) {
+                    foundItems.push({
+                        productName: product.productName,
+                        quantity: variant.weight,
+                        price: variant.price,
+                        variant: variant,
+                    });
                 }
             }
         }
     }
     
-    // After checking for specific variants, handle cases where a product is mentioned
-    // but no specific weight was matched. This is a fallback.
-    const mentionedProductNames = new Set(foundItems.map(item => item.productName.toLowerCase()));
-    for (const product of masterProductList) {
-        const productName = product.productName.toLowerCase();
-        
-        // If product is in text but we haven't matched any of its variants yet
-        if (lowerCaseText.includes(productName) && !mentionedProductNames.has(productName)) {
-            // Let's use a smart default. Prefer "1 kg" or "1kg" if available.
-            let defaultVariant = product.variants.find(v => v.weight.toLowerCase() === '1 kg' || v.weight.toLowerCase() === '1kg');
-            
-            // If "1kg" isn't an option, just fall back to the first variant in the list.
-            if (!defaultVariant) {
-                defaultVariant = product.variants[0];
-            }
-
-            if (defaultVariant) {
-                foundItems.push({
-                    productName: product.productName,
-                    quantity: defaultVariant.weight,
-                    price: defaultVariant.price,
-                    variant: defaultVariant,
-                });
-            }
-        }
-    }
-
-
     return foundItems;
 }
 
