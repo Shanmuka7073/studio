@@ -6,33 +6,95 @@ import { useToast } from '@/hooks/use-toast';
 import { useFirebase } from '@/firebase';
 import { getStores } from '@/lib/data';
 import type { Store } from '@/lib/types';
+import { calculateSimilarity } from '@/lib/calculate-similarity';
+
+export interface Command {
+  command: string;
+  action: () => void;
+  display: string;
+}
 
 interface VoiceCommanderProps {
   enabled: boolean;
   onStatusUpdate: (status: string) => void;
+  onSuggestions: (suggestions: Command[]) => void;
 }
 
-export function VoiceCommander({ enabled, onStatusUpdate }: VoiceCommanderProps) {
+const STATIC_COMMANDS: Omit<Command, 'action'>[] = [
+  { command: 'go home', display: 'Go to Home' },
+  { command: 'open home', display: 'Go to Home' },
+  { command: 'home', display: 'Go to Home' },
+  { command: 'go to stores', display: 'Browse All Stores' },
+  { command: 'open stores', display: 'Browse All Stores' },
+  { command: 'stores', display: 'Browse All Stores' },
+  { command: 'go to my orders', display: 'View My Orders' },
+  { command: 'open my orders', display: 'View My Orders' },
+  { command: 'my orders', display: 'View My Orders' },
+  { command: 'go to cart', display: 'View Cart' },
+  { command: 'open cart', display: 'View Cart' },
+  { command: 'cart', display: 'View Cart' },
+  { command: 'go to dashboard', display: 'Go to Dashboard' },
+  { command: 'open dashboard', display: 'Go to Dashboard' },
+  { command: 'dashboard', display: 'Go to Dashboard' },
+];
+
+export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: VoiceCommanderProps) {
   const router = useRouter();
   const { toast } = useToast();
-  const { firestore } = useFirebase();
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const [stores, setStores] = useState<Store[]>([]);
+  const { firestore, user } = useFirebase();
+  const [allCommands, setAllCommands] = useState<Command[]>([]);
   const listeningRef = useRef(false);
 
-  // Fetch stores once when the component mounts and firestore is available
+  // Fetch stores and build the full command list
   useEffect(() => {
-    if (firestore) {
-      getStores(firestore).then(setStores).catch(console.error);
+    if (firestore && user) {
+        const staticNavCommands: Command[] = [
+            { command: 'go home', display: 'Navigate to Home', action: () => router.push('/') },
+            { command: 'open home', display: 'Navigate to Home', action: () => router.push('/') },
+            { command: 'home', display: 'Navigate to Home', action: () => router.push('/') },
+            { command: 'go to stores', display: 'Browse All Stores', action: () => router.push('/stores') },
+            { command: 'open stores', display: 'Browse All Stores', action: () => router.push('/stores') },
+            { command: 'stores', display: 'Browse All Stores', action: () => router.push('/stores') },
+            { command: 'go to my orders', display: 'View My Orders', action: () => router.push('/dashboard/customer/my-orders') },
+            { command: 'open my orders', display: 'View My Orders', action: () => router.push('/dashboard/customer/my-orders') },
+            { command: 'my orders', display: 'View My Orders', action: () => router.push('/dashboard/customer/my-orders') },
+            { command: 'go to cart', display: 'View Your Cart', action: () => router.push('/cart') },
+            { command: 'open cart', display: 'View Your Cart', action: () => router.push('/cart') },
+            { command: 'cart', display: 'View Your Cart', action: () => router.push('/cart') },
+            { command: 'go to dashboard', display: 'View Dashboard', action: () => router.push('/dashboard') },
+            { command: 'open dashboard', display: 'View Dashboard', action: () => router.push('/dashboard') },
+            { command: 'dashboard', display: 'View Dashboard', action: () => router.push('/dashboard') },
+        ];
+
+      getStores(firestore).then(stores => {
+        const storeCommands: Command[] = stores.flatMap(store => {
+            const coreName = store.name.toLowerCase().replace(/shop|stores|store/g, '').trim();
+            const variations = [
+                `go to ${coreName}`,
+                `open ${coreName}`,
+                coreName,
+                store.name.toLowerCase()
+            ];
+            return variations.map(variation => ({
+                command: variation,
+                display: `Go to ${store.name}`, 
+                action: () => router.push(`/stores/${store.id}`)
+            }));
+        });
+        setAllCommands([...staticNavCommands, ...storeCommands]);
+      }).catch(console.error);
     }
-  }, [firestore]);
+  }, [firestore, user, router]);
   
   useEffect(() => {
     listeningRef.current = enabled;
-  }, [enabled]);
+    if (!enabled) {
+      onSuggestions([]); // Clear suggestions when disabled
+    }
+  }, [enabled, onSuggestions]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !enabled) return;
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -42,51 +104,37 @@ export function VoiceCommander({ enabled, onStatusUpdate }: VoiceCommanderProps)
       return;
     }
 
-    if (!recognitionRef.current) {
-      recognitionRef.current = new SpeechRecognition();
-    }
-    
-    const recognition = recognitionRef.current;
+    const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.lang = 'en-IN';
     recognition.interimResults = false;
 
     const handleCommand = (command: string) => {
-       // 1. Check for dynamic store navigation first
-      const storeMatch = stores.find(store => {
-          // Get the core name part, removing generic words like "shop" or "store"
-          const coreName = store.name.toLowerCase().replace(/shop|stores|store/g, '').trim();
-          // Check if the command includes the core name
-          return command.includes(coreName);
-      });
+        if (allCommands.length === 0) return;
 
-      if (storeMatch) {
-          router.push(`/stores/${storeMatch.id}`);
-          toast({
-              title: `Navigating to ${storeMatch.name}`,
-              description: `Heard: "${command}"`
-          });
-          return; // IMPORTANT: Stop processing after a match is found
-      }
+        const perfectMatch = allCommands.find(c => command === c.command);
+        if (perfectMatch) {
+            perfectMatch.action();
+            toast({ title: `Navigating...`, description: `Heard: "${command}"` });
+            onSuggestions([]);
+            return;
+        }
 
+        const potentialMatches = allCommands
+            .map(c => ({
+                ...c,
+                similarity: calculateSimilarity(command, c.command),
+            }))
+            .filter(c => c.similarity > 0.5) // Threshold for suggestions
+            .sort((a, b) => b.similarity - a.similarity)
+            .slice(0, 3);
 
-      // 2. Check for static navigation commands if no store was found
-      if (['go to home', 'open home', 'home'].some(c => command.includes(c))) {
-        router.push('/');
-        toast({ title: 'Navigating to Home', description: `Heard: "${command}"` });
-      } else if (['go to stores', 'open stores', 'stores'].some(c => command.includes(c))) {
-        router.push('/stores');
-        toast({ title: 'Navigating to Stores', description: `Heard: "${command}"` });
-      } else if (['go to my orders', 'open my orders', 'my orders'].some(c => command.includes(c))) {
-        router.push('/dashboard/customer/my-orders');
-        toast({ title: 'Navigating to My Orders', description: `Heard: "${command}"` });
-      } else if (['go to cart', 'open cart', 'cart'].some(c => command.includes(c))) {
-        router.push('/cart');
-        toast({ title: 'Navigating to Cart', description: `Heard: "${command}"` });
-      } else if (['go to dashboard', 'open dashboard', 'dashboard'].some(c => command.includes(c))) {
-        router.push('/dashboard');
-        toast({ title: 'Navigating to Dashboard', description: `Heard: "${command}"` });
-      }
+        if (potentialMatches.length > 0) {
+            onSuggestions(potentialMatches);
+        } else {
+            onSuggestions([]);
+            toast({ variant: 'destructive', title: 'Command not recognized', description: `Heard: "${command}"` });
+        }
     };
     
     recognition.onstart = () => {
@@ -107,8 +155,6 @@ export function VoiceCommander({ enabled, onStatusUpdate }: VoiceCommanderProps)
     };
     
     recognition.onend = () => {
-      // Only restart if the service is supposed to be enabled.
-      // This prevents restarting when we manually call .stop()
       if (listeningRef.current) {
           try {
             recognition.start();
@@ -121,28 +167,18 @@ export function VoiceCommander({ enabled, onStatusUpdate }: VoiceCommanderProps)
       }
     };
 
-    if (enabled) {
-      try {
-        recognition.start();
-      } catch(e) {
-        console.log("Could not start recognition, it may already be running.");
-      }
-    } else {
-      // When disabled, stop recognition and nullify the onend handler
-      // to prevent it from restarting.
-      recognition.onend = null; 
-      recognition.stop();
+    try {
+      recognition.start();
+    } catch(e) {
+      console.log("Could not start recognition, it may already be running.");
     }
 
-    // Cleanup function to stop recognition when the component unmounts or `enabled` changes to false
     return () => {
-      if(recognitionRef.current) {
-        recognitionRef.current.onend = null;
-        recognitionRef.current.stop();
-      }
+      recognition.stop();
+      recognition.onend = null;
     };
 
-  }, [enabled, router, toast, onStatusUpdate, stores]);
+  }, [enabled, toast, onStatusUpdate, allCommands, onSuggestions]);
 
-  return null; // This component does not render anything
+  return null;
 }

@@ -26,7 +26,7 @@ import {
 import { getAuth, signOut } from 'firebase/auth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useState, useEffect } from 'react';
-import { VoiceCommander } from './voice-commander';
+import { VoiceCommander, type Command } from './voice-commander';
 import { useToast } from '@/hooks/use-toast';
 
 
@@ -126,6 +126,7 @@ export function Header() {
   const [hasMounted, setHasMounted] = useState(false);
   const { toast } = useToast();
   const [voiceStatus, setVoiceStatus] = useState('Click the mic to start listening.');
+  const [suggestedCommands, setSuggestedCommands] = useState<Command[]>([]);
 
   useEffect(() => {
     setHasMounted(true);
@@ -142,10 +143,19 @@ export function Header() {
     }
     setVoiceEnabled(prev => !prev);
   };
+  
+  const handleSuggestionClick = (command: Command) => {
+    command.action();
+    setSuggestedCommands([]); // Clear suggestions after click
+  }
 
   return (
     <header className="sticky top-0 z-50 flex h-16 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:px-6">
-      <VoiceCommander enabled={voiceEnabled} onStatusUpdate={setVoiceStatus} />
+      <VoiceCommander 
+        enabled={voiceEnabled} 
+        onStatusUpdate={setVoiceStatus}
+        onSuggestions={setSuggestedCommands} 
+      />
       <nav className="hidden flex-col gap-6 text-lg font-medium md:flex md:flex-row md:items-center md:gap-5 md:text-sm lg:gap-6">
         <Link
           href="/"
@@ -275,6 +285,23 @@ export function Header() {
         <div className="absolute top-16 left-0 w-full bg-secondary text-secondary-foreground text-center py-1 text-sm font-mono z-40">
             {voiceStatus}
         </div>
+      )}
+      {suggestedCommands.length > 0 && (
+         <div className="absolute top-24 left-1/2 -translate-x-1/2 w-full max-w-md bg-background border rounded-lg shadow-lg z-50 p-2">
+            <p className="text-sm font-semibold text-muted-foreground px-2 pb-2">Did you mean...?</p>
+            <div className="flex flex-col gap-1">
+                {suggestedCommands.map((cmd, index) => (
+                    <Button 
+                        key={index}
+                        variant="ghost"
+                        className="justify-start"
+                        onClick={() => handleSuggestionClick(cmd)}
+                    >
+                        {cmd.display}
+                    </Button>
+                ))}
+            </div>
+         </div>
       )}
     </header>
   );
