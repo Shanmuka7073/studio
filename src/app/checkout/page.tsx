@@ -156,7 +156,7 @@ export default function CheckoutPage() {
         speechRecognitionRef.current = new SpeechRecognition();
         const recognition = speechRecognitionRef.current;
         recognition.lang = 'en-IN';
-        recognition.continuous = false;
+        recognition.continuous = true; // Keep listening until explicitly stopped
         recognition.interimResults = true;
         
         recognition.onstart = () => {
@@ -200,8 +200,9 @@ export default function CheckoutPage() {
     if (isListening) {
         speechRecognitionRef.current?.stop();
     } else {
-        finalTranscriptRef.current = '';
-        form.setValue('shoppingList', '');
+        // Don't clear the transcript, allow appending
+        // finalTranscriptRef.current = ''; 
+        // form.setValue('shoppingList', '');
         setStructuredList([]);
         speechRecognitionRef.current?.start();
     }
@@ -325,6 +326,7 @@ export default function CheckoutPage() {
             setStructuredList([]);
             setDeliveryCoords(null);
             form.reset();
+            finalTranscriptRef.current = '';
 
             toast({
                 title: "Order Placed!",
