@@ -22,7 +22,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 import { getProductImage, getStores, getStore } from '@/lib/data';
-import { useTransition, useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useTransition, useState, useRef, useCallback, useEffect, useMemo, RefObject } from 'react';
 import { useFirebase, errorEmitter, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, addDoc, serverTimestamp, getDocs, doc } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -33,7 +33,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import type { ProductPrice, ProductVariant, Store, User as AppUser } from '@/lib/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { VoiceOrderDialog, type VoiceOrderInfo } from '@/components/voice-order-dialog';
-
+import { create } from 'zustand';
 
 const checkoutSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -128,6 +128,21 @@ async function matchItemsToCatalog(text: string, db: any): Promise<StructuredLis
     return matchedItems;
 }
 
+interface PassThroughState {
+  placeOrderBtnRef?: RefObject<HTMLButtonElement>;
+  setPlaceOrderBtnRef: (ref: RefObject<HTMLButtonElement>) => void;
+  usePassThrough: () => Omit<PassThroughState, 'setPlaceOrderBtnRef' | 'usePassThrough'>;
+}
+
+export const checkoutPassThrough = create<PassThroughState>((set, get) => ({
+  setPlaceOrderBtnRef: (placeOrderBtnRef) => set({ placeOrderBtnRef }),
+  usePassThrough: () => {
+    const state = get();
+    const { setPlaceOrderBtnRef, usePassThrough, ...rest } = state;
+    return rest;
+  },
+}));
+
 
 export default function CheckoutPage() {
   const { cartItems, cartTotal, clearCart } = useCart();
@@ -149,6 +164,11 @@ export default function CheckoutPage() {
   const [deliveryCoords, setDeliveryCoords] = useState<{lat: number, lng: number} | null>(null);
   const [images, setImages] = useState({});
   const placeOrderBtnRef = useRef<HTMLButtonElement>(null);
+  const { setPlaceOrderBtnRef } = checkoutPassThrough();
+
+  useEffect(() => {
+    setPlaceOrderBtnRef(placeOrderBtnRef);
+  }, [setPlaceOrderBtnRef]);
 
 
    const userDocRef = useMemoFirebase(() => {
@@ -677,4 +697,3 @@ export default function CheckoutPage() {
     </div>
   );
 }
-

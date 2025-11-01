@@ -1,3 +1,4 @@
+
 'use client';
 import type { Metadata } from 'next';
 import './globals.css';
@@ -9,6 +10,8 @@ import { Footer } from '@/components/layout/footer';
 import { CartProvider } from '@/lib/cart';
 import { FirebaseClientProvider } from '@/firebase';
 import { NotificationPermissionManager } from '@/components/layout/notification-permission-manager';
+import { usePathname } from 'next/navigation';
+import { checkoutPassThrough } from '@/app/checkout/page';
 
 
 const ptSans = PT_Sans({
@@ -16,6 +19,17 @@ const ptSans = PT_Sans({
   weight: ['400', '700'],
   variable: '--font-pt-sans',
 });
+
+function PageSpecificHeader() {
+  const pathname = usePathname();
+  const { placeOrderBtnRef } = checkoutPassThrough.usePassThrough() || {};
+
+  if (pathname === '/checkout') {
+    return <Header placeOrderBtnRef={placeOrderBtnRef} />;
+  }
+  return <Header />;
+}
+
 
 export default function RootLayout({
   children,
@@ -42,7 +56,7 @@ export default function RootLayout({
         <FirebaseClientProvider>
           <CartProvider>
               <div className="relative flex min-h-dvh flex-col bg-background">
-                <Header />
+                <PageSpecificHeader />
                 <main className="flex-1 pb-10">{children}</main>
                 <NotificationPermissionManager />
                 <Footer />

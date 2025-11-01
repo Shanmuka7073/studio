@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { getAuth, signOut } from 'firebase/auth';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, RefObject } from 'react';
 import { VoiceCommander, type Command } from './voice-commander';
 import { useToast } from '@/hooks/use-toast';
 import { VoiceOrderDialog, type VoiceOrderInfo } from '@/components/voice-order-dialog';
@@ -120,7 +120,11 @@ function UserMenu() {
   );
 }
 
-export function Header() {
+interface HeaderProps {
+  placeOrderBtnRef?: RefObject<HTMLButtonElement>;
+}
+
+export function Header({ placeOrderBtnRef }: HeaderProps) {
   const pathname = usePathname();
   const { user } = useFirebase();
   const isAdmin = user && user.email === ADMIN_EMAIL;
@@ -164,6 +168,7 @@ export function Header() {
         onVoiceOrder={setVoiceOrderInfo}
         onOpenCart={() => setIsCartOpen(true)}
         isCartOpen={isCartOpen}
+        placeOrderBtnRef={placeOrderBtnRef}
       />
        {voiceOrderInfo && (
         <VoiceOrderDialog

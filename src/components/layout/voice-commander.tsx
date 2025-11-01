@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, RefObject } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { useFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
@@ -25,6 +25,7 @@ interface VoiceCommanderProps {
   onVoiceOrder: (orderInfo: VoiceOrderInfo) => void;
   onOpenCart: () => void;
   isCartOpen: boolean;
+  placeOrderBtnRef?: RefObject<HTMLButtonElement>;
 }
 
 type ParsedShoppingListItem = {
@@ -55,7 +56,7 @@ async function parseShoppingList(text: string): Promise<ParsedShoppingListItem[]
 }
 
 
-export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoiceOrder, onOpenCart, isCartOpen }: VoiceCommanderProps) {
+export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoiceOrder, onOpenCart, isCartOpen, placeOrderBtnRef }: VoiceCommanderProps) {
   const router = useRouter();
   const { toast } = useToast();
   const { firestore, user } = useFirebase();
@@ -81,6 +82,17 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
         myStore: { display: 'Create or Manage My Store', action: () => router.push('/dashboard/owner/my-store'), aliases: ['create my store', 'my store', 'manage my store', 'new store', 'register my store', 'make a store', 'open my shop', 'go to seller page', 'view my products', 'store dashboard', 'my store page'] },
         voiceOrder: { display: 'Create a Shopping List', action: () => router.push('/checkout?action=record'), aliases: ['create a shopping list', 'make a list', 'new shopping list', 'start my list', 'prepare my list', 'record my order', 'start voice order', 'start list', 'i want to shop', 'start recording', 'take my order', 'start voice shopping', 'record voice list', 'I\'ll say my list', 'speak my order', 'take my list', 'listen to my order', 'record shopping items', 'note down my list'] },
         checkout: { display: 'Proceed to Checkout', action: () => router.push('/checkout'), aliases: ['proceed to checkout', 'go to checkout', 'checkout now', 'open checkout', 'start checkout', 'finish my order', 'complete purchase', 'pay now'] },
+        placeOrder: {
+          display: "Place the order",
+          action: () => {
+            if (placeOrderBtnRef?.current) {
+              placeOrderBtnRef.current.click();
+            } else {
+              toast({ variant: 'destructive', title: 'Not on checkout page', description: 'You can only place an order from the checkout page.' });
+            }
+          },
+          aliases: ['place order', 'confirm order', 'submit order', 'finish and pay', 'complete my order']
+        },
         refresh: { display: 'Refresh the page', action: () => window.location.reload(), aliases: ['refresh the page', 'reload page', 'reload app', 'refresh screen', 'restart page', 'update screen', 'refresh everything', 'refresh'] },
         showMyProducts: { display: "Show My Store's Products", action: () => router.push('/dashboard/owner/my-store'), aliases: ["show my products", "list my items", "open inventory", "what am I selling", "see store items", "view my listings"] },
       };
@@ -134,7 +146,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
         })
         .catch(console.error);
     }
-  }, [firestore, user, router]);
+  }, [firestore, user, router, placeOrderBtnRef, toast]);
 
   useEffect(() => {
     listeningRef.current = enabled;
@@ -393,5 +405,3 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
 
   return null;
 }
-
-    
