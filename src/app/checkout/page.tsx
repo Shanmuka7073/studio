@@ -17,7 +17,7 @@ import {
   FormMessage,
   FormDescription,
 } from '@/components/ui/form';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 import { getProductImage, getStores } from '@/lib/data';
@@ -130,6 +130,7 @@ async function matchItemsToCatalog(text: string, db: any): Promise<StructuredLis
 export default function CheckoutPage() {
   const { cartItems, cartTotal, clearCart } = useCart();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [isPlacingOrder, startPlaceOrderTransition] = useTransition();
   const { firestore, user } = useFirebase();
@@ -221,14 +222,27 @@ export default function CheckoutPage() {
   };
 
 
+  const handleToggleListening = useCallback(() => {
+    if (!speechRecognitionRef.current) return;
+    
+    if (isListening) {
+        speechRecognitionRef.current.stop();
+    } else {
+        setStructuredList([]);
+        form.setValue('shoppingList', '');
+        form.setValue('storeId', '');
+        speechRecognitionRef.current.start();
+    }
+  }, [isListening, form]);
+
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
         speechRecognitionRef.current = new SpeechRecognition();
         const recognition = speechRecognitionRef.current;
         recognition.lang = 'en-IN';
-        recognition.interimResults = false; // We only need the final result
-        recognition.continuous = false; // Stops automatically after a pause
+        recognition.interimResults = false;
+        recognition.continuous = false;
         
         recognition.onstart = () => {
             setIsListening(true);
@@ -253,24 +267,23 @@ export default function CheckoutPage() {
             setIsListening(false);
         };
 
+        // Check for auto-start param
+        const autoStart = searchParams.get('action') === 'record';
+        if (autoStart) {
+          handleToggleListening();
+        }
+
     } else {
         toast({ variant: 'destructive', title: 'Not Supported', description: 'Voice recognition is not supported by your browser.' });
     }
-  }, [toast, form, firestore]); // Added firestore to dependencies
-
-
-  const handleToggleListening = () => {
-    if (!speechRecognitionRef.current) return;
     
-    if (isListening) {
-        speechRecognitionRef.current.stop();
-    } else {
-        setStructuredList([]);
-        form.setValue('shoppingList', '');
-        form.setValue('storeId', '');
-        speechRecognitionRef.current.start();
+    // Cleanup on unmount
+    return () => {
+      if (speechRecognitionRef.current) {
+        speechRecognitionRef.current.abort();
+      }
     }
-  };
+  }, [toast, form, searchParams, handleToggleListening]);
 
 
    const handleGetLocation = () => {

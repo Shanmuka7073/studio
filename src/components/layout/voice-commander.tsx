@@ -38,12 +38,13 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions }: Voice
         
       const commandMap: { [key: string]: { display: string, action: () => void, aliases: string[] } } = {
         home: { display: 'Navigate to Home', action: () => router.push('/'), aliases: ['go home', 'open home', 'back to home', 'show home', 'main page', 'home screen', 'home'] },
-        stores: { display: 'Browse All Stores', action: () => router.push('/stores'), aliases: ['go to stores', 'open stores', 'show stores', 'all stores', 'stores', 'browse stores'] },
+        stores: { display: 'Browse All Stores', action: () => router.push('/stores'), aliases: ['go to stores', 'open stores', 'show all stores', 'all stores', 'stores', 'browse stores'] },
         orders: { display: 'View My Orders', action: () => router.push('/dashboard/customer/my-orders'), aliases: ['my orders', 'go to my orders', 'open my orders', 'show my orders', 'orders'] },
         cart: { display: 'View Your Cart', action: () => router.push('/cart'), aliases: ['go to cart', 'open cart', 'show cart', 'my cart', 'cart'] },
         dashboard: { display: 'View Dashboard', action: () => router.push('/dashboard'), aliases: ['go to dashboard', 'open dashboard', 'dashboard'] },
         deliveries: { display: 'View Deliveries', action: () => router.push('/dashboard/delivery/deliveries'), aliases: ['deliveries', 'my deliveries', 'go to deliveries', 'open deliveries', 'delivery dashboard'] },
-        createStore: { display: 'Create or Manage My Store', action: () => router.push('/dashboard/owner/my-store'), aliases: ['create my store', 'my store', 'manage my store', 'new store', 'register my store'] }
+        createStore: { display: 'Create or Manage My Store', action: () => router.push('/dashboard/owner/my-store'), aliases: ['create my store', 'my store', 'manage my store', 'new store', 'register my store', 'make a store'] },
+        voiceOrder: { display: 'Create a Shopping List', action: () => router.push('/checkout?action=record'), aliases: ['create a shopping list', 'voice order', 'record my list', 'new shopping list'] },
       };
 
       const staticNavCommands: Command[] = Object.values(commandMap).flatMap(
