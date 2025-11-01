@@ -4,7 +4,7 @@
  *
  * Core Philosophy:
  * This ruleset enforces a strict user-ownership model for user profiles and stores.
- * Orders can be updated by the customer that received the order.
+ * Orders can be updated by the customer, the store owner, or the assigned delivery partner.
  * Read access is generally restricted to the owner, except for specific public data.
  *
  * Data Structure:
@@ -143,14 +143,20 @@ service cloud.firestore {
      * @path /orders/{orderId}
      * @allow (create) - User can create an order if the userId matches their auth UID.
      * @allow (get, list) - Anyone can get and list orders.
-     * @allow (update) - Allows updates by any signed-in user to unblock development.
+     * @allow (update) - Allows updates by the customer, store owner, or assigned delivery partner.
      * @deny (delete) - No one can delete an order.
-     * @principle Open rule for now to prevent permission errors.
      */
     match /orders/{orderId} {
       allow get, list: if true;
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow update: if request.auth != null;
+      allow update: if isSignedIn() && (
+        // Allow customer to update
+        request.auth.uid == resource.data.userId ||
+        // Allow store owner to update
+        get(/databases/$(database)/documents/stores/$(resource.data.storeId)).data.ownerId == request.auth.uid ||
+        // Allow assigned delivery partner to update
+        (resource.data.deliveryPartnerId != null && request.auth.uid == resource.data.deliveryPartnerId)
+      );
       allow delete: if false;
     }
 
