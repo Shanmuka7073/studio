@@ -21,13 +21,13 @@ import {
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { useTransition, useState, useCallback, useEffect } from 'react';
-import { useFirebase, errorEmitter } from '@/firebase';
-import { collection, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
+import { useFirebase, errorEmitter, useDoc, useMemoFirebase } from '@/firebase';
+import { collection, addDoc, serverTimestamp, getDocs, doc } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { CheckCircle, MapPin, Loader2, Store as StoreIcon } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import type { ProductPrice, ProductVariant, Store } from '@/lib/types';
+import type { ProductPrice, ProductVariant, Store, User as AppUser } from '@/lib/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { getStores, getStore } from '@/lib/data';
@@ -115,10 +115,27 @@ export function VoiceOrderDialog({ isOpen, onClose, orderInfo }: { isOpen: boole
   
   const [deliveryCoords, setDeliveryCoords] = useState<{lat: number, lng: number} | null>(null);
 
+  const userDocRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user]);
+  const { data: userData, isLoading: isProfileLoading } = useDoc<AppUser>(userDocRef);
+
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
     defaultValues: { name: '', phone: '', shoppingList: '', storeId: '' },
   });
+
+  useEffect(() => {
+    if (userData) {
+      form.reset({
+        name: `${userData.firstName} ${userData.lastName}`,
+        phone: userData.phoneNumber,
+        shoppingList: orderInfo?.shoppingList || '',
+        storeId: orderInfo?.storeId || '',
+      });
+    }
+  }, [userData, orderInfo, form]);
 
   const handleUnderstandList = useCallback(async (text: string) => {
     if (!firestore || !text) return;
@@ -161,12 +178,12 @@ export function VoiceOrderDialog({ isOpen, onClose, orderInfo }: { isOpen: boole
   }, [firestore, toast]);
 
   useEffect(() => {
-    if (orderInfo) {
+    if (isOpen && orderInfo) {
       form.setValue('shoppingList', orderInfo.shoppingList);
       form.setValue('storeId', orderInfo.storeId);
       handleUnderstandList(orderInfo.shoppingList);
     }
-  }, [orderInfo, form, handleUnderstandList]);
+  }, [isOpen, orderInfo, form, handleUnderstandList]);
 
    const handleGetLocation = () => {
         if (navigator.geolocation) {
@@ -346,7 +363,7 @@ export function VoiceOrderDialog({ isOpen, onClose, orderInfo }: { isOpen: boole
                                     render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Full Name</FormLabel>
-                                        <FormControl><Input placeholder="John Doe" {...field} /></FormControl>
+                                        <FormControl><Input placeholder="John Doe" {...field} readOnly={!!userData?.firstName} /></FormControl>
                                         <FormMessage />
                                     </FormItem>
                                     )}
@@ -357,7 +374,7 @@ export function VoiceOrderDialog({ isOpen, onClose, orderInfo }: { isOpen: boole
                                     render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Phone Number</FormLabel>
-                                        <FormControl><Input placeholder="(555) 123-4567" {...field} /></FormControl>
+                                        <FormControl><Input placeholder="(555) 123-4567" {...field} readOnly={!!userData?.phoneNumber} /></FormControl>
                                         <FormMessage />
                                     </FormItem>
                                     )}
@@ -403,5 +420,3 @@ export function VoiceOrderDialog({ isOpen, onClose, orderInfo }: { isOpen: boole
     </Dialog>
   );
 }
-
-    

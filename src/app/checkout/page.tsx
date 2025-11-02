@@ -192,10 +192,13 @@ export default function CheckoutPage() {
       form.reset({
         name: `${userData.firstName} ${userData.lastName}`,
         phone: userData.phoneNumber,
+        shoppingList: form.getValues('shoppingList'),
+        storeId: form.getValues('storeId'),
       });
-       if (!deliveryCoords) {
-        setShouldPromptForLocation(true);
-      }
+    }
+    // Always prompt for location if it hasn't been captured for this session
+    if (!deliveryCoords) {
+      setShouldPromptForLocation(true);
     }
   }, [userData, form, deliveryCoords]);
 
@@ -486,7 +489,7 @@ export default function CheckoutPage() {
                             <FormItem>
                                 <FormLabel>Full Name</FormLabel>
                                 <FormControl>
-                                <Input placeholder="John Doe" {...field} />
+                                <Input placeholder="John Doe" {...field} readOnly={!!userData?.firstName} />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -495,34 +498,32 @@ export default function CheckoutPage() {
                         <div className="space-y-2">
                             <FormLabel>Delivery Location</FormLabel>
                              {shouldPromptForLocation ? (
-                                <Card className="bg-muted/50 p-4 text-center">
+                                <Card className="bg-primary/5 p-4 text-center border-primary/20">
                                     <div className="flex items-center justify-center gap-2 mb-2">
-                                         <HelpCircle className="h-5 w-5 text-muted-foreground" />
-                                        <p className="font-semibold">Is this your delivery address?</p>
+                                         <HelpCircle className="h-5 w-5 text-primary" />
+                                        <p className="font-semibold text-primary">Confirm Your Delivery Location</p>
                                     </div>
-                                    <p className="text-sm text-muted-foreground mb-4">Click to confirm and share your current location for this order.</p>
+                                    <p className="text-sm text-muted-foreground mb-4">For accurate delivery, please share your current location for this order.</p>
                                     <div className="flex gap-4 justify-center">
-                                        <Button type="button" onClick={handleGetLocation}>Yes, Use Current Location</Button>
-                                        <Button type="button" variant="outline" onClick={() => setShouldPromptForLocation(false)}>No, I'll do it manually</Button>
+                                        <Button type="button" onClick={handleGetLocation}>
+                                           <MapPin className="mr-2 h-4 w-4" /> Yes, Use Current Location
+                                        </Button>
                                     </div>
                                 </Card>
-                            ) : (
-                                <>
-                                 <FormDescription>
-                                    Your precise delivery location will be based on your captured GPS coordinates.
-                                </FormDescription>
+                            ) : deliveryCoords ? (
                                 <div className="flex items-center gap-4 pt-2">
-                                    <Button type="button" variant="outline" onClick={handleGetLocation} className="flex-1">
-                                        <MapPin className="mr-2 h-4 w-4" /> Get Current Location
+                                     <div className="flex items-center text-green-600">
+                                        <CheckCircle className="mr-2 h-5 w-5" />
+                                        <span>Location captured!</span>
+                                    </div>
+                                    <Button type="button" variant="outline" size="sm" onClick={handleGetLocation}>
+                                        <MapPin className="mr-2 h-4 w-4" /> Re-capture
                                     </Button>
-                                    {deliveryCoords && (
-                                        <div className="flex items-center text-green-600">
-                                            <CheckCircle className="mr-2 h-5 w-5" />
-                                            <span>Location captured!</span>
-                                        </div>
-                                    )}
                                 </div>
-                                </>
+                            ) : (
+                                <Button type="button" variant="outline" onClick={handleGetLocation} className="w-full">
+                                    <MapPin className="mr-2 h-4 w-4" /> Get Current Location
+                                </Button>
                             )}
                         </div>
                         <FormField
@@ -532,7 +533,7 @@ export default function CheckoutPage() {
                             <FormItem>
                                 <FormLabel>Phone Number</FormLabel>
                                 <FormControl>
-                                <Input placeholder="(555) 123-4567" {...field} />
+                                <Input placeholder="(555) 123-4567" {...field} readOnly={!!userData?.phoneNumber} />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -696,5 +697,3 @@ export default function CheckoutPage() {
     </div>
   );
 }
-
-    
