@@ -29,7 +29,7 @@ const playAlarm = () => {
     gainNode.connect(audioContext.destination);
     
     oscillator.type = 'sine';
-    oscillator.frequency.setValueAtTime(880, audioContext.currentTime); // A5 note
+    oscillator.frequency.setValueAtTime(880, audio.currentTime); // A5 note
     gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
     
     oscillator.start();
