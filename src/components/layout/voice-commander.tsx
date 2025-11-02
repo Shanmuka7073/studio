@@ -1,18 +1,16 @@
 
 'use client';
 
-import { useEffect, useRef, useState, useCallback, RefObject } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { useFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { getStores, getMasterProducts, getProductPrice } from '@/lib/data';
 import type { Store, Product, ProductPrice, ProductVariant } from '@/lib/types';
 import { calculateSimilarity } from '@/lib/calculate-similarity';
-import { collection, query, where, getDocs } from 'firebase/firestore';
 import { VoiceOrderInfo } from '@/components/voice-order-dialog';
 import { useCart } from '@/lib/cart';
 import { getCommands } from '@/app/actions';
-import { generateMonthlyPackage } from '@/ai/flows/monthly-package-flow';
 import { useProfileFormStore } from '@/lib/store';
 import { ProfileFormValues } from '@/app/dashboard/customer/my-profile/page';
 import { useCheckoutStore } from '@/app/checkout/page';
@@ -30,83 +28,60 @@ interface VoiceCommanderProps {
   onSuggestions: (suggestions: Command[]) => void;
   onVoiceOrder: (orderInfo: VoiceOrderInfo) => void;
   onOpenCart: () => void;
-  onCloseCart: () => void; // New prop to close the cart
+  onCloseCart: () => void;
   isCartOpen: boolean;
 }
 
-type ParsedShoppingListItem = {
-    quantity: number;
-    unit: string;
-    itemName: string;
-};
-
-// This function now lives here to be used by the voice commander
-async function parseShoppingList(text: string): Promise<ParsedShoppingListItem[]> {
-    const items: ParsedShoppingListItem[] = [];
-    // Updated pattern to be more flexible with units
-    const pattern = /(\d+)\s*(kg|g|grams|kilogram|kilo|pc|piece|pieces)?\s*([a-zA-Z\s]+)/gi;
-    let match;
-
-    while ((match = pattern.exec(text)) !== null) {
-        const quantity = parseInt(match[1], 10);
-        let unit = match[2] ? match[2].toLowerCase() : 'pc'; // Default to 'piece' if no unit
-        if (unit === 'grams') unit = 'g';
-        if (unit === 'kilogram' || unit === 'kilo') unit = 'kg';
-        if (unit === 'piece' || unit === 'pieces') unit = 'pc';
-
-        const itemName = match[3].trim().toLowerCase();
-
-        items.push({ quantity, unit, itemName });
-    }
-    return items;
-}
-
-export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoiceOrder, onOpenCart, onCloseCart, isCartOpen }: VoiceCommanderProps) {
+export function VoiceCommander({
+  enabled,
+  onStatusUpdate,
+  onSuggestions,
+  onVoiceOrder,
+  onOpenCart,
+  onCloseCart,
+}: VoiceCommanderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { toast } = useToast();
   const { firestore, user } = useFirebase();
-  const [allStores, setAllStores] = useState<Store[]>([]);
-  const [allCommands, setAllCommands] = useState<Command[]>([]);
-  const [masterProductList, setMasterProductList] = useState<Product[]>([]);
-  const [productPrices, setProductPrices] = useState<Record<string, ProductPrice>>({});
-
   const { addItem: addItemToCart } = useCart();
-  
+  const { form: profileForm } = useProfileFormStore();
+  const { shouldPromptForLocation, handleGetLocation, getFinalTotal, placeOrderBtnRef } = useCheckoutStore();
+
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const isSpeakingRef = useRef(false);
   const isEnabledRef = useRef(enabled);
+  const commandsRef = useRef<Command[]>([]);
+  const storesRef = useRef<Store[]>([]);
+  const masterProductsRef = useRef<Product[]>([]);
+  const productPricesRef = useRef<Record<string, ProductPrice>>({});
+  const formFieldToFillRef = useRef<keyof ProfileFormValues | null>(null);
+  const checkoutStateRef = useRef<'idle' | 'promptingLocation' | 'promptingConfirmation'>('idle');
 
-  // For profile form filling
-  const { form: profileForm } = useProfileFormStore();
-  const formFieldToFill = useRef<keyof ProfileFormValues | null>(null);
-  
-  const { shouldPromptForLocation, handleGetLocation, getFinalTotal, placeOrderBtnRef } = useCheckoutStore();
-  const checkoutState = useRef<'idle' | 'promptingLocation' | 'promptingConfirmation'>('idle');
-
-  // Update the ref whenever the `enabled` prop changes
+  // Update the enabled ref when the prop changes
   useEffect(() => {
     isEnabledRef.current = enabled;
-    if (enabled) {
-      recognitionRef.current?.start();
-    } else {
-      recognitionRef.current?.stop();
+    if (recognitionRef.current) {
+      if (enabled) {
+        try {
+          recognitionRef.current.start();
+        } catch (e) {
+          // Ignore error if it's already started
+        }
+      } else {
+        recognitionRef.current.stop();
+      }
     }
   }, [enabled]);
 
-
- const speak = useCallback((text: string, onEndCallback?: () => void) => {
+  const speak = useCallback((text: string, onEndCallback?: () => void) => {
     if (typeof window === 'undefined' || !window.speechSynthesis) {
       if (onEndCallback) onEndCallback();
       return;
     }
-    
+
     isSpeakingRef.current = true;
-    
-    // Stop listening while speaking
-    if (recognitionRef.current) {
-        recognitionRef.current.stop();
-    }
+    recognitionRef.current?.stop(); // Stop listening while speaking
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.pitch = 1;
@@ -114,260 +89,91 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
     utterance.lang = 'en-US';
 
     utterance.onend = () => {
-        isSpeakingRef.current = false;
-        if (onEndCallback) {
-            onEndCallback();
-        }
-        // The main onend handler of the recognition service will restart it if enabled.
-        if (isEnabledRef.current) {
-            recognitionRef.current?.start();
-        }
+      isSpeakingRef.current = false;
+      if (onEndCallback) {
+        onEndCallback();
+      }
+      // The main `onend` handler for recognition will restart it
     };
     
     utterance.onerror = (e) => {
-        isSpeakingRef.current = false;
-        console.error("Speech synthesis error:", e);
-        if (onEndCallback) onEndCallback();
-        if (isEnabledRef.current) {
-            recognitionRef.current?.start();
-        }
-    }
+      console.error("Speech synthesis error:", e);
+      isSpeakingRef.current = false;
+      if (onEndCallback) onEndCallback();
+    };
 
     window.speechSynthesis.speak(utterance);
-}, []);
+  }, []);
+
+  const findProductAndVariant = useCallback(async (productName: string, desiredWeight?: string): Promise<{ product: Product | null, variant: ProductVariant | null }> => {
+    const lowerProductName = productName.toLowerCase();
+    const productMatch = masterProductsRef.current.find(p => p.name.toLowerCase() === lowerProductName);
+
+    if (!productMatch) return { product: null, variant: null };
+
+    let priceData = productPricesRef.current[lowerProductName];
+    if (!priceData && firestore) {
+        priceData = await getProductPrice(firestore, lowerProductName);
+        if (priceData) {
+            productPricesRef.current[lowerProductName] = priceData;
+        }
+    }
+    
+    if (priceData?.variants?.length > 0) {
+        if (desiredWeight) {
+            const lowerDesiredWeight = desiredWeight.replace(/\s/g, '').toLowerCase();
+            const variantMatch = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === lowerDesiredWeight);
+            if (variantMatch) return { product: productMatch, variant: variantMatch };
+        }
+        
+        const onePieceVariant = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === '1pc');
+        if (onePieceVariant) return { product: productMatch, variant: onePieceVariant };
+
+        return { product: productMatch, variant: priceData.variants[0] };
+    }
+    
+    return { product: null, variant: null };
+  }, [firestore]);
+
 
   const handleProfileFormInteraction = useCallback(() => {
     if (!profileForm) {
-        speak("I can't seem to access the profile form right now.");
-        return;
+      speak("I can't seem to access the profile form right now.");
+      return;
     }
-
     const fields: { name: keyof ProfileFormValues; label: string }[] = [
-        { name: 'firstName', label: 'first name' },
-        { name: 'lastName', label: 'last name' },
-        { name: 'phone', label: 'phone number' },
-        { name: 'address', label: 'full address' },
+      { name: 'firstName', label: 'first name' },
+      { name: 'lastName', label: 'last name' },
+      { name: 'phone', label: 'phone number' },
+      { name: 'address', label: 'full address' },
     ];
-
     const formValues = profileForm.getValues();
     const firstEmptyField = fields.find(f => !formValues[f.name]);
     
     if (firstEmptyField) {
-        formFieldToFill.current = firstEmptyField.name;
-        speak(`What is your ${firstEmptyField.label}?`);
+      formFieldToFillRef.current = firstEmptyField.name;
+      speak(`What is your ${firstEmptyField.label}?`);
     } else {
-        formFieldToFill.current = null;
-        speak("Your profile looks complete! You can say 'save changes' to submit.");
+      formFieldToFillRef.current = null;
+      speak("Your profile looks complete! You can say 'save changes' to submit.");
     }
   }, [profileForm, speak]);
 
-  const findProductAndVariant = useCallback(async (productName: string, desiredWeight?: string): Promise<{ product: Product | null, variant: ProductVariant | null }> => {
-        const lowerProductName = productName.toLowerCase();
-        const productMatch = masterProductList.find(p => p.name.toLowerCase() === lowerProductName);
-
-        if (!productMatch) return { product: null, variant: null };
-
-        let priceData = productPrices[lowerProductName];
-        if (!priceData && firestore) {
-            priceData = await getProductPrice(firestore, lowerProductName);
-            if (priceData) {
-                setProductPrices(prev => ({ ...prev, [lowerProductName]: priceData }));
-            }
-        }
-        
-        if (priceData && priceData.variants && priceData.variants.length > 0) {
-            // If a specific weight is desired, find it
-            if (desiredWeight) {
-                const lowerDesiredWeight = desiredWeight.replace(/\s/g, '').toLowerCase();
-                const variantMatch = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === lowerDesiredWeight);
-                if (variantMatch) {
-                    return { product: productMatch, variant: variantMatch };
-                }
-            }
-            
-            // If no desired weight or no match, try to find a '1 pc' default
-            const onePieceVariant = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === '1pc');
-            if (onePieceVariant) {
-                return { product: productMatch, variant: onePieceVariant };
-            }
-
-            // If still no match, return the first (often smallest) variant as a fallback
-            return { product: productMatch, variant: priceData.variants[0] };
-        }
-        
-        return { product: null, variant: null };
-
-    }, [masterProductList, firestore, productPrices]);
-
-  // Fetch static data and build the command list
-  useEffect(() => {
-    if (firestore && user) {
-        
-      const commandActions: { [key: string]: Function } = {
-        home: () => router.push('/'),
-        stores: () => router.push('/stores'),
-        dashboard: () => router.push('/dashboard'),
-        cart: () => router.push('/cart'),
-        orders: () => router.push('/dashboard/customer/my-orders'),
-        deliveries: () => router.push('/dashboard/delivery/deliveries'),
-        myStore: () => router.push('/dashboard/owner/my-store'),
-        voiceOrder: () => {
-            if (pathname !== '/checkout') {
-                router.push('/checkout?action=record');
-            } else {
-                const micButton = document.querySelector('button[aria-label="Toggle voice recording"]') as HTMLButtonElement;
-                micButton?.click();
-            }
-        },
-        checkout: () => {
-            onCloseCart();
-            router.push('/checkout');
-        },
-        placeOrder: () => {
-          if (placeOrderBtnRef?.current) {
-            placeOrderBtnRef.current.click();
-          } else {
-            speak("You can only place an order from the checkout page.");
-            toast({ variant: 'destructive', title: 'Not on checkout page', description: 'You can only place an order from the checkout page.' });
-          }
-        },
-        saveChanges: () => {
-          if (pathname === '/dashboard/customer/my-profile' && profileForm) {
-            const formElement = document.querySelector('form');
-            if (formElement) {
-              formElement.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
-            }
-          } else {
-            speak("There are no changes to save on this page.");
-          }
-        },
-        refresh: () => window.location.reload(),
-        orderItem: async ({ product, quantity }: { product: string, quantity?: string }) => {
-            speak(`Looking for ${product}.`);
-            const { product: foundProduct, variant } = await findProductAndVariant(product, quantity);
-            if (foundProduct && variant) {
-                addItemToCart(foundProduct, variant, 1);
-                speak(`Added ${variant.weight} of ${product} to your cart.`);
-                onOpenCart();
-            } else {
-                speak(`Sorry, I could not find ${product}.`);
-            }
-        },
-      };
-
-      // Fetch dynamic data for commands
-      Promise.all([
-          getStores(firestore),
-          getMasterProducts(firestore),
-          getCommands()
-      ]).then(async ([stores, masterProducts, fileCommands]) => {
-          setAllStores(stores);
-          setMasterProductList(masterProducts);
-          
-          let builtCommands: Command[] = [];
-
-          // 1. DYNAMIC STORE NAVIGATION COMMANDS
-          stores.forEach((store) => {
-            const coreName = store.name.toLowerCase().replace(/shop|store|kirana/g, '').trim();
-            const variations: string[] = [...new Set([
-              store.name.toLowerCase(), coreName, `go to ${store.name.toLowerCase()}`, `open ${store.name.toLowerCase()}`,
-              `visit ${store.name.toLowerCase()}`, `show ${store.name.toLowerCase()}`, `go to ${coreName}`, `open ${coreName}`
-            ])];
-            variations.forEach(variation => {
-                builtCommands.push({
-                    command: variation,
-                    display: `Go to ${store.name}`,
-                    action: () => router.push(`/stores/${store.id}`),
-                    reply: `Navigating to ${store.name}.`
-                });
-            });
-          });
-
-          // Fetch all price data to generate order commands
-          const priceDocs = await getDocs(collection(firestore, 'productPrices'));
-          const allPrices = priceDocs.docs.reduce((acc, doc) => {
-              acc[doc.id] = doc.data() as ProductPrice;
-              return acc;
-          }, {} as Record<string, ProductPrice>);
-          setProductPrices(allPrices);
-          
-          // 2. TEMPLATE-BASED ORDERING COMMANDS
-          const orderItemTemplate = fileCommands.orderItem;
-          if (orderItemTemplate && masterProducts.length > 0 && Object.keys(allPrices).length > 0) {
-              masterProducts.forEach(product => {
-                  const priceData = allPrices[product.name.toLowerCase()];
-                  if (priceData && priceData.variants) {
-                      
-                      // Handle templates with quantity (e.g., "add 1kg of chicken")
-                      priceData.variants.forEach(variant => {
-                          orderItemTemplate.aliases.forEach(template => {
-                            if(template.includes('{quantity}')) {
-                                const commandStr = template
-                                    .replace('{product}', product.name.toLowerCase())
-                                    .replace('{quantity}', variant.weight.toLowerCase());
-                                
-                                builtCommands.push({
-                                    command: commandStr,
-                                    display: `Order ${variant.weight} of ${product.name}`,
-                                    action: () => commandActions.orderItem({ product: product.name, quantity: variant.weight }),
-                                    reply: orderItemTemplate.reply,
-                                });
-                            }
-                          });
-                      });
-
-                       // Handle templates without quantity (e.g., "add one chicken")
-                       orderItemTemplate.aliases.forEach(template => {
-                            if(!template.includes('{quantity}')) {
-                                const commandStr = template.replace('{product}', product.name.toLowerCase());
-                                builtCommands.push({
-                                    command: commandStr,
-                                    display: `Order one ${product.name}`,
-                                    action: () => commandActions.orderItem({ product: product.name }), // No quantity passed
-                                    reply: orderItemTemplate.reply,
-                                });
-                            }
-                       });
-                  }
-              });
-          }
-
-          // 3. STATIC NAVIGATION COMMANDS (excluding orderItem)
-          Object.entries(fileCommands).forEach(([key, { display, aliases, reply }]) => {
-              if (key === 'orderItem') return;
-              const action = commandActions[key];
-              if (!action) return;
-              aliases.forEach(alias => {
-                  builtCommands.push({ command: alias, display, action, reply });
-              });
-          });
-          
-          setAllCommands(builtCommands);
-        })
-        .catch(console.error);
-    }
-  }, [firestore, user, router, toast, onCloseCart, pathname, profileForm, speak, onOpenCart, addItemToCart, findProductAndVariant]);
-
+  // This useEffect runs only once to set up the recognition service and load commands
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      if (enabled) {
-        onStatusUpdate('❌ Voice commands not supported by your browser.');
-      }
+      console.error("SpeechRecognition API not supported.");
       return;
     }
 
-    if (!recognitionRef.current) {
-        recognitionRef.current = new SpeechRecognition();
-        recognitionRef.current.continuous = false; // Process one command at a time
-        recognitionRef.current.lang = 'en-IN';
-        recognitionRef.current.interimResults = false;
-    }
-    
-    const recognition = recognitionRef.current;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false; // Process one command at a time
+    recognition.lang = 'en-IN';
+    recognition.interimResults = false;
+    recognitionRef.current = recognition;
 
     const handleCommand = async (command: string) => {
         onStatusUpdate(`Processing: "${command}"`);
@@ -375,36 +181,36 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
             if (!firestore || !user) return;
             
             if (command === 'yes') {
-                if (checkoutState.current === 'promptingLocation') {
+                if (checkoutStateRef.current === 'promptingLocation') {
                     handleGetLocation();
-                    checkoutState.current = 'promptingConfirmation';
-                    speak("Great, location captured. I will calculate the total. One moment.", () => {
+                    checkoutStateRef.current = 'promptingConfirmation';
+                    speak("Great, location captured. One moment.", () => {
                         setTimeout(() => { 
                             const total = getFinalTotal();
                             if (total > 0) {
                                 speak(`Your total is ${total.toFixed(2)} rupees. Shall I place the order?`);
                             } else {
                                 speak("I couldn't calculate the total. Please check your cart or list.");
-                                checkoutState.current = 'idle';
+                                checkoutStateRef.current = 'idle';
                             }
                         }, 2000);
                     });
                     return;
-                } else if (checkoutState.current === 'promptingConfirmation') {
+                } else if (checkoutStateRef.current === 'promptingConfirmation') {
                     placeOrderBtnRef?.current?.click();
-                    checkoutState.current = 'idle';
+                    checkoutStateRef.current = 'idle';
                     return;
                 }
             }
       
-            if (formFieldToFill.current && profileForm) {
-                profileForm.setValue(formFieldToFill.current, command, { shouldValidate: true });
-                formFieldToFill.current = null;
+            if (formFieldToFillRef.current && profileForm) {
+                profileForm.setValue(formFieldToFillRef.current, command, { shouldValidate: true });
+                formFieldToFillRef.current = null;
                 handleProfileFormInteraction();
                 return;
             }
             
-            const perfectMatch = allCommands.find((c) => command === c.command);
+            const perfectMatch = commandsRef.current.find((c) => command === c.command);
             if (perfectMatch) {
                 speak(perfectMatch.reply);
                 await perfectMatch.action();
@@ -422,7 +228,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
                 const cleanList = trigger ? shoppingList.substring(trigger.length) : shoppingList;
       
                 if (cleanList && storeName) {
-                    const matchingStores = allStores.filter(s => s.name.toLowerCase().includes(storeName));
+                    const matchingStores = storesRef.current.filter(s => s.name.toLowerCase().includes(storeName));
                     if (matchingStores.length === 1) {
                         const targetStore = matchingStores[0];
                         speak(`Creating your shopping list for ${targetStore.name}.`);
@@ -433,11 +239,8 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
                 }
             }
             
-            const potentialMatches = allCommands
-              .map((c) => ({
-                ...c,
-                similarity: calculateSimilarity(command, c.command),
-              }))
+            const potentialMatches = commandsRef.current
+              .map((c) => ({ ...c, similarity: calculateSimilarity(command, c.command) }))
               .filter((c) => c.similarity > 0.7)
               .sort((a, b) => b.similarity - a.similarity)
               .filter((value, index, self) => self.findIndex((v) => v.display === value.display) === index)
@@ -463,74 +266,141 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
       }
     };
 
+
     recognition.onstart = () => {
       onStatusUpdate('🎧 Listening...');
     };
-
     recognition.onresult = (event) => {
-      const transcript = event.results[event.results.length - 1][0].transcript
-        .toLowerCase()
-        .trim();
-      onStatusUpdate(`Heard: "${transcript}"`);
+      const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
       handleCommand(transcript);
     };
-
     recognition.onerror = (event) => {
       if (event.error !== 'aborted' && event.error !== 'no-speech') {
         console.error('Speech recognition error', event.error);
         onStatusUpdate(`⚠️ Error: ${event.error}`);
       }
     };
-
     recognition.onend = () => {
       if (isEnabledRef.current && !isSpeakingRef.current) {
         try {
-            recognition.start();
+          recognition.start();
         } catch (e) {
-          // This can happen if start() is called while it's already starting.
-          // It's generally safe to ignore.
-          if (!(e instanceof DOMException && e.name === 'InvalidStateError')) {
-            console.error('Could not restart recognition service: ', e);
-            onStatusUpdate('⚠️ Mic error, please toggle off and on.');
-          }
+          console.error('Could not restart recognition service: ', e);
         }
       } else {
         onStatusUpdate('Click the mic to start listening.');
       }
     };
 
+    // Load all commands and data
+    if (firestore && user) {
+        const commandActions: { [key: string]: Function } = {
+          home: () => router.push('/'),
+          stores: () => router.push('/stores'),
+          dashboard: () => router.push('/dashboard'),
+          cart: () => router.push('/cart'),
+          orders: () => router.push('/dashboard/customer/my-orders'),
+          deliveries: () => router.push('/dashboard/delivery/deliveries'),
+          myStore: () => router.push('/dashboard/owner/my-store'),
+          voiceOrder: () => {
+              if (pathname !== '/checkout') {
+                  router.push('/checkout?action=record');
+              } else {
+                  const micButton = document.querySelector('button[aria-label="Toggle voice recording"]') as HTMLButtonElement;
+                  micButton?.click();
+              }
+          },
+          checkout: () => { onCloseCart(); router.push('/checkout'); },
+          placeOrder: () => {
+            if (placeOrderBtnRef?.current) placeOrderBtnRef.current.click();
+            else speak("You can only place an order from the checkout page.");
+          },
+          saveChanges: () => {
+            if (pathname === '/dashboard/customer/my-profile' && profileForm) {
+              const formElement = document.querySelector('form');
+              if (formElement) formElement.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+            } else {
+              speak("There are no changes to save on this page.");
+            }
+          },
+          refresh: () => window.location.reload(),
+          orderItem: async ({ product, quantity }: { product: string, quantity?: string }) => {
+              speak(`Looking for ${product}.`);
+              const { product: foundProduct, variant } = await findProductAndVariant(product, quantity);
+              if (foundProduct && variant) {
+                  addItemToCart(foundProduct, variant, 1);
+                  speak(`Added ${variant.weight} of ${product} to your cart.`);
+                  onOpenCart();
+              } else {
+                  speak(`Sorry, I could not find ${product}.`);
+              }
+          },
+        };
+
+        Promise.all([ getStores(firestore), getMasterProducts(firestore), getCommands() ])
+            .then(([stores, masterProducts, fileCommands]) => {
+                storesRef.current = stores;
+                masterProductsRef.current = masterProducts;
+                
+                let builtCommands: Command[] = [];
+
+                stores.forEach((store) => {
+                    const coreName = store.name.toLowerCase().replace(/shop|store|kirana/g, '').trim();
+                    const variations = [...new Set([
+                        store.name.toLowerCase(), coreName, `go to ${store.name.toLowerCase()}`, `open ${store.name.toLowerCase()}`,
+                        `visit ${store.name.toLowerCase()}`, `show ${store.name.toLowerCase()}`
+                    ])];
+                    variations.forEach(variation => {
+                        builtCommands.push({
+                            command: variation,
+                            display: `Go to ${store.name}`,
+                            action: () => router.push(`/stores/${store.id}`),
+                            reply: `Navigating to ${store.name}.`
+                        });
+                    });
+                });
+
+                const orderItemTemplate = fileCommands.orderItem;
+                if (orderItemTemplate && masterProducts.length > 0) {
+                    masterProducts.forEach(product => {
+                        // This logic is simplified; real logic would fetch variants here.
+                        // Add command for "add one {product}"
+                         orderItemTemplate.aliases.forEach(template => {
+                            if(!template.includes('{quantity}')) {
+                                const commandStr = template.replace('{product}', product.name.toLowerCase());
+                                builtCommands.push({
+                                    command: commandStr,
+                                    display: `Order one ${product.name}`,
+                                    action: () => commandActions.orderItem({ product: product.name }),
+                                    reply: orderItemTemplate.reply,
+                                });
+                            }
+                        });
+                    });
+                }
+                
+                Object.entries(fileCommands).forEach(([key, { display, aliases, reply }]) => {
+                    if (key === 'orderItem') return;
+                    const action = commandActions[key];
+                    if (action) {
+                      aliases.forEach(alias => {
+                          builtCommands.push({ command: alias, display, action, reply });
+                      });
+                    }
+                });
+                
+                commandsRef.current = builtCommands;
+            }).catch(console.error);
+    }
+    
+    // Cleanup on unmount
     return () => {
-        if (recognitionRef.current) {
-            recognitionRef.current.onstart = null;
-            recognitionRef.current.onresult = null;
-            recognitionRef.current.onerror = null;
-            recognitionRef.current.onend = null;
-            recognitionRef.current.abort();
-        }
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+      }
     };
-  }, [
-    toast, 
-    onStatusUpdate, 
-    allCommands, 
-    onSuggestions, 
-    firestore, 
-    user, 
-    allStores, 
-    onVoiceOrder, 
-    findProductAndVariant, 
-    addItemToCart, 
-    onOpenCart, 
-    speak, 
-    pathname, 
-    profileForm, 
-    handleProfileFormInteraction, 
-    shouldPromptForLocation, 
-    handleGetLocation, 
-    getFinalTotal, 
-    placeOrderBtnRef
-]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firestore, user]); // This effect should only run once on mount
 
   return null;
 }
-
-    
