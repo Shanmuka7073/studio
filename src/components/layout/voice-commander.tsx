@@ -15,6 +15,7 @@ import { getCommands } from '@/app/actions';
 import { generateMonthlyPackage } from '@/ai/flows/monthly-package-flow';
 import { useProfileFormStore } from '@/lib/store';
 import { ProfileFormValues } from '@/app/dashboard/customer/my-profile/page';
+import { useCheckoutStore } from '@/app/checkout/page';
 
 export interface Command {
   command: string;
@@ -30,8 +31,6 @@ interface VoiceCommanderProps {
   onOpenCart: () => void;
   onCloseCart: () => void; // New prop to close the cart
   isCartOpen: boolean;
-  placeOrderBtnRef?: RefObject<HTMLButtonElement>;
-  getFinalTotal?: () => number;
 }
 
 type ParsedShoppingListItem = {
@@ -62,7 +61,7 @@ async function parseShoppingList(text: string): Promise<ParsedShoppingListItem[]
 }
 
 
-export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoiceOrder, onOpenCart, onCloseCart, isCartOpen, placeOrderBtnRef, getFinalTotal }: VoiceCommanderProps) {
+export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoiceOrder, onOpenCart, onCloseCart, isCartOpen }: VoiceCommanderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { toast } = useToast();
@@ -80,8 +79,8 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
   // For profile form filling
   const { form: profileForm } = useProfileFormStore();
   const formFieldToFill = useRef<keyof ProfileFormValues | null>(null);
-
-  // New state for checkout flow
+  
+  const { shouldPromptForLocation, handleGetLocation, getFinalTotal, placeOrderBtnRef } = useCheckoutStore();
   const checkoutState = useRef<'idle' | 'promptingLocation' | 'promptingConfirmation'>('idle');
 
 
@@ -257,25 +256,23 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
         })
         .catch(console.error);
     }
-  }, [firestore, user, router, placeOrderBtnRef, toast, onCloseCart, pathname, profileForm, speak]);
+  }, [firestore, user, router, toast, onCloseCart, pathname, profileForm, speak]);
 
   useEffect(() => {
     listeningRef.current = enabled;
      if (enabled && pathname === '/dashboard/customer/my-profile') {
       handleProfileFormInteraction();
     }
-    if (enabled && pathname === '/checkout') {
-        const locationButton = document.querySelector('button[aria-label="Get Current Location"]') as HTMLButtonElement | null;
-        if(locationButton) {
-            checkoutState.current = 'promptingLocation';
-            speak("For accurate delivery, please share your current location for this order. Say yes to confirm.");
-        }
+    // Handle checkout/dialog voice prompts
+    if (enabled && shouldPromptForLocation) {
+        checkoutState.current = 'promptingLocation';
+        speak("For accurate delivery, please share your current location for this order. Say yes to confirm.");
     }
     if (!enabled) {
       onSuggestions([]);
       checkoutState.current = 'idle';
     }
-  }, [enabled, onSuggestions, pathname, speak, handleProfileFormInteraction]);
+  }, [enabled, onSuggestions, pathname, speak, handleProfileFormInteraction, shouldPromptForLocation]);
 
     const findProductAndVariant = useCallback(async (parsedItem: {name: string, quantity: string}): Promise<{ product: Product | null, variant: ProductVariant | null }> => {
         if (!firestore) return { product: null, variant: null };
@@ -328,14 +325,13 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
       if (!firestore || !user) return;
       
       // Handle checkout flow state
-      if (pathname === '/checkout' && command === 'yes') {
+      if (command === 'yes') {
           if (checkoutState.current === 'promptingLocation') {
-              const locationButton = document.querySelector('button[aria-label="Get Current Location"]') as HTMLButtonElement | null;
-              locationButton?.click();
-              checkoutState.current = 'promptingConfirmation'; // Move to next state
+              handleGetLocation(); // This is the function from the global store
+              checkoutState.current = 'promptingConfirmation';
               speak("Great, location captured. I will calculate the total. One moment.", () => {
                   setTimeout(() => { // Give time for state to update
-                      const total = getFinalTotal ? getFinalTotal() : 0;
+                      const total = getFinalTotal();
                       if (total > 0) {
                           speak(`Your total is ${total.toFixed(2)} rupees. Shall I place the order?`);
                       } else {
@@ -608,7 +604,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
     return () => {
       recognition.stop();
     };
-  }, [enabled, toast, onStatusUpdate, allCommands, onSuggestions, firestore, user, myStore, masterProductList, router, allStores, onVoiceOrder, findProductAndVariant, addItemToCart, onOpenCart, isCartOpen, onCloseCart, speak, pathname, profileForm, handleProfileFormInteraction, getFinalTotal, placeOrderBtnRef]);
+  }, [enabled, toast, onStatusUpdate, allCommands, onSuggestions, firestore, user, myStore, masterProductList, router, allStores, onVoiceOrder, findProductAndVariant, addItemToCart, onOpenCart, isCartOpen, onCloseCart, speak, pathname, profileForm, handleProfileFormInteraction, shouldPromptForLocation, handleGetLocation, getFinalTotal, placeOrderBtnRef]);
 
   return null; // This component does not render anything itself.
 }

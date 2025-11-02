@@ -120,7 +120,6 @@ export function VoiceOrderDialog({ isOpen, onClose, orderInfo }: { isOpen: boole
   const { setPlaceOrderBtnRef, setFinalTotalGetter, setShouldPromptForLocation, setHandleGetLocation } = useCheckoutStore();
   
   const handleGetLocation = useCallback(() => {
-        setShouldPromptForLocation(false);
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 (position) => {
@@ -137,7 +136,7 @@ export function VoiceOrderDialog({ isOpen, onClose, orderInfo }: { isOpen: boole
         } else {
             toast({ variant: 'destructive', title: "Not Supported", description: "Geolocation is not supported by your browser." });
         }
-  }, [toast, setShouldPromptForLocation]);
+  }, [toast]);
 
   const shouldPromptForLocation = isOpen && !deliveryCoords;
   const voiceOrderSubtotal = structuredList.reduce((acc, item) => acc + ((item.price || 0) * item.quantity), 0);
@@ -149,7 +148,8 @@ export function VoiceOrderDialog({ isOpen, onClose, orderInfo }: { isOpen: boole
         setPlaceOrderBtnRef(placeOrderBtnRef);
         setFinalTotalGetter(() => finalTotal);
         setShouldPromptForLocation(shouldPromptForLocation);
-        setHandleGetLocation(handleGetLocation);
+        // We set the handler, but the VoiceCommander will call it.
+        setHandleGetLocation(() => handleGetLocation); 
     } else {
         setPlaceOrderBtnRef(null);
         setFinalTotalGetter(() => 0);
@@ -457,5 +457,3 @@ export function VoiceOrderDialog({ isOpen, onClose, orderInfo }: { isOpen: boole
     </Dialog>
   );
 }
-
-    

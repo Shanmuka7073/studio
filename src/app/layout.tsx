@@ -11,8 +11,9 @@ import { CartProvider } from '@/lib/cart';
 import { FirebaseClientProvider } from '@/firebase';
 import { NotificationPermissionManager } from '@/components/layout/notification-permission-manager';
 import { usePathname } from 'next/navigation';
-import { useCheckoutPassThrough } from '@/app/checkout/page';
-
+import { VoiceCommander } from '@/components/layout/voice-commander';
+import { useState } from 'react';
+import { VoiceOrderDialog, type VoiceOrderInfo } from '@/components/voice-order-dialog';
 
 const ptSans = PT_Sans({
   subsets: ['latin'],
@@ -20,22 +21,19 @@ const ptSans = PT_Sans({
   variable: '--font-pt-sans',
 });
 
-function PageSpecificHeader() {
-  const pathname = usePathname();
-  const { placeOrderBtnRef, getFinalTotal } = useCheckoutPassThrough();
-
-  if (pathname === '/checkout') {
-    return <Header placeOrderBtnRef={placeOrderBtnRef} getFinalTotal={getFinalTotal} />;
-  }
-  return <Header />;
-}
-
 
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState('Click the mic to start listening.');
+  const [suggestedCommands, setSuggestedCommands] = useState<any[]>([]);
+  const [voiceOrderInfo, setVoiceOrderInfo] = useState<VoiceOrderInfo | null>(null);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -56,7 +54,30 @@ export default function RootLayout({
         <FirebaseClientProvider>
           <CartProvider>
               <div className="relative flex min-h-dvh flex-col bg-background">
-                <PageSpecificHeader />
+                <Header 
+                  voiceEnabled={voiceEnabled}
+                  onToggleVoice={() => setVoiceEnabled(prev => !prev)}
+                  voiceStatus={voiceStatus}
+                  suggestedCommands={suggestedCommands}
+                  isCartOpen={isCartOpen}
+                  onCartOpenChange={setIsCartOpen}
+                />
+                 <VoiceCommander 
+                  enabled={voiceEnabled} 
+                  onStatusUpdate={setVoiceStatus}
+                  onSuggestions={setSuggestedCommands}
+                  onVoiceOrder={setVoiceOrderInfo}
+                  onOpenCart={() => setIsCartOpen(true)}
+                  onCloseCart={() => setIsCartOpen(false)}
+                  isCartOpen={isCartOpen}
+                />
+                {voiceOrderInfo && (
+                  <VoiceOrderDialog
+                    isOpen={!!voiceOrderInfo}
+                    onClose={() => setVoiceOrderInfo(null)}
+                    orderInfo={voiceOrderInfo}
+                  />
+                )}
                 <main className="flex-1 pb-10">{children}</main>
                 <NotificationPermissionManager />
                 <Footer />
@@ -68,5 +89,3 @@ export default function RootLayout({
     </html>
   );
 }
-
-    

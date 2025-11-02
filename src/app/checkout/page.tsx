@@ -32,7 +32,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import type { ProductPrice, ProductVariant, Store, User as AppUser } from '@/lib/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { VoiceOrderDialog, type VoiceOrderInfo } from '@/components/voice-order-dialog';
 import { create } from 'zustand';
 
 const checkoutSchema = z.object({
@@ -185,7 +184,6 @@ export default function CheckoutPage() {
   const finalTotal = hasItemsInCart ? cartTotal + DELIVERY_FEE : voiceOrderSubtotal + DELIVERY_FEE;
   
   const handleGetLocation = useCallback(() => {
-        setShouldPromptForLocation(false); // We've handled the prompt
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 (position) => {
@@ -202,7 +200,7 @@ export default function CheckoutPage() {
         } else {
             toast({ variant: 'destructive', title: "Not Supported", description: "Geolocation is not supported by your browser." });
         }
-    }, [toast, setShouldPromptForLocation]);
+    }, [toast]);
     
    // This state now drives the voice prompt for location
   const shouldPromptForLocation = !hasItemsInCart && structuredList.length === 0 && searchParams.get('action') === 'record' && !deliveryCoords;
@@ -211,7 +209,7 @@ export default function CheckoutPage() {
     setPlaceOrderBtnRef(placeOrderBtnRef);
     setFinalTotalGetter(() => finalTotal);
     setShouldPromptForLocation(shouldPromptForLocation);
-    setHandleGetLocation(handleGetLocation);
+    setHandleGetLocation(() => handleGetLocation);
 
     // Cleanup on unmount
     return () => {
@@ -481,14 +479,6 @@ export default function CheckoutPage() {
 
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
-        {voiceOrderInfo && (
-            <VoiceOrderDialog
-                isOpen={!!voiceOrderInfo}
-                onClose={() => setVoiceOrderInfo(null)}
-                orderInfo={voiceOrderInfo}
-            />
-        )}
-
         <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid md:grid-cols-2 gap-12">
                 <div>

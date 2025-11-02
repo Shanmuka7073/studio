@@ -27,9 +27,9 @@ import {
 import { getAuth, signOut } from 'firebase/auth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useState, useEffect, RefObject } from 'react';
-import { VoiceCommander, type Command } from './voice-commander';
+import { Command } from './voice-commander';
 import { useToast } from '@/hooks/use-toast';
-import { VoiceOrderDialog, type VoiceOrderInfo } from '@/components/voice-order-dialog';
+import { useCheckoutStore } from '@/app/checkout/page';
 
 
 const ADMIN_EMAIL = 'admin@gmail.com';
@@ -121,29 +121,27 @@ function UserMenu() {
 }
 
 interface HeaderProps {
-  placeOrderBtnRef?: RefObject<HTMLButtonElement>;
-  getFinalTotal?: () => number;
+  voiceEnabled: boolean;
+  onToggleVoice: () => void;
+  voiceStatus: string;
+  suggestedCommands: Command[];
+  isCartOpen: boolean;
+  onCartOpenChange: (open: boolean) => void;
 }
 
-export function Header({ placeOrderBtnRef, getFinalTotal }: HeaderProps) {
+export function Header({ voiceEnabled, onToggleVoice, voiceStatus, suggestedCommands, isCartOpen, onCartOpenChange }: HeaderProps) {
   const pathname = usePathname();
   const { user } = useFirebase();
   const isAdmin = user && user.email === ADMIN_EMAIL;
   const dashboardHref = isAdmin ? '/dashboard/admin' : '/dashboard';
-  const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
   const { toast } = useToast();
-  const [voiceStatus, setVoiceStatus] = useState('Click the mic to start listening.');
-  const [suggestedCommands, setSuggestedCommands] = useState<Command[]>([]);
-  const [voiceOrderInfo, setVoiceOrderInfo] = useState<VoiceOrderInfo | null>(null);
-  const [isCartOpen, setIsCartOpen] = useState(false);
-
 
   useEffect(() => {
     setHasMounted(true);
   }, []);
 
-  const handleToggleVoice = () => {
+  const handleToggleVoiceWithCheck = () => {
     if (!user) {
       toast({
         variant: 'destructive',
@@ -152,34 +150,16 @@ export function Header({ placeOrderBtnRef, getFinalTotal }: HeaderProps) {
       });
       return;
     }
-    setVoiceEnabled(prev => !prev);
+    onToggleVoice();
   };
   
   const handleSuggestionClick = (command: Command) => {
     command.action();
-    setSuggestedCommands([]); // Clear suggestions after click
+    // This state is managed in the RootLayout now
   }
 
   return (
     <header className="sticky top-0 z-50 flex h-16 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:px-6">
-      <VoiceCommander 
-        enabled={voiceEnabled} 
-        onStatusUpdate={setVoiceStatus}
-        onSuggestions={setSuggestedCommands}
-        onVoiceOrder={setVoiceOrderInfo}
-        onOpenCart={() => setIsCartOpen(true)}
-        onCloseCart={() => setIsCartOpen(false)}
-        isCartOpen={isCartOpen}
-        placeOrderBtnRef={placeOrderBtnRef}
-        getFinalTotal={getFinalTotal}
-      />
-       {voiceOrderInfo && (
-        <VoiceOrderDialog
-          isOpen={!!voiceOrderInfo}
-          onClose={() => setVoiceOrderInfo(null)}
-          orderInfo={voiceOrderInfo}
-        />
-      )}
       <nav className="hidden flex-col gap-6 text-lg font-medium md:flex md:flex-row md:items-center md:gap-5 md:text-sm lg:gap-6">
         <Link
           href="/"
@@ -290,12 +270,12 @@ export function Header({ placeOrderBtnRef, getFinalTotal }: HeaderProps) {
       <div className="flex w-full items-center justify-end gap-4 md:ml-auto md:gap-2 lg:gap-4">
         {hasMounted ? (
           <>
-            <Button variant={voiceEnabled ? 'secondary' : 'outline'} size="icon" onClick={handleToggleVoice} className="relative">
+            <Button variant={voiceEnabled ? 'secondary' : 'outline'} size="icon" onClick={handleToggleVoiceWithCheck} className="relative">
               {voiceEnabled ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
               {voiceEnabled && <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-red-500 animate-pulse"></span>}
               <span className="sr-only">{voiceEnabled ? 'Stop voice commands' : 'Start voice commands'}</span>
             </Button>
-            <CartIcon open={isCartOpen} onOpenChange={setIsCartOpen} />
+            <CartIcon open={isCartOpen} onOpenChange={onCartOpenChange} />
             <UserMenu />
           </>
         ) : (
@@ -330,5 +310,3 @@ export function Header({ placeOrderBtnRef, getFinalTotal }: HeaderProps) {
     </header>
   );
 }
-
-    
