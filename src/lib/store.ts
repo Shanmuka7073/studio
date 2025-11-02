@@ -7,6 +7,8 @@ import { Store, Product, ProductPrice } from './types';
 import { getStores, getMasterProducts, getProductPrice } from './data';
 import { useFirebase } from '@/firebase';
 import { useEffect } from 'react';
+import { UseFormReturn } from 'react-hook-form';
+import { ProfileFormValues } from '@/app/dashboard/customer/my-profile/page';
 
 
 export interface AppState {
@@ -93,3 +95,14 @@ export const useInitializeApp = () => {
 
     return loading;
 };
+
+// --- Store for Profile Page Form ---
+interface ProfileFormState {
+  form: UseFormReturn<ProfileFormValues> | null;
+  setForm: (form: UseFormReturn<ProfileFormValues> | null) => void;
+}
+
+export const useProfileFormStore = create<ProfileFormState>((set) => ({
+  form: null,
+  setForm: (form) => set({ form }),
+}));

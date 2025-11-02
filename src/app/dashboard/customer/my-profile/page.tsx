@@ -11,10 +11,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { doc, setDoc } from 'firebase/firestore';
-import { useTransition, useEffect } from 'react';
+import { useTransition, useEffect, useRef } from 'react';
 import type { User as AppUser } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useProfileFormStore } from '@/lib/store';
 
 const profileSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
@@ -24,7 +25,7 @@ const profileSchema = z.object({
   address: z.string().min(10, 'A valid address is required'),
 });
 
-type ProfileFormValues = z.infer<typeof profileSchema>;
+export type ProfileFormValues = z.infer<typeof profileSchema>;
 
 export default function MyProfilePage() {
   const { user, isUserLoading, firestore } = useFirebase();
@@ -38,6 +39,8 @@ export default function MyProfilePage() {
   }, [firestore, user]);
 
   const { data: userData, isLoading: isProfileLoading } = useDoc<AppUser>(userDocRef);
+  
+  const { setForm, setFieldRef } = useProfileFormStore();
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -49,6 +52,13 @@ export default function MyProfilePage() {
       address: '',
     },
   });
+  
+  // Expose form instance to global state
+  useEffect(() => {
+    setForm(form);
+    return () => setForm(null); // Cleanup
+  }, [form, setForm]);
+
 
   useEffect(() => {
     if (userData) {
@@ -113,7 +123,7 @@ export default function MyProfilePage() {
       <Card className="max-w-2xl mx-auto">
         <CardHeader>
           <CardTitle className="text-3xl font-headline">My Profile</CardTitle>
-          <CardDescription>Manage your personal information. This data will be used to auto-fill forms across the app.</CardDescription>
+          <CardDescription>Manage your personal information. Activate the voice assistant to fill the form by speaking.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>

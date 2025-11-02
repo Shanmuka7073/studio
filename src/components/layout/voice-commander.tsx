@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback, RefObject } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { useFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { getStores, getMasterProducts, getProductPrice } from '@/lib/data';
@@ -13,6 +13,8 @@ import { VoiceOrderInfo } from '@/components/voice-order-dialog';
 import { useCart } from '@/lib/cart';
 import { getCommands } from '@/app/actions';
 import { generateMonthlyPackage } from '@/ai/flows/monthly-package-flow';
+import { useProfileFormStore } from '@/lib/store';
+import { ProfileFormValues } from '@/app/dashboard/customer/my-profile/page';
 
 export interface Command {
   command: string;
@@ -61,6 +63,7 @@ async function parseShoppingList(text: string): Promise<ParsedShoppingListItem[]
 
 export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoiceOrder, onOpenCart, onCloseCart, isCartOpen, placeOrderBtnRef }: VoiceCommanderProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { toast } = useToast();
   const { firestore, user } = useFirebase();
   const [allStores, setAllStores] = useState<Store[]>([]);
@@ -71,36 +74,44 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
   
   const listeningRef = useRef(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const isSpeakingRef = useRef(false);
 
-  // Use browser's native speech synthesis for audio feedback
-  const speak = useCallback((text: string) => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) return;
-    try {
-      // Pause recognition while speaking
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
+  // For profile form filling
+  const { form: profileForm } = useProfileFormStore();
+  const formFieldToFill = useRef<keyof ProfileFormValues | null>(null);
 
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.pitch = 1;
-      utterance.rate = 1;
 
-      utterance.onend = () => {
-        // Resume recognition after speaking
-        if (recognitionRef.current && listeningRef.current) {
-           try {
-            recognitionRef.current.start();
-           } catch(e) {
-            console.warn("Could not restart recognition after speech synthesis.", e);
-           }
-        }
-      };
-
-      window.speechSynthesis.speak(utterance);
-    } catch (e) {
-      console.error("Browser speech synthesis error:", e);
+  const speak = useCallback((text: string, onEndCallback?: () => void) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis || isSpeakingRef.current) return;
+    
+    isSpeakingRef.current = true;
+    
+    // Pause recognition while speaking
+    if (recognitionRef.current && listeningRef.current) {
+      recognitionRef.current.stop();
     }
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.pitch = 1;
+    utterance.rate = 1;
+
+    utterance.onend = () => {
+      // Resume recognition after speaking
+      if (recognitionRef.current && listeningRef.current) {
+         try {
+          recognitionRef.current.start();
+         } catch(e) {
+          console.warn("Could not restart recognition after speech synthesis.", e);
+         }
+      }
+      isSpeakingRef.current = false;
+      if (onEndCallback) {
+        onEndCallback();
+      }
+    };
+
+    window.speechSynthesis.speak(utterance);
   }, []);
 
   // Fetch stores and build the full command list
@@ -189,11 +200,14 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
 
   useEffect(() => {
     listeningRef.current = enabled;
+     if (enabled && pathname === '/dashboard/customer/my-profile') {
+      // Enter form-filling mode when enabled on the profile page
+      handleProfileFormInteraction();
+    }
     if (!enabled) {
       onSuggestions([]); // Clear suggestions when disabled
     }
-  }, [enabled, onSuggestions]);
-
+  }, [enabled, onSuggestions, pathname]);
 
     const findProductAndVariant = useCallback(async (parsedItem: {name: string, quantity: string}): Promise<{ product: Product | null, variant: ProductVariant | null }> => {
         if (!firestore) return { product: null, variant: null };
@@ -215,6 +229,31 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
         return { product: null, variant: null };
 
     }, [masterProductList, firestore]);
+
+     const handleProfileFormInteraction = useCallback(() => {
+        if (!profileForm) {
+            speak("I can't seem to access the profile form right now.");
+            return;
+        }
+
+        const fields: { name: keyof ProfileFormValues; label: string }[] = [
+            { name: 'firstName', label: 'first name' },
+            { name: 'lastName', label: 'last name' },
+            { name: 'phone', label: 'phone number' },
+            { name: 'address', label: 'full address' },
+        ];
+
+        const formValues = profileForm.getValues();
+        const firstEmptyField = fields.find(f => !formValues[f.name]);
+        
+        if (firstEmptyField) {
+            formFieldToFill.current = firstEmptyField.name;
+            speak(`What is your ${firstEmptyField.label}?`);
+        } else {
+            formFieldToFill.current = null;
+            speak("Your profile looks complete!");
+        }
+    }, [profileForm, speak]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !enabled) {
@@ -245,6 +284,15 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
     const handleCommand = async (command: string) => {
       if (!firestore || !user) return;
       
+      // Handle profile form filling
+      if (formFieldToFill.current && profileForm) {
+          profileForm.setValue(formFieldToFill.current, command, { shouldValidate: true });
+          formFieldToFill.current = null; // Clear the field to fill
+          handleProfileFormInteraction(); // Check for the next empty field
+          return;
+      }
+
+
       const monthlyListTriggers = ['one month groceries for', 'monthly list for', 'groceries for a month for'];
       const monthlyListTriggerFound = monthlyListTriggers.find(t => command.includes(t));
       if (monthlyListTriggerFound) {
@@ -315,7 +363,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
                   onSuggestions([]);
                   return; // Command handled
               } else if (matchingStores.length > 1) {
-                  const message = `I found multiple stores named "${storeName}". Please be more specific, for example, by saying the store's full name or address.`;
+                  const message = `I found multiple stores named "${storeName}". Please be more specific.`;
                   speak(message);
                   toast({ variant: 'destructive', title: "Multiple Stores Found", description: message });
                   onSuggestions([]);
@@ -464,12 +512,16 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
         console.error('Speech recognition error', event.error);
         onStatusUpdate(`⚠️ Error: ${event.error}`);
       }
+       isSpeakingRef.current = false;
+       listeningRef.current = false;
     };
 
     recognition.onend = () => {
       if (listeningRef.current) {
         try {
-          recognition.start();
+          if (!isSpeakingRef.current) {
+            recognition.start();
+          }
         } catch (e) {
           console.error('Could not restart recognition service: ', e);
           onStatusUpdate('⚠️ Mic error, please toggle off and on.');
@@ -488,7 +540,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
     return () => {
       recognition.stop();
     };
-  }, [enabled, toast, onStatusUpdate, allCommands, onSuggestions, firestore, user, myStore, masterProductList, router, allStores, onVoiceOrder, findProductAndVariant, addItemToCart, onOpenCart, isCartOpen, onCloseCart, speak]);
+  }, [enabled, toast, onStatusUpdate, allCommands, onSuggestions, firestore, user, myStore, masterProductList, router, allStores, onVoiceOrder, findProductAndVariant, addItemToCart, onOpenCart, isCartOpen, onCloseCart, speak, pathname, profileForm, handleProfileFormInteraction]);
 
   return null; // This component does not render anything itself.
 }
