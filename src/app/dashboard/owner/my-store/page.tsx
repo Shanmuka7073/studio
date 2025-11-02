@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useTransition, useEffect, useMemo, useRef } from 'react';
@@ -688,6 +689,13 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
     name: 'variants'
   });
 
+  const handleTemplateSelect = (value: string) => {
+    if (!value) return;
+    const [itemName, categoryName] = value.split('::');
+    form.setValue('name', itemName);
+    form.setValue('category', categoryName);
+  };
+
   const handleGenerateImage = async () => {
     const productName = form.getValues('name');
     if (!productName) {
@@ -784,6 +792,29 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+             <FormItem>
+                <FormLabel>Product Template (Optional)</FormLabel>
+                <Select onValueChange={handleTemplateSelect}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a predefined item..." />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {groceryData.categories.map(cat => (
+                        cat.items.map(item => (
+                            <SelectItem key={`${cat.categoryName}-${item}`} value={`${item}::${cat.categoryName}`}>
+                                {item} ({cat.categoryName})
+                            </SelectItem>
+                        ))
+                      ))}
+                    </SelectContent>
+                </Select>
+                <FormDescription>
+                    Select an item to auto-fill the name and category.
+                </FormDescription>
+            </FormItem>
+
             <FormField
               control={form.control}
               name="name"
@@ -826,7 +857,7 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Category</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a category" />
