@@ -70,16 +70,33 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
   const { addItem: addItemToCart } = useCart();
   
   const listeningRef = useRef(false);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   // Use browser's native speech synthesis for audio feedback
   const speak = useCallback((text: string) => {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
     try {
-      // Cancel any ongoing speech before starting a new one
+      // Pause recognition while speaking
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.pitch = 1;
       utterance.rate = 1;
+
+      utterance.onend = () => {
+        // Resume recognition after speaking
+        if (recognitionRef.current && listeningRef.current) {
+           try {
+            recognitionRef.current.start();
+           } catch(e) {
+            console.warn("Could not restart recognition after speech synthesis.", e);
+           }
+        }
+      };
+
       window.speechSynthesis.speak(utterance);
     } catch (e) {
       console.error("Browser speech synthesis error:", e);
@@ -200,7 +217,12 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
     }, [masterProductList, firestore]);
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !enabled) return;
+    if (typeof window === 'undefined' || !enabled) {
+        if(recognitionRef.current) {
+            recognitionRef.current.stop();
+        }
+        return;
+    };
 
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -211,10 +233,14 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
       return;
     }
 
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.lang = 'en-IN';
-    recognition.interimResults = false;
+    if (!recognitionRef.current) {
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.continuous = true;
+        recognitionRef.current.lang = 'en-IN';
+        recognitionRef.current.interimResults = false;
+    }
+    
+    const recognition = recognitionRef.current;
 
     const handleCommand = async (command: string) => {
       if (!firestore || !user) return;
@@ -461,7 +487,6 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
 
     return () => {
       recognition.stop();
-      recognition.onend = null; // Prevent restart on component unmount
     };
   }, [enabled, toast, onStatusUpdate, allCommands, onSuggestions, firestore, user, myStore, masterProductList, router, allStores, onVoiceOrder, findProductAndVariant, addItemToCart, onOpenCart, isCartOpen, onCloseCart, speak]);
 
