@@ -12,7 +12,6 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { VoiceOrderInfo } from '@/components/voice-order-dialog';
 import { useCart } from '@/lib/cart';
 import { getCommands } from '@/app/actions';
-import { textToSpeech } from '@/ai/flows/tts-flow';
 
 export interface Command {
   command: string;
@@ -68,9 +67,24 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
   const [masterProductList, setMasterProductList] = useState<Product[]>([]);
   const [myStore, setMyStore] = useState<Store | null>(null);
   const { addItem: addItemToCart } = useCart();
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
-
+  
   const listeningRef = useRef(false);
+
+  // Use browser's native speech synthesis for audio feedback
+  const speak = useCallback((text: string) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    try {
+      const utterance = new SpeechSynthesisUtterance(text);
+      // Optional: configure voice, pitch, rate
+      // const voices = window.speechSynthesis.getVoices();
+      // utterance.voice = voices.find(v => v.lang === 'en-US') || voices[0];
+      utterance.pitch = 1;
+      utterance.rate = 1;
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      console.error("Browser speech synthesis error:", e);
+    }
+  }, []);
 
   // Fetch stores and build the full command list
   useEffect(() => {
@@ -196,15 +210,6 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
         return { product: null, variant: null };
 
     }, [masterProductList, firestore]);
-
-  const speak = useCallback(async (text: string) => {
-    try {
-      const audioDataUri = await textToSpeech(text);
-      setAudioUrl(audioDataUri);
-    } catch (e) {
-      console.error("TTS Error:", e);
-    }
-  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !enabled) return;
@@ -427,13 +432,5 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
     };
   }, [enabled, toast, onStatusUpdate, allCommands, onSuggestions, firestore, user, myStore, masterProductList, router, allStores, onVoiceOrder, findProductAndVariant, addItemToCart, onOpenCart, isCartOpen, onCloseCart, speak]);
 
-  return (
-      <>
-        {audioUrl && (
-          <audio autoPlay src={audioUrl} onEnded={() => setAudioUrl(null)}>
-            Your browser does not support the audio element.
-          </audio>
-        )}
-      </>
-  );
+  return null; // This component does not render anything itself.
 }
