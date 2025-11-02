@@ -133,18 +133,28 @@ interface PassThroughState {
   setPlaceOrderBtnRef: (ref: RefObject<HTMLButtonElement> | null) => void;
   getFinalTotal: () => number;
   setFinalTotalGetter: (getter: () => number) => void;
+  shouldPromptForLocation: boolean;
+  setShouldPromptForLocation: (should: boolean) => void;
+  handleGetLocation: () => void;
+  setHandleGetLocation: (handler: () => void) => void;
 }
 
-const useCheckoutStore = create<PassThroughState>((set) => ({
+export const useCheckoutStore = create<PassThroughState>((set) => ({
   placeOrderBtnRef: null,
   setPlaceOrderBtnRef: (placeOrderBtnRef) => set({ placeOrderBtnRef }),
   getFinalTotal: () => 0,
   setFinalTotalGetter: (getter) => set({ getFinalTotal: getter }),
+  shouldPromptForLocation: false,
+  setShouldPromptForLocation: (should) => set({ shouldPromptForLocation: should }),
+  handleGetLocation: () => {},
+  setHandleGetLocation: (handler) => set({ handleGetLocation: handler }),
 }));
 
 export const useCheckoutPassThrough = () => useCheckoutStore((state) => ({ 
     placeOrderBtnRef: state.placeOrderBtnRef, 
-    getFinalTotal: state.getFinalTotal 
+    getFinalTotal: state.getFinalTotal,
+    shouldPromptForLocation: state.shouldPromptForLocation,
+    handleGetLocation: state.handleGetLocation,
 }));
 
 
@@ -167,25 +177,50 @@ export default function CheckoutPage() {
   const [deliveryCoords, setDeliveryCoords] = useState<{lat: number, lng: number} | null>(null);
   const [images, setImages] = useState({});
   const placeOrderBtnRef = useRef<HTMLButtonElement>(null);
-  const setPlaceOrderBtnRef = useCheckoutStore((state) => state.setPlaceOrderBtnRef);
-  const setFinalTotalGetter = useCheckoutStore((state) => state.setFinalTotalGetter);
+  
+  const { setPlaceOrderBtnRef, setFinalTotalGetter, setShouldPromptForLocation, setHandleGetLocation } = useCheckoutStore();
 
   const hasItemsInCart = cartItems.length > 0;
   const voiceOrderSubtotal = structuredList.reduce((acc, item) => acc + ((item.price || 0) * item.quantity), 0);
   const finalTotal = hasItemsInCart ? cartTotal + DELIVERY_FEE : voiceOrderSubtotal + DELIVERY_FEE;
-
-  // This state now drives the voice prompt for location
-  const [shouldPromptForLocation, setShouldPromptForLocation] = useState(false);
   
+  const handleGetLocation = useCallback(() => {
+        setShouldPromptForLocation(false); // We've handled the prompt
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    setDeliveryCoords({
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    });
+                    toast({ title: "Location Fetched!", description: "Your current location has been captured for delivery." });
+                },
+                () => {
+                    toast({ variant: 'destructive', title: "Location Error", description: "Could not retrieve your location. Please enter your address manually and ensure permissions are enabled." });
+                }
+            );
+        } else {
+            toast({ variant: 'destructive', title: "Not Supported", description: "Geolocation is not supported by your browser." });
+        }
+    }, [toast, setShouldPromptForLocation]);
+    
+   // This state now drives the voice prompt for location
+  const shouldPromptForLocation = !hasItemsInCart && structuredList.length === 0 && searchParams.get('action') === 'record' && !deliveryCoords;
+
   useEffect(() => {
     setPlaceOrderBtnRef(placeOrderBtnRef);
     setFinalTotalGetter(() => finalTotal);
+    setShouldPromptForLocation(shouldPromptForLocation);
+    setHandleGetLocation(handleGetLocation);
+
     // Cleanup on unmount
     return () => {
       setPlaceOrderBtnRef(null);
       setFinalTotalGetter(() => 0);
+      setShouldPromptForLocation(false);
+      setHandleGetLocation(() => {});
     }
-  }, [setPlaceOrderBtnRef, setFinalTotalGetter, finalTotal]);
+  }, [setPlaceOrderBtnRef, setFinalTotalGetter, finalTotal, shouldPromptForLocation, setShouldPromptForLocation, handleGetLocation, setHandleGetLocation]);
 
 
    const userDocRef = useMemoFirebase(() => {
@@ -214,13 +249,7 @@ export default function CheckoutPage() {
         storeId: form.getValues('storeId'),
       });
     }
-
-    const autoRecord = searchParams.get('action') === 'record';
-    // If it's a voice-driven checkout and we don't have coords, prompt for location.
-    if (autoRecord && !deliveryCoords) {
-      setShouldPromptForLocation(true);
-    }
-  }, [userData, form, deliveryCoords, searchParams]);
+  }, [userData, form]);
 
   const handleUnderstandList = useCallback(async (text: string) => {
     if (!firestore) return;
@@ -301,26 +330,6 @@ export default function CheckoutPage() {
     }
   }, [isListening, form]);
   
-  const handleGetLocation = useCallback(() => {
-        setShouldPromptForLocation(false); // We've handled the prompt
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    setDeliveryCoords({
-                        lat: position.coords.latitude,
-                        lng: position.coords.longitude
-                    });
-                    toast({ title: "Location Fetched!", description: "Your current location has been captured for delivery." });
-                },
-                () => {
-                    toast({ variant: 'destructive', title: "Location Error", description: "Could not retrieve your location. Please enter your address manually and ensure permissions are enabled." });
-                }
-            );
-        } else {
-            toast({ variant: 'destructive', title: "Not Supported", description: "Geolocation is not supported by your browser." });
-        }
-    }, [toast]);
-
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
@@ -336,19 +345,6 @@ export default function CheckoutPage() {
         
         recognition.onresult = (event) => {
             const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
-
-            if (transcript.includes('place order')) {
-                placeOrderBtnRef.current?.click();
-                return;
-            }
-             // This is the new voice command handling for location
-             if (shouldPromptForLocation && transcript === 'yes') {
-                handleGetLocation();
-                // After getting location, you might want to automatically ask for the list
-                // For now, we'll let the user click the mic again.
-                return;
-            }
-
             form.setValue('shoppingList', transcript);
             handleUnderstandList(transcript);
         };
@@ -381,7 +377,7 @@ export default function CheckoutPage() {
     } else {
         toast({ variant: 'destructive', title: 'Not Supported', description: 'Voice recognition is not supported by your browser.' });
     }
-  }, [toast, form, searchParams, handleToggleListening, handleUnderstandList, shouldPromptForLocation, handleGetLocation]);
+  }, [toast, form, searchParams, handleToggleListening, handleUnderstandList]);
 
 
     const handleConfirmVoiceOrder = () => {

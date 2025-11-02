@@ -20,17 +20,18 @@ import {
 } from '@/components/ui/form';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { useTransition, useState, useCallback, useEffect } from 'react';
+import { useTransition, useState, useCallback, useEffect, useRef } from 'react';
 import { useFirebase, errorEmitter, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, addDoc, serverTimestamp, getDocs, doc } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { CheckCircle, MapPin, Loader2, Store as StoreIcon } from 'lucide-react';
+import { CheckCircle, MapPin, Loader2, Store as StoreIcon, HelpCircle } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import type { ProductPrice, ProductVariant, Store, User as AppUser } from '@/lib/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { getStores, getStore } from '@/lib/data';
+import { useCheckoutStore } from '@/app/checkout/page';
 
 
 const checkoutSchema = z.object({
@@ -115,6 +116,52 @@ export function VoiceOrderDialog({ isOpen, onClose, orderInfo }: { isOpen: boole
   
   const [deliveryCoords, setDeliveryCoords] = useState<{lat: number, lng: number} | null>(null);
 
+  const placeOrderBtnRef = useRef<HTMLButtonElement>(null);
+  const { setPlaceOrderBtnRef, setFinalTotalGetter, setShouldPromptForLocation, setHandleGetLocation } = useCheckoutStore();
+  
+  const handleGetLocation = useCallback(() => {
+        setShouldPromptForLocation(false);
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    setDeliveryCoords({
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    });
+                    toast({ title: "Location Fetched!", description: "Your current location has been captured for delivery." });
+                },
+                () => {
+                    toast({ variant: 'destructive', title: "Location Error", description: "Could not retrieve your location. Please ensure permissions are enabled." });
+                }
+            );
+        } else {
+            toast({ variant: 'destructive', title: "Not Supported", description: "Geolocation is not supported by your browser." });
+        }
+  }, [toast, setShouldPromptForLocation]);
+
+  const shouldPromptForLocation = isOpen && !deliveryCoords;
+  const voiceOrderSubtotal = structuredList.reduce((acc, item) => acc + ((item.price || 0) * item.quantity), 0);
+  const finalTotal = voiceOrderSubtotal + DELIVERY_FEE;
+
+
+  useEffect(() => {
+    if (isOpen) {
+        setPlaceOrderBtnRef(placeOrderBtnRef);
+        setFinalTotalGetter(() => finalTotal);
+        setShouldPromptForLocation(shouldPromptForLocation);
+        setHandleGetLocation(handleGetLocation);
+    } else {
+        setPlaceOrderBtnRef(null);
+        setFinalTotalGetter(() => 0);
+        setShouldPromptForLocation(false);
+        setHandleGetLocation(() => {});
+        setDeliveryCoords(null);
+        setStructuredList([]);
+    }
+  }, [isOpen, placeOrderBtnRef, setPlaceOrderBtnRef, finalTotal, setFinalTotalGetter, shouldPromptForLocation, setShouldPromptForLocation, handleGetLocation, setHandleGetLocation]);
+
+
+
   const userDocRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return doc(firestore, 'users', user.uid);
@@ -185,25 +232,6 @@ export function VoiceOrderDialog({ isOpen, onClose, orderInfo }: { isOpen: boole
     }
   }, [isOpen, orderInfo, form, handleUnderstandList]);
 
-   const handleGetLocation = () => {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    setDeliveryCoords({
-                        lat: position.coords.latitude,
-                        lng: position.coords.longitude
-                    });
-                    toast({ title: "Location Fetched!", description: "Your current location has been captured for delivery." });
-                },
-                () => {
-                    toast({ variant: 'destructive', title: "Location Error", description: "Could not retrieve your location. Please ensure permissions are enabled." });
-                }
-            );
-        } else {
-            toast({ variant: 'destructive', title: "Not Supported", description: "Geolocation is not supported by your browser." });
-        }
-    };
-
   const onSubmit = (data: CheckoutFormValues) => {
     if (!firestore || !user) {
         toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to place an order.' });
@@ -230,9 +258,8 @@ export function VoiceOrderDialog({ isOpen, onClose, orderInfo }: { isOpen: boole
             toast({ variant: 'destructive', title: 'Error', description: 'Selected store could not be found.' });
             return;
         }
-
-        const voiceOrderSubtotal = structuredList.reduce((acc, item) => acc + (item.price || 0), 0);
-        const totalAmount = voiceOrderSubtotal + DELIVERY_FEE;
+        
+        const totalAmount = finalTotal;
         
         let orderData: any = {
             userId: user.uid,
@@ -283,8 +310,6 @@ export function VoiceOrderDialog({ isOpen, onClose, orderInfo }: { isOpen: boole
     });
   };
 
-  const voiceOrderSubtotal = structuredList.reduce((acc, item) => acc + ((item.price || 0) * item.quantity), 0);
-  const finalTotal = voiceOrderSubtotal + DELIVERY_FEE;
   const storeName = availableStores.find(s => s.id === orderInfo?.storeId)?.name || '...';
 
   return (
@@ -354,50 +379,62 @@ export function VoiceOrderDialog({ isOpen, onClose, orderInfo }: { isOpen: boole
 
                 <ScrollArea className="md:pr-4">
                     <div className="space-y-6">
-                        <Card>
-                            <CardHeader><CardTitle>Delivery Details</CardTitle></CardHeader>
-                            <CardContent className="space-y-4">
-                                <FormField
-                                    control={form.control}
-                                    name="name"
-                                    render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Full Name</FormLabel>
-                                        <FormControl><Input placeholder="John Doe" {...field} readOnly={!!userData?.firstName} /></FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={form.control}
-                                    name="phone"
-                                    render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Phone Number</FormLabel>
-                                        <FormControl><Input placeholder="(555) 123-4567" {...field} readOnly={!!userData?.phoneNumber} /></FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                    )}
-                                />
-                                <div className="space-y-2">
-                                    <FormLabel>Delivery Location</FormLabel>
-                                    <FormDescription>
-                                        We need your current location for delivery.
-                                    </FormDescription>
-                                    <div className="flex items-center gap-4 pt-1">
-                                        <Button type="button" variant="outline" onClick={handleGetLocation} className="flex-1">
-                                            <MapPin className="mr-2 h-4 w-4" /> Get Current Location
-                                        </Button>
-                                        {deliveryCoords && (
-                                            <div className="flex items-center text-green-600 text-sm">
-                                                <CheckCircle className="mr-2 h-4 w-4" />
-                                                <span>Captured!</span>
-                                            </div>
-                                        )}
-                                    </div>
+                         {shouldPromptForLocation ? (
+                            <Card className="bg-primary/5 p-4 text-center border-primary/20">
+                                <div className="flex items-center justify-center gap-2 mb-2">
+                                     <HelpCircle className="h-5 w-5 text-primary" />
+                                    <p className="font-semibold text-primary">Confirm Your Delivery Location</p>
                                 </div>
-                            </CardContent>
-                        </Card>
+                                <p className="text-sm text-muted-foreground mb-4">For accurate delivery, please share your current location for this order. Say "Yes" if you've enabled voice commands.</p>
+                                <div className="flex gap-4 justify-center">
+                                    <Button type="button" onClick={handleGetLocation}>
+                                       <MapPin className="mr-2 h-4 w-4" /> Yes, Use Current Location
+                                    </Button>
+                                </div>
+                            </Card>
+                         ) : (
+                            <Card>
+                                <CardHeader><CardTitle>Delivery Details</CardTitle></CardHeader>
+                                <CardContent className="space-y-4">
+                                    <FormField
+                                        control={form.control}
+                                        name="name"
+                                        render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Full Name</FormLabel>
+                                            <FormControl><Input placeholder="John Doe" {...field} readOnly={!!userData?.firstName} /></FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="phone"
+                                        render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Phone Number</FormLabel>
+                                            <FormControl><Input placeholder="(555) 123-4567" {...field} readOnly={!!userData?.phoneNumber} /></FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                        )}
+                                    />
+                                    <div className="space-y-2">
+                                        <FormLabel>Delivery Location</FormLabel>
+                                        <div className="flex items-center gap-4 pt-1">
+                                             <Button type="button" variant="outline" onClick={handleGetLocation} className="flex-1">
+                                                <MapPin className="mr-2 h-4 w-4" /> {deliveryCoords ? 'Re-capture' : 'Get Current Location'}
+                                            </Button>
+                                            {deliveryCoords && (
+                                                <div className="flex items-center text-green-600 text-sm">
+                                                    <CheckCircle className="mr-2 h-4 w-4" />
+                                                    <span>Captured!</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                         )}
                         <Card>
                             <CardHeader><CardTitle>Order Summary</CardTitle></CardHeader>
                             <CardContent className="space-y-2">
@@ -409,7 +446,7 @@ export function VoiceOrderDialog({ isOpen, onClose, orderInfo }: { isOpen: boole
                                 <span>₹{finalTotal.toFixed(2)}</span>
                              </CardFooter>
                         </Card>
-                         <Button type="submit" disabled={isPlacingOrder || structuredList.length === 0} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
+                         <Button ref={placeOrderBtnRef} type="submit" disabled={isPlacingOrder || structuredList.length === 0} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
                             {isPlacingOrder ? 'Placing Order...' : 'Place Order'}
                         </Button>
                     </div>
@@ -420,3 +457,5 @@ export function VoiceOrderDialog({ isOpen, onClose, orderInfo }: { isOpen: boole
     </Dialog>
   );
 }
+
+    
