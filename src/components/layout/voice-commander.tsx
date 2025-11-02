@@ -12,6 +12,7 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { VoiceOrderInfo } from '@/components/voice-order-dialog';
 import { useCart } from '@/lib/cart';
 import { getCommands } from '@/app/actions';
+import { textToSpeech } from '@/ai/flows/tts-flow';
 
 export interface Command {
   command: string;
@@ -67,6 +68,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
   const [masterProductList, setMasterProductList] = useState<Product[]>([]);
   const [myStore, setMyStore] = useState<Store | null>(null);
   const { addItem: addItemToCart } = useCart();
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
 
   const listeningRef = useRef(false);
 
@@ -195,6 +197,15 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
 
     }, [masterProductList, firestore]);
 
+  const speak = useCallback(async (text: string) => {
+    try {
+      const audioDataUri = await textToSpeech(text);
+      setAudioUrl(audioDataUri);
+    } catch (e) {
+      console.error("TTS Error:", e);
+    }
+  }, []);
+
   useEffect(() => {
     if (typeof window === 'undefined' || !enabled) return;
 
@@ -241,10 +252,12 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
               const targetStore = allStores.find(s => s.name.toLowerCase().includes(storeName));
 
               if (targetStore) {
+                  speak(`Creating your shopping list for ${targetStore.name}.`);
                   onVoiceOrder({ shoppingList, storeId: targetStore.id });
                   onSuggestions([]);
                   return; // Command handled
               } else {
+                  speak(`Sorry, I could not find a store named "${storeName}".`);
                   toast({ variant: 'destructive', title: "Store Not Found", description: `Could not find a store named "${storeName}".` });
                   onSuggestions([]);
                   return;
@@ -268,13 +281,14 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
           if (parsedItems.length > 0) {
               onOpenCart(); // Open the cart side panel
               onSuggestions([]);
-              toast({ title: "Adding to cart...", description: `Heard: "${command}"`});
+              speak(`Adding items to your cart.`);
               
               for (const item of parsedItems) {
                   const { product, variant } = await findProductAndVariant(item);
                   if (product && variant) {
                       addItemToCart(product, variant, 1); // quantity is implicitly 1 of the variant (e.g. 1 x 1kg pack)
                   } else {
+                      speak(`Sorry, I could not find "${item.itemName}".`);
                       toast({ variant: 'destructive', title: "Item not found", description: `Could not find "${item.quantity}${item.unit} ${item.itemName}" in the catalog.`});
                   }
               }
@@ -301,6 +315,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
               };
 
               addDocumentNonBlocking(collection(firestore, 'stores', myStore.id, 'products'), newProductData);
+              speak(`Okay, ${productMatch.name} has been added to your store.`);
               toast({ title: "Product Added!", description: `${productMatch.name} has been added to your store.` });
               onSuggestions([]);
               return; // Command handled
@@ -312,6 +327,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
       
       if (removeTriggerFound && myStore) {
           const productName = command.substring(removeTriggerFound.length).replace(/from my store|product/g, '').trim();
+          speak(`Okay, I'll remove ${productName}. This feature is not fully implemented yet.`);
           toast({ title: "Command Acknowledged", description: `Logic to remove "${productName}" from your store is not yet implemented.` });
           onSuggestions([]);
           return;
@@ -321,8 +337,8 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
       // Check for perfect match on other commands
       const perfectMatch = allCommands.find((c) => command === c.command);
       if (perfectMatch) {
+        speak(`Navigating to ${perfectMatch.display.replace('View', '').replace('Your','').trim()}`);
         perfectMatch.action();
-        toast({ title: `Navigating...`, description: `Heard: "${command}"` });
         onSuggestions([]);
         return;
       }
@@ -331,8 +347,8 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
       const sanitizedCommand = command.replace(/\s/g, '');
       const spaceInsensitiveMatch = allCommands.find(c => c.command.replace(/\s/g, '') === sanitizedCommand);
       if(spaceInsensitiveMatch) {
+        speak(`Navigating to ${spaceInsensitiveMatch.display.replace('View', '').replace('Your','').trim()}`);
         spaceInsensitiveMatch.action();
-        toast({ title: `Navigating...`, description: `Heard: "${command}"` });
         onSuggestions([]);
         return;
       }
@@ -354,8 +370,10 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
         .slice(0, 3);
 
       if (potentialMatches.length > 0) {
+        speak("I'm not sure. Did you mean one of these?");
         onSuggestions(potentialMatches);
       } else {
+        speak(`Sorry, I didn't understand "${command}".`);
         onSuggestions([]);
         toast({
           variant: 'destructive',
@@ -407,7 +425,15 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
       recognition.stop();
       recognition.onend = null; // Prevent restart on component unmount
     };
-  }, [enabled, toast, onStatusUpdate, allCommands, onSuggestions, firestore, user, myStore, masterProductList, router, allStores, onVoiceOrder, findProductAndVariant, addItemToCart, onOpenCart, isCartOpen, onCloseCart]);
+  }, [enabled, toast, onStatusUpdate, allCommands, onSuggestions, firestore, user, myStore, masterProductList, router, allStores, onVoiceOrder, findProductAndVariant, addItemToCart, onOpenCart, isCartOpen, onCloseCart, speak]);
 
-  return null;
+  return (
+      <>
+        {audioUrl && (
+          <audio autoPlay src={audioUrl} onEnded={() => setAudioUrl(null)}>
+            Your browser does not support the audio element.
+          </audio>
+        )}
+      </>
+  );
 }
