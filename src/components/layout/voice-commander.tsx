@@ -12,6 +12,7 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { VoiceOrderInfo } from '@/components/voice-order-dialog';
 import { useCart } from '@/lib/cart';
 import { getCommands } from '@/app/actions';
+import { generateMonthlyPackage } from '@/ai/flows/monthly-package-flow';
 
 export interface Command {
   command: string;
@@ -177,28 +178,16 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
   }, [enabled, onSuggestions]);
 
 
-    const findProductAndVariant = useCallback(async (parsedItem: ParsedShoppingListItem): Promise<{ product: Product | null, variant: ProductVariant | null }> => {
+    const findProductAndVariant = useCallback(async (parsedItem: {name: string, quantity: string}): Promise<{ product: Product | null, variant: ProductVariant | null }> => {
         if (!firestore) return { product: null, variant: null };
         
-        // Find a master product that matches the item name
-        const masterProductMatch = masterProductList.find(p => parsedItem.itemName.includes(p.name.toLowerCase()));
+        const masterProductMatch = masterProductList.find(p => p.name.toLowerCase() === parsedItem.name.toLowerCase());
 
         if (masterProductMatch) {
-            // If we have a product match, fetch its specific price variants
             const priceData = await getProductPrice(firestore, masterProductMatch.name);
             if (priceData && priceData.variants) {
-                // Now find the variant that matches the spoken weight
-                // e.g., "1kg" should match "1kg", "1 kg" etc.
-                 const targetWeight = (parsedItem.quantity + (parsedItem.unit === 'pc' ? 'pc' : parsedItem.unit)).replace(/\s/g, '').toLowerCase();
-
-                const variantMatch = priceData.variants.find(v => {
-                    const variantWeight = v.weight.replace(/\s/g, '').toLowerCase();
-                    // Handle cases like "1kg" matching "1 kg"
-                    if (variantWeight === targetWeight) return true;
-                    // Handle cases where unit is implied, e.g. "1 chicken" -> "1pc"
-                    if (parsedItem.unit === 'pc' && variantWeight === (parsedItem.quantity + 'pc')) return true;
-                    return false;
-                });
+                const targetWeight = parsedItem.quantity.replace(/\s/g, '').toLowerCase();
+                const variantMatch = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === targetWeight);
 
                 if (variantMatch) {
                     return { product: masterProductMatch, variant: variantMatch };
@@ -229,7 +218,45 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
 
     const handleCommand = async (command: string) => {
       if (!firestore || !user) return;
-        
+      
+      const monthlyListTriggers = ['one month groceries for', 'monthly list for', 'groceries for a month for'];
+      const monthlyListTriggerFound = monthlyListTriggers.find(t => command.includes(t));
+      if (monthlyListTriggerFound) {
+        const matches = command.match(/(\d+)/);
+        if (matches) {
+            const memberCount = parseInt(matches[1], 10);
+            speak(`Generating a one-month grocery list for ${memberCount} members. This may take a moment.`);
+            onSuggestions([]);
+            
+            const packageResult = await generateMonthlyPackage({ memberCount });
+            
+            if (packageResult && packageResult.items) {
+                onOpenCart();
+                speak(`Adding ${packageResult.items.length} items to your cart.`);
+                let notFoundCount = 0;
+                
+                for (const item of packageResult.items) {
+                    const { product, variant } = await findProductAndVariant(item);
+                    if (product && variant) {
+                        addItemToCart(product, variant, 1);
+                    } else {
+                        notFoundCount++;
+                        console.warn(`Could not find a matching product/variant for: ${item.name} (${item.quantity})`);
+                    }
+                }
+                
+                if (notFoundCount > 0) {
+                     toast({ variant: 'destructive', title: "Some Items Not Found", description: `${notFoundCount} item(s) from the generated list could not be found in the product catalog.`});
+                }
+                 toast({ title: "Items Added!", description: `A monthly grocery list has been added to your cart.`});
+                 return;
+            } else {
+                speak('Sorry, I could not generate the grocery list at this time.');
+                return;
+            }
+        }
+      }
+
       const orderTriggers = ['order ', 'buy ', 'get ', 'shop ', 'purchase ', 'i want '];
       const addToCartTriggers = ['add '];
 
@@ -295,7 +322,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
               speak(`Adding items to your cart.`);
               
               for (const item of parsedItems) {
-                  const { product, variant } = await findProductAndVariant(item);
+                  const { product, variant } = await findProductAndVariant({ name: item.itemName, quantity: `${item.quantity}${item.unit}` });
                   if (product && variant) {
                       addItemToCart(product, variant, 1); // quantity is implicitly 1 of the variant (e.g. 1 x 1kg pack)
                   } else {
