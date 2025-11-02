@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import groceryData from '@/lib/grocery-data.json';
 import { Input } from '@/components/ui/input';
-import { collection, query, where, documentId, getDocs } from 'firebase/firestore';
+import { collection, query, where, documentId, getDocs, limit } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
@@ -137,30 +137,47 @@ export default function StoreDetailPage() {
   const [productImages, setProductImages] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
   const [priceDataMap, setPriceDataMap] = useState<Record<string, ProductPrice>>({});
+  const [allStoreProducts, setAllStoreProducts] = useState<Product[]>([]);
 
-  const productsQuery = useMemoFirebase(() => {
-    if (!firestore || !id) return null;
-    return collection(firestore, 'stores', id, 'products');
+  // Fetch ALL products for the store just once to determine categories
+  useEffect(() => {
+    if (firestore && id) {
+        const productsCol = collection(firestore, 'stores', id, 'products');
+        getDocs(productsCol).then(snapshot => {
+            const allProducts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+            setAllStoreProducts(allProducts);
+        });
+    }
   }, [firestore, id]);
 
-  const { data: products, isLoading: productsLoading } = useCollection<Product>(productsQuery);
-
-  // Memoize categories to prevent re-renders
   const storeCategories = useMemo(() => {
-    if (!products) return [];
-    const uniqueCategories = [...new Set(products.map(p => p.category || 'Miscellaneous'))];
-    // Find the original category objects from groceryData to preserve order and structure
+    if (allStoreProducts.length === 0) return [];
+    const uniqueCategories = [...new Set(allStoreProducts.map(p => p.category || 'Miscellaneous'))];
     return groceryData.categories.filter(gc => uniqueCategories.includes(gc.categoryName));
-  }, [products]);
-
+  }, [allStoreProducts]);
+  
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-
-  // Set default category once products load
+  
   useEffect(() => {
     if (storeCategories.length > 0 && !selectedCategory) {
       setSelectedCategory(storeCategories[0].categoryName);
     }
   }, [storeCategories, selectedCategory]);
+
+  const productsQuery = useMemoFirebase(() => {
+    if (!firestore || !id || !selectedCategory) return null;
+    
+    // Create a query for the selected category with a limit
+    const baseQuery = query(
+        collection(firestore, 'stores', id, 'products'),
+        where('category', '==', selectedCategory),
+        limit(20) // CRITICAL: Limit the number of products fetched
+    );
+
+    return baseQuery;
+  }, [firestore, id, selectedCategory]);
+  
+  const { data: products, isLoading: productsLoading } = useCollection<Product>(productsQuery);
 
   useEffect(() => {
     if (firestore && id) {
@@ -200,24 +217,14 @@ export default function StoreDetailPage() {
   
   const filteredProducts = useMemo(() => {
     if (!products) return [];
-    let tempProducts = [...products];
-
-    // Filter by selected category
-    if (selectedCategory) {
-        tempProducts = tempProducts.filter(product => product.category === selectedCategory);
-    }
-
-    // Filter by search term
     if (searchTerm) {
-      tempProducts = tempProducts.filter(product =>
-        product.name.toLowerCase().includes(searchTerm.toLowerCase())
+      return allStoreProducts.filter(product =>
+        product.name.toLowerCase().includes(searchTerm.toLowerCase()) && product.category === selectedCategory
       );
     }
+    return products;
+  }, [products, searchTerm, allStoreProducts, selectedCategory]);
 
-    return tempProducts;
-  }, [products, selectedCategory, searchTerm]);
-
-  // NEW: Effect to bulk-fetch prices for filtered products
   useEffect(() => {
     const fetchPrices = async () => {
         if (!firestore || filteredProducts.length === 0) return;
@@ -226,15 +233,26 @@ export default function StoreDetailPage() {
         if (productNames.length === 0) return;
 
         const pricesRef = collection(firestore, 'productPrices');
-        const q = query(pricesRef, where(documentId(), 'in', productNames));
+        // Firestore 'in' query is limited to 30 items. We must batch the requests.
+        const batches = [];
+        for (let i = 0; i < productNames.length; i += 30) {
+            batches.push(productNames.slice(i, i + 30));
+        }
+
+        const pricePromises = batches.map(batch => 
+            getDocs(query(pricesRef, where(documentId(), 'in', batch)))
+        );
 
         try {
-            const priceSnapshot = await getDocs(q);
+            const snapshots = await Promise.all(pricePromises);
             const newPriceDataMap = {};
-            priceSnapshot.forEach(doc => {
-                newPriceDataMap[doc.id] = doc.data() as ProductPrice;
+            snapshots.forEach(snapshot => {
+                 snapshot.forEach(doc => {
+                    newPriceDataMap[doc.id] = doc.data() as ProductPrice;
+                });
             });
-            setPriceDataMap(newPriceDataMap);
+           
+            setPriceDataMap(prev => ({...prev, ...newPriceDataMap}));
         } catch (error) {
             console.error("Error fetching product prices:", error);
         }
@@ -258,11 +276,14 @@ export default function StoreDetailPage() {
         
         <div className="flex-1">
           <main className="p-4 md:p-6">
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold font-headline">{selectedCategory} ({filteredProducts.length})</h2>
-                <div className="w-full max-w-sm">
+            <div className="flex justify-between items-start md:items-center mb-6 flex-col md:flex-row gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold font-headline">{selectedCategory}</h2>
+                  {!searchTerm && <p className="text-sm text-muted-foreground">Showing the first {products?.length || 0} products. Use search to find more.</p>}
+                </div>
+                <div className="w-full md:max-w-sm">
                     <Input 
-                        placeholder="Search in this category..."
+                        placeholder={`Search in ${selectedCategory}...`}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -270,7 +291,7 @@ export default function StoreDetailPage() {
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                {productsLoading ? (
+                {productsLoading && !searchTerm ? (
                     <p>Loading products...</p>
                 ) : filteredProducts && filteredProducts.length > 0 ? (
                     filteredProducts.map((product) => {
