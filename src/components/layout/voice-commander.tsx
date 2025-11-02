@@ -302,17 +302,17 @@ export function VoiceCommander({
             if (orderItemTemplate) {
                 for (const alias of orderItemTemplate.aliases) {
                     const pattern = alias.replace(/{quantity}/g, '(.+)').replace(/{product}/g, '(.+)');
-                    const regex = new RegExp(`^${pattern}$`);
+                    const regex = new RegExp(`^${pattern}$`, 'i');
                     const match = command.match(regex);
                     
                     if (match) {
                         const quantity = match[1]?.trim();
                         const product = match[2]?.trim();
 
-                        if(product && quantity) {
-                            await commandActionsRef.current.orderItem({ product, quantity });
-                            onSuggestions([]);
-                            return; // Command was handled
+                        if(product) {
+                           commandActionsRef.current.orderItem({ product, quantity });
+                           onSuggestions([]);
+                           return; // Command was handled
                         }
                     }
                 }
