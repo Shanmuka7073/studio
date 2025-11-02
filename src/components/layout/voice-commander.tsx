@@ -241,6 +241,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
           // 1. STATIC NAVIGATION COMMANDS (from commands.json)
           const staticNavCommands: Command[] = Object.entries(fileCommands).flatMap(
             ([key, { display, aliases, reply }]) => {
+              if (key === 'orderItem') return []; // Skip the special template command
               const action = commandActions[key];
               if (!action) return [];
               return aliases.map(alias => ({ command: alias, display, action, reply }));
@@ -265,11 +266,10 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
           
           // 3. DYNAMIC PRODUCT ORDERING COMMANDS (TEMPLATE-BASED)
           const productOrderingCommands: Command[] = [];
-          if (masterProducts.length > 0) {
-              const orderTemplates = [
-                  "add {quantity} {product}", "add {quantity} of {product}", "i want {quantity} {product}", "get me {quantity} {product}",
-                  "buy {quantity} {product}", "order {quantity} {product}", "add {product} {quantity}", "i need {quantity} {product}"
-              ];
+          const orderItemTemplate = fileCommands['orderItem'];
+
+          if (masterProducts.length > 0 && orderItemTemplate) {
+              const orderTemplates = orderItemTemplate.aliases;
               // Common quantities to generate commands for
               const quantities = ["1 kg", "2 kg", "500 grams", "250 grams", "1 piece"];
 
@@ -285,7 +285,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
                           productOrderingCommands.push({
                               command: commandString,
                               display: `Add ${quantity} ${product.name} to cart`,
-                              reply: `Adding ${quantity} of ${product.name} to your cart.`,
+                              reply: orderItemTemplate.reply.replace('{quantity}', quantity).replace('{product}', product.name),
                               action: async () => {
                                   onOpenCart();
                                   const { product: foundProduct, variant } = await findProductAndVariant({ name: product.name, quantity: qtyValue + (qtyUnit === 'kg' ? 'kg' : 'pc') });
@@ -350,6 +350,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
     const recognition = recognitionRef.current;
 
     const handleCommand = async (command: string) => {
+        onStatusUpdate('Processing...'); // Give immediate feedback that it's working
         try {
             if (!firestore || !user) return;
             
@@ -388,7 +389,6 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
             // Check for perfect match on all commands (static, store, and dynamic product commands)
             const perfectMatch = allCommands.find((c) => command === c.command);
             if (perfectMatch) {
-                onStatusUpdate('Processing...');
                 speak(perfectMatch.reply);
                 await perfectMatch.action();
                 onSuggestions([]);
@@ -399,7 +399,6 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
             const monthlyListTriggers = ['one month groceries for', 'monthly list for', 'groceries for a month for'];
             const monthlyListTriggerFound = monthlyListTriggers.find(t => command.includes(t));
             if (monthlyListTriggerFound) {
-              onStatusUpdate('Processing...');
               const matches = command.match(/(\d+)/);
               if (matches) {
                   const memberCount = parseInt(matches[1], 10);
@@ -440,7 +439,6 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
             let fromKeyword = ' from ';
             let fromIndex = command.lastIndexOf(fromKeyword);
             if (orderTriggerFound && fromIndex > -1) {
-                onStatusUpdate('Processing...');
                 const shoppingList = command.substring(orderTriggerFound.length, fromIndex).trim();
                 const storeName = command.substring(fromIndex + fromKeyword.length).trim();
       
