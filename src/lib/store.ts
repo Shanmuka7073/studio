@@ -4,15 +4,19 @@
 import { create } from 'zustand';
 import { Firestore } from 'firebase/firestore';
 import { Store, Product, ProductPrice } from './types';
-import { getStores, getMasterProducts, getAllProductPrices } from './data';
+import { getStores, getMasterProducts, getProductPrice } from './data';
+import { useFirebase } from '@/firebase';
+import { useEffect } from 'react';
+
 
 export interface AppState {
   stores: Store[];
   masterProducts: Product[];
-  productPrices: Record<string, ProductPrice>;
+  productPrices: Record<string, ProductPrice | null>;
   loading: boolean;
   error: Error | null;
   fetchInitialData: (db: Firestore) => Promise<void>;
+  fetchProductPrices: (db: Firestore, productNames: string[]) => Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -23,7 +27,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   error: null,
 
   fetchInitialData: async (db: Firestore) => {
-    // Only fetch if data is not already loaded to prevent redundant calls
+    // Prevent re-fetching if data is already present
     if (get().stores.length > 0 && get().masterProducts.length > 0) {
       set({ loading: false });
       return;
@@ -31,17 +35,14 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     set({ loading: true, error: null });
     try {
-      // Fetch all critical data in parallel for speed
-      const [stores, masterProducts, productPrices] = await Promise.all([
+      const [stores, masterProducts] = await Promise.all([
         getStores(db),
         getMasterProducts(db),
-        getAllProductPrices(db),
       ]);
 
       set({
         stores,
         masterProducts,
-        productPrices,
         loading: false,
       });
     } catch (error) {
@@ -49,11 +50,38 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ error: error as Error, loading: false });
     }
   },
+  
+  fetchProductPrices: async (db: Firestore, productNames: string[]) => {
+      const existingPrices = get().productPrices;
+      const namesToFetch = productNames.filter(name => existingPrices[name.toLowerCase()] === undefined);
+
+      if (namesToFetch.length === 0) {
+          return;
+      }
+      
+      try {
+          const pricePromises = namesToFetch.map(name => getProductPrice(db, name));
+          const results = await Promise.all(pricePromises);
+
+          const newPrices = namesToFetch.reduce((acc, name, index) => {
+              acc[name.toLowerCase()] = results[index];
+              return acc;
+          }, {} as Record<string, ProductPrice | null>);
+
+          set(state => ({
+              productPrices: { ...state.productPrices, ...newPrices }
+          }));
+
+      } catch (error) {
+          console.error("Failed to fetch product prices:", error);
+          // Optionally handle price-specific errors
+      }
+  }
 }));
 
 // Custom hook to initialize the store's data on app load
 export const useInitializeApp = () => {
-    const { firestore } = useFirebase(); // Assuming you have a useFirebase hook
+    const { firestore } = useFirebase();
     const fetchInitialData = useAppStore((state) => state.fetchInitialData);
     const loading = useAppStore((state) => state.loading);
 

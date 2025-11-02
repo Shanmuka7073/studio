@@ -134,12 +134,13 @@ export default function StoreDetailPage() {
   const { firestore } = useFirebase();
 
   // Get all data from the central Zustand store
-  const { stores, masterProducts, productPrices, loading, fetchInitialData } = useAppStore((state) => ({
+  const { stores, masterProducts, productPrices, loading, fetchInitialData, fetchProductPrices } = useAppStore((state) => ({
     stores: state.stores,
     masterProducts: state.masterProducts,
     productPrices: state.productPrices,
     loading: state.loading,
     fetchInitialData: state.fetchInitialData,
+    fetchProductPrices: state.fetchProductPrices,
   }));
 
   const [storeImage, setStoreImage] = useState({ imageUrl: 'https://placehold.co/250x250/E2E8F0/64748B?text=Loading...', imageHint: 'loading' });
@@ -203,6 +204,15 @@ export default function StoreDetailPage() {
     // Apply pagination limit
     return productsInCategory.slice(0, 20);
   }, [allStoreProducts, selectedCategory, searchTerm]);
+  
+  // Effect to fetch prices for visible products
+  useEffect(() => {
+    if (firestore && filteredProducts.length > 0) {
+      const productNames = filteredProducts.map(p => p.name);
+      fetchProductPrices(firestore, productNames);
+    }
+  }, [firestore, filteredProducts, fetchProductPrices]);
+
 
   useEffect(() => {
     const fetchProductImages = async () => {
