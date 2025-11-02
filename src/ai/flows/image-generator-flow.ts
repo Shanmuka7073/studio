@@ -9,6 +9,10 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
+// FEATURE FLAG: Set this to true to enable AI image generation.
+// Disabling this will make the app fall back to placeholder images and avoid costs.
+const AI_IMAGE_GENERATION_ENABLED = false;
+
 const ImageRequestSchema = z.object({
   prompt: z.string().describe('The text prompt for image generation, e.g., "A bowl of fresh tomatoes".'),
 });
@@ -29,6 +33,12 @@ const imageGenerationFlow = ai.defineFlow(
     outputSchema: ImageResponseSchema.nullable(),
   },
   async ({ prompt }) => {
+    // Check the feature flag before proceeding.
+    if (!AI_IMAGE_GENERATION_ENABLED) {
+        console.log('AI image generation is disabled. Skipping flow.');
+        return null;
+    }
+      
     try {
       const fullPrompt = `A high-quality, photorealistic image of the following grocery item on a clean, white background: ${prompt}. The image should be bright and appealing.`;
       
