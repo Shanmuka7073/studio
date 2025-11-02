@@ -21,6 +21,7 @@ export interface Command {
   command: string;
   action: () => void;
   display: string;
+  reply: string;
 }
 
 interface VoiceCommanderProps {
@@ -193,7 +194,6 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
             if (formElement) {
               formElement.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
             }
-             speak("Saving your changes.");
           } else {
             speak("There are no changes to save on this page.");
           }
@@ -217,10 +217,10 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
           setMasterProductList(masterProducts);
 
           const staticNavCommands: Command[] = Object.entries(fileCommands).flatMap(
-            ([key, { display, aliases }]) => {
+            ([key, { display, aliases, reply }]) => {
               const action = commandActions[key];
               if (!action) return [];
-              return aliases.map(alias => ({ command: alias, display, action }));
+              return aliases.map(alias => ({ command: alias, display, action, reply }));
             }
           );
 
@@ -250,6 +250,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
               command: variation,
               display: `Go to ${store.name}`,
               action: () => router.push(`/stores/${store.id}`),
+              reply: `Navigating to ${store.name}.`
             }));
           });
           setAllCommands([...staticNavCommands, ...storeCommands]);
@@ -513,7 +514,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
       // Check for perfect match on other commands
       const perfectMatch = allCommands.find((c) => command === c.command);
       if (perfectMatch) {
-        speak(`Navigating to ${perfectMatch.display.replace('View', '').replace('Your','').trim()}`);
+        speak(perfectMatch.reply);
         perfectMatch.action();
         onSuggestions([]);
         return;
@@ -523,7 +524,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
       const sanitizedCommand = command.replace(/\s/g, '');
       const spaceInsensitiveMatch = allCommands.find(c => c.command.replace(/\s/g, '') === sanitizedCommand);
       if(spaceInsensitiveMatch) {
-        speak(`Navigating to ${spaceInsensitiveMatch.display.replace('View', '').replace('Your','').trim()}`);
+        speak(spaceInsensitiveMatch.reply);
         spaceInsensitiveMatch.action();
         onSuggestions([]);
         return;

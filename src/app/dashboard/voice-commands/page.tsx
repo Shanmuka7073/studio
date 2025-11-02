@@ -6,13 +6,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, PlusCircle, Save, X, Mic } from 'lucide-react';
+import { Loader2, PlusCircle, Save, X, Mic, MessageSquare } from 'lucide-react';
 import { getCommands, saveCommands } from '@/app/actions';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Label } from '@/components/ui/label';
 
 type CommandGroup = {
   display: string;
+  reply: string;
   aliases: string[];
 };
 
@@ -85,10 +87,10 @@ export default function VoiceCommandsPage() {
             // Create a deep copy to avoid state mutation issues
             const updatedCommands = JSON.parse(JSON.stringify(currentCommands));
             
-            // Ensure the command group exists before trying to add to it
             if (!updatedCommands[actionKey]) {
                 updatedCommands[actionKey] = {
-                    display: 'New Command Group', // Placeholder display name
+                    display: 'New Command Group',
+                    reply: 'New reply.',
                     aliases: []
                 };
             }
@@ -136,6 +138,16 @@ export default function VoiceCommandsPage() {
         });
     };
 
+    const handleReplyChange = (actionKey: string, newReply: string) => {
+        setCommands(currentCommands => ({
+            ...currentCommands,
+            [actionKey]: {
+                ...currentCommands[actionKey],
+                reply: newReply
+            }
+        }));
+    };
+
     const handleSaveAll = () => {
         startTransition(async () => {
             try {
@@ -174,14 +186,14 @@ export default function VoiceCommandsPage() {
         <div className="container mx-auto py-12 px-4 md:px-6">
              <div className="text-center mb-12">
                 <h1 className="text-4xl font-bold font-headline">Voice Commands Control</h1>
-                <p className="text-lg text-muted-foreground mt-2">View and add new phrases (aliases) for voice-activated actions.</p>
+                <p className="text-lg text-muted-foreground mt-2">View and add new phrases (aliases) for voice-activated actions and edit their replies.</p>
             </div>
 
             <Card className="max-w-4xl mx-auto">
                 <CardHeader>
-                    <CardTitle>Manage Command Aliases</CardTitle>
+                    <CardTitle>Manage Commands & Replies</CardTitle>
                     <CardDescription>
-                        Each action can be triggered by multiple phrases. Add new phrases (comma-separated) or remove existing ones. The "Go to [Store Name]" commands are generated automatically and cannot be edited here.
+                        Each action can be triggered by multiple phrases. You can also customize what the app says back to you.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -198,21 +210,39 @@ export default function VoiceCommandsPage() {
                                         <span className="font-semibold text-lg">{group.display}</span>
                                     </AccordionTrigger>
                                     <AccordionContent>
-                                        <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
-                                            <div className="flex flex-wrap gap-2">
-                                                {group.aliases.map((alias, index) => (
-                                                    <Badge key={index} variant="secondary" className="relative pr-6 group">
-                                                        {alias}
-                                                         <button
-                                                            onClick={() => handleRemoveCommand(key, alias)}
-                                                            className="absolute top-1/2 -translate-y-1/2 right-1 rounded-full p-0.5 bg-background/50 hover:bg-background text-muted-foreground hover:text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                                                        >
-                                                            <X className="h-3 w-3" />
-                                                            <span className="sr-only">Remove {alias}</span>
-                                                        </button>
-                                                    </Badge>
-                                                ))}
+                                        <div className="space-y-6 p-4 bg-muted/50 rounded-lg">
+                                            
+                                            <div className="space-y-2">
+                                                <Label htmlFor={`reply-${key}`} className="flex items-center gap-2 font-semibold">
+                                                    <MessageSquare className="h-4 w-4" />
+                                                    App's Reply
+                                                </Label>
+                                                <Input
+                                                    id={`reply-${key}`}
+                                                    value={group.reply || ''}
+                                                    onChange={(e) => handleReplyChange(key, e.target.value)}
+                                                    placeholder="Enter what the app should say..."
+                                                />
                                             </div>
+
+                                            <div className="space-y-2">
+                                                <Label className="font-semibold">User's Phrases (Aliases)</Label>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {group.aliases.map((alias, index) => (
+                                                        <Badge key={index} variant="secondary" className="relative pr-6 group">
+                                                            {alias}
+                                                             <button
+                                                                onClick={() => handleRemoveCommand(key, alias)}
+                                                                className="absolute top-1/2 -translate-y-1/2 right-1 rounded-full p-0.5 bg-background/50 hover:bg-background text-muted-foreground hover:text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                                                            >
+                                                                <X className="h-3 w-3" />
+                                                                <span className="sr-only">Remove {alias}</span>
+                                                            </button>
+                                                        </Badge>
+                                                    ))}
+                                                </div>
+                                            </div>
+
                                              <div className="flex items-center gap-2 pt-4 border-t">
                                                 <Input
                                                     placeholder="Add new phrase(s), comma-separated..."
@@ -228,12 +258,10 @@ export default function VoiceCommandsPage() {
                                                 <Button size="sm" onClick={() => handleAddCommand(key)}>
                                                     <PlusCircle className="mr-2 h-4 w-4" /> Add
                                                 </Button>
-                                                {key === 'home' && (
-                                                    <Button size="sm" variant="outline" onClick={() => handleVoiceAdd(key)} disabled={isListening}>
-                                                        <Mic className="h-4 w-4" />
-                                                        <span className="sr-only">Add by voice</span>
-                                                    </Button>
-                                                )}
+                                                <Button size="sm" variant="outline" onClick={() => handleVoiceAdd(key)} disabled={isListening}>
+                                                    <Mic className="h-4 w-4" />
+                                                    <span className="sr-only">Add by voice</span>
+                                                </Button>
                                             </div>
                                         </div>
                                     </AccordionContent>

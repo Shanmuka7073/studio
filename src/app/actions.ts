@@ -11,6 +11,7 @@ const COMMANDS_FILE_PATH = path.join(process.cwd(), 'src', 'lib', 'commands.json
 
 type CommandGroup = {
   display: string;
+  reply: string;
   aliases: string[];
 };
 
