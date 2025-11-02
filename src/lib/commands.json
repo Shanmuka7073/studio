@@ -1,3 +1,4 @@
+
 {
   "home": {
     "display": "Navigate to Home",
@@ -1454,6 +1455,16 @@
       "submit order",
       "finish and pay",
       "complete my order"
+    ]
+  },
+  "saveChanges": {
+    "display": "Save Changes",
+    "aliases": [
+      "save changes",
+      "submit form",
+      "confirm changes",
+      "save my profile",
+      "update profile"
     ]
   },
   "refresh": {

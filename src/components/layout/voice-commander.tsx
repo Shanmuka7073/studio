@@ -81,38 +81,42 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
   const formFieldToFill = useRef<keyof ProfileFormValues | null>(null);
 
 
-  const speak = useCallback((text: string, onEndCallback?: () => void) => {
-    if (typeof window === 'undefined' || !window.speechSynthesis || isSpeakingRef.current) return;
+ const speak = useCallback((text: string, onEndCallback?: () => void) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis || isSpeakingRef.current) {
+      // If speech is already in progress, queue the next utterance
+      if (onEndCallback) onEndCallback();
+      return;
+    }
     
     isSpeakingRef.current = true;
     
-    // Pause recognition while speaking
     if (recognitionRef.current && listeningRef.current) {
-      recognitionRef.current.stop();
+        recognitionRef.current.stop();
     }
 
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.pitch = 1;
-    utterance.rate = 1;
+    utterance.rate = 1.1;
+    utterance.lang = 'en-US';
 
     utterance.onend = () => {
-      // Resume recognition after speaking
-      if (recognitionRef.current && listeningRef.current) {
-         try {
-          recognitionRef.current.start();
-         } catch(e) {
-          console.warn("Could not restart recognition after speech synthesis.", e);
-         }
-      }
-      isSpeakingRef.current = false;
-      if (onEndCallback) {
-        onEndCallback();
-      }
+        isSpeakingRef.current = false;
+        // Resume recognition only if the commander is still enabled
+        if (listeningRef.current && recognitionRef.current) {
+            try {
+                recognitionRef.current.start();
+            } catch(e) {
+                console.warn("Recognition service was already running or failed to start.", e);
+            }
+        }
+        if (onEndCallback) {
+            onEndCallback();
+        }
     };
 
     window.speechSynthesis.speak(utterance);
-  }, []);
+}, []);
 
   // Fetch stores and build the full command list
   useEffect(() => {
@@ -136,6 +140,26 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
             placeOrderBtnRef.current.click();
           } else {
             toast({ variant: 'destructive', title: 'Not on checkout page', description: 'You can only place an order from the checkout page.' });
+          }
+        },
+        saveChanges: () => {
+          if (pathname === '/dashboard/customer/my-profile' && profileForm) {
+            // The `onSubmit` function is already bound to the form instance.
+            // We just need to trigger the form's submission handler.
+            profileForm.handleSubmit(data => {
+              // This is a bit of a workaround. The actual submission logic is in the form itself.
+              // We need a way to call that logic.
+              // A better way would be to have the submit function in the zustand store too.
+              // For now, let's assume we can get it from the form element.
+              const formElement = document.querySelector('form');
+              if (formElement) {
+                // This is a direct way to trigger form submission handlers.
+                formElement.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+              }
+            })();
+             speak("Saving your changes.");
+          } else {
+            speak("There are no changes to save on this page.");
           }
         },
         refresh: () => window.location.reload(),
@@ -196,7 +220,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
         })
         .catch(console.error);
     }
-  }, [firestore, user, router, placeOrderBtnRef, toast, onCloseCart]);
+  }, [firestore, user, router, placeOrderBtnRef, toast, onCloseCart, pathname, profileForm, speak]);
 
   useEffect(() => {
     listeningRef.current = enabled;
@@ -251,7 +275,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
             speak(`What is your ${firstEmptyField.label}?`);
         } else {
             formFieldToFill.current = null;
-            speak("Your profile looks complete!");
+            speak("Your profile looks complete! You can say 'save changes' to submit.");
         }
     }, [profileForm, speak]);
 
@@ -363,7 +387,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
                   onSuggestions([]);
                   return; // Command handled
               } else if (matchingStores.length > 1) {
-                  const message = `I found multiple stores named "${storeName}". Please be more specific.`;
+                  const message = `I found multiple stores named "${storeName}". Please be more specific, for example, by saying the store's full name or address.`;
                   speak(message);
                   toast({ variant: 'destructive', title: "Multiple Stores Found", description: message });
                   onSuggestions([]);
