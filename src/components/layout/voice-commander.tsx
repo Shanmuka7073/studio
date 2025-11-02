@@ -305,7 +305,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
 
     if (!recognitionRef.current) {
         recognitionRef.current = new SpeechRecognition();
-        recognitionRef.current.continuous = true;
+        recognitionRef.current.continuous = false; // Set to false for more control
         recognitionRef.current.lang = 'en-IN';
         recognitionRef.current.interimResults = false;
     }
@@ -313,7 +313,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
     const recognition = recognitionRef.current;
 
     const handleCommand = async (command: string) => {
-        onStatusUpdate('Processing...'); // Give immediate feedback that it's working
+        onStatusUpdate(`Processing: "${command}"`); // Give immediate feedback that it's working
         try {
             if (!firestore || !user) return;
             
@@ -397,11 +397,11 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
       
             // Voice order from a specific store
             const orderTriggers = ['order ', 'buy ', 'get ', 'purchase ', 'i want '];
-            const orderTriggerFound = orderTriggers.find(t => command.startsWith(t));
-            let fromKeyword = ' from ';
+            const fromKeyword = ' from ';
             let fromIndex = command.lastIndexOf(fromKeyword);
-            if ((orderTriggerFound || true) && fromIndex > -1) {
-                const trigger = orderTriggerFound || '';
+
+            if (fromIndex > -1) {
+                const trigger = orderTriggers.find(t => command.startsWith(t)) || '';
                 const shoppingList = command.substring(trigger.length, fromIndex).trim();
                 const storeName = command.substring(fromIndex + fromKeyword.length).trim();
       
@@ -471,17 +471,15 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
         onStatusUpdate(`⚠️ Error: ${event.error}`);
       }
        isSpeakingRef.current = false;
-       listeningRef.current = false;
+       // The onend event will handle restarting
     };
 
     recognition.onend = () => {
-      if (listeningRef.current) {
+      if (listeningRef.current && !isSpeakingRef.current) {
         try {
-          if (!isSpeakingRef.current) {
-            // Only restart if not in the middle of speaking
             recognition.start();
-          }
         } catch (e) {
+          // This error can happen if the component is unmounting, etc.
           console.error('Could not restart recognition service: ', e);
           onStatusUpdate('⚠️ Mic error, please toggle off and on.');
         }
@@ -493,13 +491,14 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
     try {
       recognition.start();
     } catch (e) {
-      // This can happen if it's already started, which is fine.
+      // This can happen if it's already started, which is fine in some edge cases.
       console.log('Could not start recognition, it may already be running.');
     }
 
     return () => {
         if (recognitionRef.current) {
             try {
+                recognitionRef.current.onend = null; // Prevent restart on unmount
                 recognitionRef.current.stop();
             } catch(e) {
                 // Ignore errors on stop
@@ -510,6 +509,3 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
 
   return null; // This component does not render anything itself.
 }
-
-
-    
