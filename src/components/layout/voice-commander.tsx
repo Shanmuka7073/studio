@@ -31,6 +31,7 @@ interface VoiceCommanderProps {
   onCloseCart: () => void; // New prop to close the cart
   isCartOpen: boolean;
   placeOrderBtnRef?: RefObject<HTMLButtonElement>;
+  getFinalTotal?: () => number;
 }
 
 type ParsedShoppingListItem = {
@@ -61,7 +62,7 @@ async function parseShoppingList(text: string): Promise<ParsedShoppingListItem[]
 }
 
 
-export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoiceOrder, onOpenCart, onCloseCart, isCartOpen, placeOrderBtnRef }: VoiceCommanderProps) {
+export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoiceOrder, onOpenCart, onCloseCart, isCartOpen, placeOrderBtnRef, getFinalTotal }: VoiceCommanderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { toast } = useToast();
@@ -80,10 +81,12 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
   const { form: profileForm } = useProfileFormStore();
   const formFieldToFill = useRef<keyof ProfileFormValues | null>(null);
 
+  // New state for checkout flow
+  const checkoutState = useRef<'idle' | 'promptingLocation' | 'promptingConfirmation'>('idle');
+
 
  const speak = useCallback((text: string, onEndCallback?: () => void) => {
     if (typeof window === 'undefined' || !window.speechSynthesis || isSpeakingRef.current) {
-      // If speech is already in progress, queue the next utterance
       if (onEndCallback) onEndCallback();
       return;
     }
@@ -91,7 +94,11 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
     isSpeakingRef.current = true;
     
     if (recognitionRef.current && listeningRef.current) {
-        recognitionRef.current.stop();
+        try {
+            recognitionRef.current.stop();
+        } catch (e) {
+            console.warn("Recognition stop error:", e);
+        }
     }
 
     window.speechSynthesis.cancel();
@@ -102,21 +109,51 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
 
     utterance.onend = () => {
         isSpeakingRef.current = false;
-        // Resume recognition only if the commander is still enabled
         if (listeningRef.current && recognitionRef.current) {
             try {
                 recognitionRef.current.start();
             } catch(e) {
-                console.warn("Recognition service was already running or failed to start.", e);
+                console.warn("Could not restart recognition:", e);
             }
         }
         if (onEndCallback) {
             onEndCallback();
         }
     };
+    
+    utterance.onerror = (e) => {
+        isSpeakingRef.current = false;
+        console.error("Speech synthesis error:", e);
+        if (onEndCallback) onEndCallback();
+    }
 
     window.speechSynthesis.speak(utterance);
 }, []);
+
+  const handleProfileFormInteraction = useCallback(() => {
+    if (!profileForm) {
+        speak("I can't seem to access the profile form right now.");
+        return;
+    }
+
+    const fields: { name: keyof ProfileFormValues; label: string }[] = [
+        { name: 'firstName', label: 'first name' },
+        { name: 'lastName', label: 'last name' },
+        { name: 'phone', label: 'phone number' },
+        { name: 'address', label: 'full address' },
+    ];
+
+    const formValues = profileForm.getValues();
+    const firstEmptyField = fields.find(f => !formValues[f.name]);
+    
+    if (firstEmptyField) {
+        formFieldToFill.current = firstEmptyField.name;
+        speak(`What is your ${firstEmptyField.label}?`);
+    } else {
+        formFieldToFill.current = null;
+        speak("Your profile looks complete! You can say 'save changes' to submit.");
+    }
+  }, [profileForm, speak]);
 
   // Fetch stores and build the full command list
   useEffect(() => {
@@ -130,7 +167,15 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
         orders: () => router.push('/dashboard/customer/my-orders'),
         deliveries: () => router.push('/dashboard/delivery/deliveries'),
         myStore: () => router.push('/dashboard/owner/my-store'),
-        voiceOrder: () => router.push('/checkout?action=record'),
+        voiceOrder: () => {
+            if (pathname !== '/checkout') {
+                router.push('/checkout?action=record');
+            } else {
+                // If already on checkout, just start listening
+                const micButton = document.querySelector('button[aria-label="Toggle voice recording"]') as HTMLButtonElement;
+                micButton?.click();
+            }
+        },
         checkout: () => {
             onCloseCart();
             router.push('/checkout');
@@ -139,24 +184,16 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
           if (placeOrderBtnRef?.current) {
             placeOrderBtnRef.current.click();
           } else {
+            speak("You can only place an order from the checkout page.");
             toast({ variant: 'destructive', title: 'Not on checkout page', description: 'You can only place an order from the checkout page.' });
           }
         },
         saveChanges: () => {
           if (pathname === '/dashboard/customer/my-profile' && profileForm) {
-            // The `onSubmit` function is already bound to the form instance.
-            // We just need to trigger the form's submission handler.
-            profileForm.handleSubmit(data => {
-              // This is a bit of a workaround. The actual submission logic is in the form itself.
-              // We need a way to call that logic.
-              // A better way would be to have the submit function in the zustand store too.
-              // For now, let's assume we can get it from the form element.
-              const formElement = document.querySelector('form');
-              if (formElement) {
-                // This is a direct way to trigger form submission handlers.
-                formElement.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
-              }
-            })();
+            const formElement = document.querySelector('form');
+            if (formElement) {
+              formElement.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+            }
              speak("Saving your changes.");
           } else {
             speak("There are no changes to save on this page.");
@@ -225,13 +262,20 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
   useEffect(() => {
     listeningRef.current = enabled;
      if (enabled && pathname === '/dashboard/customer/my-profile') {
-      // Enter form-filling mode when enabled on the profile page
       handleProfileFormInteraction();
     }
-    if (!enabled) {
-      onSuggestions([]); // Clear suggestions when disabled
+    if (enabled && pathname === '/checkout') {
+        const locationButton = document.querySelector('button[aria-label="Get Current Location"]') as HTMLButtonElement | null;
+        if(locationButton) {
+            checkoutState.current = 'promptingLocation';
+            speak("For accurate delivery, please share your current location for this order. Say yes to confirm.");
+        }
     }
-  }, [enabled, onSuggestions, pathname]);
+    if (!enabled) {
+      onSuggestions([]);
+      checkoutState.current = 'idle';
+    }
+  }, [enabled, onSuggestions, pathname, speak, handleProfileFormInteraction]);
 
     const findProductAndVariant = useCallback(async (parsedItem: {name: string, quantity: string}): Promise<{ product: Product | null, variant: ProductVariant | null }> => {
         if (!firestore) return { product: null, variant: null };
@@ -253,31 +297,6 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
         return { product: null, variant: null };
 
     }, [masterProductList, firestore]);
-
-     const handleProfileFormInteraction = useCallback(() => {
-        if (!profileForm) {
-            speak("I can't seem to access the profile form right now.");
-            return;
-        }
-
-        const fields: { name: keyof ProfileFormValues; label: string }[] = [
-            { name: 'firstName', label: 'first name' },
-            { name: 'lastName', label: 'last name' },
-            { name: 'phone', label: 'phone number' },
-            { name: 'address', label: 'full address' },
-        ];
-
-        const formValues = profileForm.getValues();
-        const firstEmptyField = fields.find(f => !formValues[f.name]);
-        
-        if (firstEmptyField) {
-            formFieldToFill.current = firstEmptyField.name;
-            speak(`What is your ${firstEmptyField.label}?`);
-        } else {
-            formFieldToFill.current = null;
-            speak("Your profile looks complete! You can say 'save changes' to submit.");
-        }
-    }, [profileForm, speak]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !enabled) {
@@ -308,6 +327,31 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
     const handleCommand = async (command: string) => {
       if (!firestore || !user) return;
       
+      // Handle checkout flow state
+      if (pathname === '/checkout' && command === 'yes') {
+          if (checkoutState.current === 'promptingLocation') {
+              const locationButton = document.querySelector('button[aria-label="Get Current Location"]') as HTMLButtonElement | null;
+              locationButton?.click();
+              checkoutState.current = 'promptingConfirmation'; // Move to next state
+              speak("Great, location captured. I will calculate the total. One moment.", () => {
+                  setTimeout(() => { // Give time for state to update
+                      const total = getFinalTotal ? getFinalTotal() : 0;
+                      if (total > 0) {
+                          speak(`Your total is ${total.toFixed(2)} rupees. Shall I place the order?`);
+                      } else {
+                          speak("I couldn't calculate the total. Please check your cart or list.");
+                          checkoutState.current = 'idle';
+                      }
+                  }, 2000); // 2-second delay to allow for total calculation
+              });
+              return;
+          } else if (checkoutState.current === 'promptingConfirmation') {
+              placeOrderBtnRef?.current?.click();
+              checkoutState.current = 'idle'; // Reset state
+              return;
+          }
+      }
+
       // Handle profile form filling
       if (formFieldToFill.current && profileForm) {
           profileForm.setValue(formFieldToFill.current, command, { shouldValidate: true });
@@ -564,7 +608,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
     return () => {
       recognition.stop();
     };
-  }, [enabled, toast, onStatusUpdate, allCommands, onSuggestions, firestore, user, myStore, masterProductList, router, allStores, onVoiceOrder, findProductAndVariant, addItemToCart, onOpenCart, isCartOpen, onCloseCart, speak, pathname, profileForm, handleProfileFormInteraction]);
+  }, [enabled, toast, onStatusUpdate, allCommands, onSuggestions, firestore, user, myStore, masterProductList, router, allStores, onVoiceOrder, findProductAndVariant, addItemToCart, onOpenCart, isCartOpen, onCloseCart, speak, pathname, profileForm, handleProfileFormInteraction, getFinalTotal, placeOrderBtnRef]);
 
   return null; // This component does not render anything itself.
 }

@@ -22,10 +22,10 @@ const ptSans = PT_Sans({
 
 function PageSpecificHeader() {
   const pathname = usePathname();
-  const { placeOrderBtnRef } = useCheckoutPassThrough();
+  const { placeOrderBtnRef, getFinalTotal } = useCheckoutPassThrough();
 
   if (pathname === '/checkout') {
-    return <Header placeOrderBtnRef={placeOrderBtnRef} />;
+    return <Header placeOrderBtnRef={placeOrderBtnRef} getFinalTotal={getFinalTotal} />;
   }
   return <Header />;
 }
@@ -68,3 +68,5 @@ export default function RootLayout({
     </html>
   );
 }
+
+    

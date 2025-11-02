@@ -131,14 +131,21 @@ async function matchItemsToCatalog(text: string, db: any): Promise<StructuredLis
 interface PassThroughState {
   placeOrderBtnRef: RefObject<HTMLButtonElement> | null;
   setPlaceOrderBtnRef: (ref: RefObject<HTMLButtonElement> | null) => void;
+  getFinalTotal: () => number;
+  setFinalTotalGetter: (getter: () => number) => void;
 }
 
 const useCheckoutStore = create<PassThroughState>((set) => ({
   placeOrderBtnRef: null,
   setPlaceOrderBtnRef: (placeOrderBtnRef) => set({ placeOrderBtnRef }),
+  getFinalTotal: () => 0,
+  setFinalTotalGetter: (getter) => set({ getFinalTotal: getter }),
 }));
 
-export const useCheckoutPassThrough = () => useCheckoutStore((state) => ({ placeOrderBtnRef: state.placeOrderBtnRef }));
+export const useCheckoutPassThrough = () => useCheckoutStore((state) => ({ 
+    placeOrderBtnRef: state.placeOrderBtnRef, 
+    getFinalTotal: state.getFinalTotal 
+}));
 
 
 export default function CheckoutPage() {
@@ -154,7 +161,6 @@ export default function CheckoutPage() {
   const [structuredList, setStructuredList] = useState<StructuredListItem[]>([]);
   const [availableStores, setAvailableStores] = useState<Store[]>([]);
   const [voiceOrderInfo, setVoiceOrderInfo] = useState<VoiceOrderInfo | null>(null);
-  const [shouldPromptForLocation, setShouldPromptForLocation] = useState(false);
   
   const speechRecognitionRef = useRef<SpeechRecognition | null>(null);
 
@@ -162,12 +168,24 @@ export default function CheckoutPage() {
   const [images, setImages] = useState({});
   const placeOrderBtnRef = useRef<HTMLButtonElement>(null);
   const setPlaceOrderBtnRef = useCheckoutStore((state) => state.setPlaceOrderBtnRef);
+  const setFinalTotalGetter = useCheckoutStore((state) => state.setFinalTotalGetter);
 
+  const hasItemsInCart = cartItems.length > 0;
+  const voiceOrderSubtotal = structuredList.reduce((acc, item) => acc + ((item.price || 0) * item.quantity), 0);
+  const finalTotal = hasItemsInCart ? cartTotal + DELIVERY_FEE : voiceOrderSubtotal + DELIVERY_FEE;
+
+  // This state now drives the voice prompt for location
+  const [shouldPromptForLocation, setShouldPromptForLocation] = useState(false);
+  
   useEffect(() => {
     setPlaceOrderBtnRef(placeOrderBtnRef);
+    setFinalTotalGetter(() => finalTotal);
     // Cleanup on unmount
-    return () => setPlaceOrderBtnRef(null);
-  }, [setPlaceOrderBtnRef]);
+    return () => {
+      setPlaceOrderBtnRef(null);
+      setFinalTotalGetter(() => 0);
+    }
+  }, [setPlaceOrderBtnRef, setFinalTotalGetter, finalTotal]);
 
 
    const userDocRef = useMemoFirebase(() => {
@@ -196,11 +214,13 @@ export default function CheckoutPage() {
         storeId: form.getValues('storeId'),
       });
     }
-    // Always prompt for location if it hasn't been captured for this session
-    if (!deliveryCoords) {
+
+    const autoRecord = searchParams.get('action') === 'record';
+    // If it's a voice-driven checkout and we don't have coords, prompt for location.
+    if (autoRecord && !deliveryCoords) {
       setShouldPromptForLocation(true);
     }
-  }, [userData, form, deliveryCoords]);
+  }, [userData, form, deliveryCoords, searchParams]);
 
   const handleUnderstandList = useCallback(async (text: string) => {
     if (!firestore) return;
@@ -282,7 +302,7 @@ export default function CheckoutPage() {
   }, [isListening, form]);
   
   const handleGetLocation = useCallback(() => {
-        setShouldPromptForLocation(false);
+        setShouldPromptForLocation(false); // We've handled the prompt
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 (position) => {
@@ -321,8 +341,11 @@ export default function CheckoutPage() {
                 placeOrderBtnRef.current?.click();
                 return;
             }
+             // This is the new voice command handling for location
              if (shouldPromptForLocation && transcript === 'yes') {
                 handleGetLocation();
+                // After getting location, you might want to automatically ask for the list
+                // For now, we'll let the user click the mic again.
                 return;
             }
 
@@ -460,10 +483,6 @@ export default function CheckoutPage() {
     });
   };
 
-  const hasItemsInCart = cartItems.length > 0;
-  const voiceOrderSubtotal = structuredList.reduce((acc, item) => acc + ((item.price || 0) * item.quantity), 0);
-  const finalTotal = hasItemsInCart ? cartTotal + DELIVERY_FEE : voiceOrderSubtotal + DELIVERY_FEE;
-
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
         {voiceOrderInfo && (
@@ -503,7 +522,7 @@ export default function CheckoutPage() {
                                          <HelpCircle className="h-5 w-5 text-primary" />
                                         <p className="font-semibold text-primary">Confirm Your Delivery Location</p>
                                     </div>
-                                    <p className="text-sm text-muted-foreground mb-4">For accurate delivery, please share your current location for this order.</p>
+                                    <p className="text-sm text-muted-foreground mb-4">For accurate delivery, please share your current location for this order. Say "Yes" if you've enabled voice commands.</p>
                                     <div className="flex gap-4 justify-center">
                                         <Button type="button" onClick={handleGetLocation}>
                                            <MapPin className="mr-2 h-4 w-4" /> Yes, Use Current Location
@@ -697,3 +716,5 @@ export default function CheckoutPage() {
     </div>
   );
 }
+
+    

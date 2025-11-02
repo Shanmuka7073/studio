@@ -122,9 +122,10 @@ function UserMenu() {
 
 interface HeaderProps {
   placeOrderBtnRef?: RefObject<HTMLButtonElement>;
+  getFinalTotal?: () => number;
 }
 
-export function Header({ placeOrderBtnRef }: HeaderProps) {
+export function Header({ placeOrderBtnRef, getFinalTotal }: HeaderProps) {
   const pathname = usePathname();
   const { user } = useFirebase();
   const isAdmin = user && user.email === ADMIN_EMAIL;
@@ -170,6 +171,7 @@ export function Header({ placeOrderBtnRef }: HeaderProps) {
         onCloseCart={() => setIsCartOpen(false)}
         isCartOpen={isCartOpen}
         placeOrderBtnRef={placeOrderBtnRef}
+        getFinalTotal={getFinalTotal}
       />
        {voiceOrderInfo && (
         <VoiceOrderDialog
@@ -328,3 +330,5 @@ export function Header({ placeOrderBtnRef }: HeaderProps) {
     </header>
   );
 }
+
+    
