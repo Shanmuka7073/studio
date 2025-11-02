@@ -126,9 +126,13 @@ export function VoiceCommander({
             if (variantMatch) return { product: productMatch, variant: variantMatch };
         }
         
-        const onePieceVariant = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === '1pc');
-        if (onePieceVariant) return { product: productMatch, variant: onePieceVariant };
+        // Smart fallback for "one {product}"
+        if (!desiredWeight || desiredWeight === 'one') {
+          const onePieceVariant = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === '1pc');
+          if (onePieceVariant) return { product: productMatch, variant: onePieceVariant };
+        }
 
+        // Fallback to the first (often smallest) variant if no match found
         return { product: productMatch, variant: priceData.variants[0] };
     }
     
@@ -165,7 +169,7 @@ export function VoiceCommander({
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      console.error("SpeechRecognition API not supported.");
+      onStatusUpdate("⚠️ Voice recognition not supported in this browser.");
       return;
     }
 
@@ -280,13 +284,19 @@ export function VoiceCommander({
         onStatusUpdate(`⚠️ Error: ${event.error}`);
       }
     };
+    
     recognition.onend = () => {
-      if (isEnabledRef.current && !isSpeakingRef.current) {
-        try {
-          recognition.start();
-        } catch (e) {
-          console.error('Could not restart recognition service: ', e);
-        }
+      // This is the key change: always restart listening if the feature is enabled.
+      if (isEnabledRef.current) {
+        // A short delay helps prevent race conditions on some browsers.
+        setTimeout(() => {
+          try {
+            recognitionRef.current?.start();
+          } catch (e) {
+            // This can happen if the component unmounts quickly.
+            console.error('Could not restart recognition service: ', e);
+          }
+        }, 100);
       } else {
         onStatusUpdate('Click the mic to start listening.');
       }
@@ -363,16 +373,30 @@ export function VoiceCommander({
                 const orderItemTemplate = fileCommands.orderItem;
                 if (orderItemTemplate && masterProducts.length > 0) {
                     masterProducts.forEach(product => {
-                        // This logic is simplified; real logic would fetch variants here.
-                        // Add command for "add one {product}"
                          orderItemTemplate.aliases.forEach(template => {
+                            // Template for commands without a quantity, e.g., "add one {product}"
                             if(!template.includes('{quantity}')) {
                                 const commandStr = template.replace('{product}', product.name.toLowerCase());
                                 builtCommands.push({
                                     command: commandStr,
                                     display: `Order one ${product.name}`,
-                                    action: () => commandActions.orderItem({ product: product.name }),
+                                    action: () => commandActions.orderItem({ product: product.name, quantity: 'one' }),
                                     reply: orderItemTemplate.reply,
+                                });
+                            }
+                            // Template for commands with a quantity
+                            else {
+                                const priceData = productPricesRef.current[product.name.toLowerCase()];
+                                priceData?.variants.forEach(variant => {
+                                    const commandStr = template
+                                        .replace('{quantity}', variant.weight)
+                                        .replace('{product}', product.name.toLowerCase());
+                                    builtCommands.push({
+                                        command: commandStr,
+                                        display: `Order ${variant.weight} of ${product.name}`,
+                                        action: () => commandActions.orderItem({ product: product.name, quantity: variant.weight }),
+                                        reply: orderItemTemplate.reply,
+                                    });
                                 });
                             }
                         });
@@ -404,3 +428,5 @@ export function VoiceCommander({
 
   return null;
 }
+
+    
