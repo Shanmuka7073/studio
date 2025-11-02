@@ -84,7 +84,6 @@ export default function VoiceCommandsPage() {
         let duplicates: string[] = [];
         
         setCommands(currentCommands => {
-            // Create a deep copy to avoid state mutation issues
             const updatedCommands = JSON.parse(JSON.stringify(currentCommands));
             
             if (!updatedCommands[actionKey]) {
@@ -96,7 +95,9 @@ export default function VoiceCommandsPage() {
             }
             
             aliasesToAdd.forEach(newAlias => {
-                if (!updatedCommands[actionKey].aliases.includes(newAlias)) {
+                const isDuplicate = Object.values(updatedCommands).some(group => group.aliases.includes(newAlias));
+
+                if (!updatedCommands[actionKey].aliases.includes(newAlias) && !isDuplicate) {
                     updatedCommands[actionKey].aliases.push(newAlias);
                     addedCount++;
                 } else {
@@ -181,6 +182,8 @@ export default function VoiceCommandsPage() {
 
         recognition.start();
     };
+    
+    const isTemplateKey = (key: string) => key === 'orderItem';
 
     return (
         <div className="container mx-auto py-12 px-4 md:px-6">
@@ -193,7 +196,7 @@ export default function VoiceCommandsPage() {
                 <CardHeader>
                     <CardTitle>Manage Commands & Replies</CardTitle>
                     <CardDescription>
-                        Each action can be triggered by multiple phrases. You can also customize what the app says back to you.
+                        Each action can be triggered by multiple phrases. For ordering, use {'{product}'} and {'{quantity}'} as placeholders.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -207,7 +210,10 @@ export default function VoiceCommandsPage() {
                             {Object.entries(commands).map(([key, group]) => (
                                 <AccordionItem value={key} key={key}>
                                     <AccordionTrigger>
-                                        <span className="font-semibold text-lg">{group.display}</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-semibold text-lg">{group.display}</span>
+                                            {isTemplateKey(key) && <Badge variant="outline">Template</Badge>}
+                                        </div>
                                     </AccordionTrigger>
                                     <AccordionContent>
                                         <div className="space-y-6 p-4 bg-muted/50 rounded-lg">
@@ -229,7 +235,7 @@ export default function VoiceCommandsPage() {
                                                 <Label className="font-semibold">User's Phrases (Aliases)</Label>
                                                 <div className="flex flex-wrap gap-2">
                                                     {group.aliases.map((alias, index) => (
-                                                        <Badge key={index} variant="secondary" className="relative pr-6 group">
+                                                        <Badge key={index} variant={isTemplateKey(key) ? "default" : "secondary"} className="relative pr-6 group text-base py-1">
                                                             {alias}
                                                              <button
                                                                 onClick={() => handleRemoveCommand(key, alias)}
@@ -245,7 +251,7 @@ export default function VoiceCommandsPage() {
 
                                              <div className="flex items-center gap-2 pt-4 border-t">
                                                 <Input
-                                                    placeholder="Add new phrase(s), comma-separated..."
+                                                    placeholder={isTemplateKey(key) ? "e.g., I want {quantity} of {product}" : "Add new phrase(s), comma-separated..."}
                                                     value={newCommands[key] || ''}
                                                     onChange={(e) => setNewCommands(prev => ({...prev, [key]: e.target.value}))}
                                                     onKeyDown={(e) => {
