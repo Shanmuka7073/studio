@@ -5,13 +5,11 @@ import Image from 'next/image';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/lib/cart';
-import type { Product, ProductVariant } from '@/lib/types';
+import type { Product, ProductPrice, ProductVariant } from '@/lib/types';
 import { ShoppingCart } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { useFirebase } from '@/firebase';
-import { getProductPrice } from '@/lib/data';
 import { Skeleton } from './ui/skeleton';
 
 interface ProductCardProps {
@@ -19,35 +17,28 @@ interface ProductCardProps {
   image: {
     imageUrl: string;
     imageHint: string;
-  }
+  };
+  priceData?: ProductPrice | null; // Price data is now passed as a prop
 }
 
-export default function ProductCard({ product, image }: ProductCardProps) {
+export default function ProductCard({ product, image, priceData }: ProductCardProps) {
   const { addItem } = useCart();
   const { toast } = useToast();
-  const { firestore } = useFirebase();
 
-  const [priceVariants, setPriceVariants] = useState<ProductVariant[]>([]);
-  const [isLoadingPrice, setIsLoadingPrice] = useState(true);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
 
-  useEffect(() => {
-    const fetchPrice = async () => {
-      if (!firestore || !product.name) return;
-      setIsLoadingPrice(true);
-      const priceData = await getProductPrice(firestore, product.name);
-      if (priceData && priceData.variants.length > 0) {
-        setPriceVariants(priceData.variants);
-        setSelectedVariant(priceData.variants[0]);
-      } else {
-        setPriceVariants([]);
-        setSelectedVariant(null);
-      }
-      setIsLoadingPrice(false);
-    };
+  // Prices are now derived from props, not fetched internally
+  const priceVariants = useMemo(() => priceData?.variants || [], [priceData]);
+  const isLoadingPrice = priceData === undefined; // Loading is true if priceData is not yet available
 
-    fetchPrice();
-  }, [firestore, product.name]);
+  useEffect(() => {
+    // Set the default selected variant once price variants are available
+    if (priceVariants.length > 0) {
+      setSelectedVariant(priceVariants[0]);
+    } else {
+      setSelectedVariant(null);
+    }
+  }, [priceVariants]);
   
   // Use the AI-generated data URI if available, otherwise use the placeholder
   const displayImageUrl = product.imageUrl ? product.imageUrl : image.imageUrl;
@@ -130,4 +121,3 @@ export default function ProductCard({ product, image }: ProductCardProps) {
     </Card>
   );
 }
-    

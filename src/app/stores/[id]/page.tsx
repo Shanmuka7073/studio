@@ -1,17 +1,17 @@
 
 'use client';
-import { getStore, getStoreImage, getProductImage } from '@/lib/data';
+import { getStore, getStoreImage, getProductImage, getProductPrice } from '@/lib/data';
 import Image from 'next/image';
 import ProductCard from '@/components/product-card';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
-import { Store, Product } from '@/lib/types';
+import { Store, Product, ProductPrice } from '@/lib/types';
 import { useEffect, useState, useMemo } from 'react';
 import { notFound, useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import groceryData from '@/lib/grocery-data.json';
 import { Input } from '@/components/ui/input';
-import { collection } from 'firebase/firestore';
+import { collection, query, where, documentId, getDocs } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
@@ -136,6 +136,7 @@ export default function StoreDetailPage() {
   const [storeImage, setStoreImage] = useState({ imageUrl: 'https://placehold.co/250x250/E2E8F0/64748B?text=Loading...', imageHint: 'loading' });
   const [productImages, setProductImages] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
+  const [priceDataMap, setPriceDataMap] = useState<Record<string, ProductPrice>>({});
 
   const productsQuery = useMemoFirebase(() => {
     if (!firestore || !id) return null;
@@ -216,6 +217,32 @@ export default function StoreDetailPage() {
     return tempProducts;
   }, [products, selectedCategory, searchTerm]);
 
+  // NEW: Effect to bulk-fetch prices for filtered products
+  useEffect(() => {
+    const fetchPrices = async () => {
+        if (!firestore || filteredProducts.length === 0) return;
+
+        const productNames = [...new Set(filteredProducts.map(p => p.name.toLowerCase()))];
+        if (productNames.length === 0) return;
+
+        const pricesRef = collection(firestore, 'productPrices');
+        const q = query(pricesRef, where(documentId(), 'in', productNames));
+
+        try {
+            const priceSnapshot = await getDocs(q);
+            const newPriceDataMap = {};
+            priceSnapshot.forEach(doc => {
+                newPriceDataMap[doc.id] = doc.data() as ProductPrice;
+            });
+            setPriceDataMap(newPriceDataMap);
+        } catch (error) {
+            console.error("Error fetching product prices:", error);
+        }
+    };
+
+    fetchPrices();
+  }, [firestore, filteredProducts]);
+
 
   if (loading) {
     return <div className="container mx-auto py-12 px-4 md:px-6">Loading...</div>;
@@ -248,7 +275,8 @@ export default function StoreDetailPage() {
                 ) : filteredProducts && filteredProducts.length > 0 ? (
                     filteredProducts.map((product) => {
                     const image = productImages[product.id] || { imageUrl: 'https://placehold.co/300x300/E2E8F0/64748B?text=...', imageHint: 'loading' };
-                    return <ProductCard key={product.id} product={product} image={image} />
+                    const priceData = priceDataMap[product.name.toLowerCase()];
+                    return <ProductCard key={product.id} product={product} image={image} priceData={priceData} />
                     })
                 ) : (
                     <p className="text-muted-foreground col-span-full">No products found matching your criteria.</p>
