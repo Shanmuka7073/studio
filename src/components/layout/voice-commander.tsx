@@ -74,10 +74,9 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
   const speak = useCallback((text: string) => {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
     try {
+      // Cancel any ongoing speech before starting a new one
+      window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
-      // Optional: configure voice, pitch, rate
-      // const voices = window.speechSynthesis.getVoices();
-      // utterance.voice = voices.find(v => v.lang === 'en-US') || voices[0];
       utterance.pitch = 1;
       utterance.rate = 1;
       window.speechSynthesis.speak(utterance);
@@ -245,7 +244,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
       }
       if (fromIndex === -1) {
         fromKeyword = ' at ';
-        fromIndex = command.lastIndexOf(fromKeyword);
+        fromIndex = command.lastIndexOf(fromIndex);
       }
 
       // SCENARIO 1: Full order command with store ("order 1kg chicken from local basket")
@@ -254,13 +253,20 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
           const storeName = command.substring(fromIndex + fromKeyword.length).trim();
 
           if (shoppingList && storeName) {
-              const targetStore = allStores.find(s => s.name.toLowerCase().includes(storeName));
+              const matchingStores = allStores.filter(s => s.name.toLowerCase().includes(storeName));
 
-              if (targetStore) {
+              if (matchingStores.length === 1) {
+                  const targetStore = matchingStores[0];
                   speak(`Creating your shopping list for ${targetStore.name}.`);
                   onVoiceOrder({ shoppingList, storeId: targetStore.id });
                   onSuggestions([]);
                   return; // Command handled
+              } else if (matchingStores.length > 1) {
+                  const message = `I found multiple stores named "${storeName}". Please be more specific, for example, by saying the store's full name or address.`;
+                  speak(message);
+                  toast({ variant: 'destructive', title: "Multiple Stores Found", description: message });
+                  onSuggestions([]);
+                  return;
               } else {
                   speak(`Sorry, I could not find a store named "${storeName}".`);
                   toast({ variant: 'destructive', title: "Store Not Found", description: `Could not find a store named "${storeName}".` });
