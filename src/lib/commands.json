@@ -15,6 +15,16 @@
       "get one {product}"
     ]
   },
+  "orderChicken": {
+    "display": "Order Chicken (Specific)",
+    "reply": "Adding chicken to your cart.",
+    "aliases": [
+      "add 1kg chicken",
+      "add one kilo chicken",
+      "i want chicken",
+      "add chicken"
+    ]
+  },
   "home": {
     "display": "Navigate to Home",
     "reply": "Okay, taking you to the home page.",
