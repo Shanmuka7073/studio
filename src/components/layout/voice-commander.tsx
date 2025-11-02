@@ -350,144 +350,145 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
     const recognition = recognitionRef.current;
 
     const handleCommand = async (command: string) => {
-      if (!firestore || !user) return;
-      
-      // Handle checkout flow state
-      if (command === 'yes') {
-          if (checkoutState.current === 'promptingLocation') {
-              handleGetLocation(); // This is the function from the global store
-              checkoutState.current = 'promptingConfirmation';
-              speak("Great, location captured. I will calculate the total. One moment.", () => {
-                  setTimeout(() => { 
-                      const total = getFinalTotal();
-                      if (total > 0) {
-                          speak(`Your total is ${total.toFixed(2)} rupees. Shall I place the order?`);
-                      } else {
-                          speak("I couldn't calculate the total. Please check your cart or list.");
-                          checkoutState.current = 'idle';
-                      }
-                  }, 2000);
-              });
-              return;
-          } else if (checkoutState.current === 'promptingConfirmation') {
-              placeOrderBtnRef?.current?.click();
-              checkoutState.current = 'idle'; // Reset state
-              return;
-          }
-      }
-
-      // Handle profile form filling
-      if (formFieldToFill.current && profileForm) {
-          profileForm.setValue(formFieldToFill.current, command, { shouldValidate: true });
-          formFieldToFill.current = null; // Clear the field to fill
-          handleProfileFormInteraction(); // Check for the next empty field
-          return;
-      }
-      
-      // Check for perfect match on all commands (static, store, and dynamic product commands)
-      const perfectMatch = allCommands.find((c) => command === c.command);
-      if (perfectMatch) {
-        speak(perfectMatch.reply);
-        perfectMatch.action();
-        onSuggestions([]);
-        return;
-      }
-      
-      // Fallback for less specific commands or parsing
-      const monthlyListTriggers = ['one month groceries for', 'monthly list for', 'groceries for a month for'];
-      const monthlyListTriggerFound = monthlyListTriggers.find(t => command.includes(t));
-      if (monthlyListTriggerFound) {
-        const matches = command.match(/(\d+)/);
-        if (matches) {
-            const memberCount = parseInt(matches[1], 10);
-            speak(`Generating a one-month grocery list for ${memberCount} members. This may take a moment.`);
-            onSuggestions([]);
+        try {
+            if (!firestore || !user) return;
             
-            const packageResult = await generateMonthlyPackage({ memberCount });
-            
-            if (packageResult && packageResult.items) {
-                onOpenCart();
-                speak(`Adding ${packageResult.items.length} items to your cart.`);
-                let notFoundCount = 0;
-                
-                for (const item of packageResult.items) {
-                    const { product, variant } = await findProductAndVariant(item);
-                    if (product && variant) {
-                        addItemToCart(product, variant, 1);
-                    } else {
-                        notFoundCount++;
-                        console.warn(`Could not find a matching product/variant for: ${item.name} (${item.quantity})`);
-                    }
+            // Handle checkout flow state
+            if (command === 'yes') {
+                if (checkoutState.current === 'promptingLocation') {
+                    handleGetLocation(); // This is the function from the global store
+                    checkoutState.current = 'promptingConfirmation';
+                    speak("Great, location captured. I will calculate the total. One moment.", () => {
+                        setTimeout(() => { 
+                            const total = getFinalTotal();
+                            if (total > 0) {
+                                speak(`Your total is ${total.toFixed(2)} rupees. Shall I place the order?`);
+                            } else {
+                                speak("I couldn't calculate the total. Please check your cart or list.");
+                                checkoutState.current = 'idle';
+                            }
+                        }, 2000);
+                    });
+                    return;
+                } else if (checkoutState.current === 'promptingConfirmation') {
+                    placeOrderBtnRef?.current?.click();
+                    checkoutState.current = 'idle'; // Reset state
+                    return;
                 }
-                
-                if (notFoundCount > 0) {
-                     toast({ variant: 'destructive', title: "Some Items Not Found", description: `${notFoundCount} item(s) from the generated list could not be found in the product catalog.`});
-                }
-                 toast({ title: "Items Added!", description: `A monthly grocery list has been added to your cart.`});
-                 return;
-            } else {
-                speak('Sorry, I could not generate the grocery list at this time.');
+            }
+      
+            // Handle profile form filling
+            if (formFieldToFill.current && profileForm) {
+                profileForm.setValue(formFieldToFill.current, command, { shouldValidate: true });
+                formFieldToFill.current = null; // Clear the field to fill
+                handleProfileFormInteraction(); // Check for the next empty field
                 return;
             }
-        }
-      }
-
-      // Voice order from a specific store
-      const orderTriggers = ['order ', 'buy ', 'get ', 'purchase ', 'i want '];
-      const orderTriggerFound = orderTriggers.find(t => command.startsWith(t));
-      let fromKeyword = ' from ';
-      let fromIndex = command.lastIndexOf(fromKeyword);
-      if (orderTriggerFound && fromIndex > -1) {
-          const shoppingList = command.substring(orderTriggerFound.length, fromIndex).trim();
-          const storeName = command.substring(fromIndex + fromKeyword.length).trim();
-
-          if (shoppingList && storeName) {
-              const matchingStores = allStores.filter(s => s.name.toLowerCase().includes(storeName));
-
-              if (matchingStores.length === 1) {
-                  const targetStore = matchingStores[0];
-                  speak(`Creating your shopping list for ${targetStore.name}.`);
-                  onVoiceOrder({ shoppingList, storeId: targetStore.id });
+            
+            // Check for perfect match on all commands (static, store, and dynamic product commands)
+            const perfectMatch = allCommands.find((c) => command === c.command);
+            if (perfectMatch) {
+                onStatusUpdate('Processing...');
+                speak(perfectMatch.reply);
+                await perfectMatch.action();
+                onSuggestions([]);
+                return;
+            }
+            
+            // Fallback for less specific commands or parsing
+            const monthlyListTriggers = ['one month groceries for', 'monthly list for', 'groceries for a month for'];
+            const monthlyListTriggerFound = monthlyListTriggers.find(t => command.includes(t));
+            if (monthlyListTriggerFound) {
+              onStatusUpdate('Processing...');
+              const matches = command.match(/(\d+)/);
+              if (matches) {
+                  const memberCount = parseInt(matches[1], 10);
+                  speak(`Generating a one-month grocery list for ${memberCount} members. This may take a moment.`);
                   onSuggestions([]);
-                  return; 
-              } else if (matchingStores.length > 1) {
-                  speak(`I found multiple stores named "${storeName}". Please be more specific.`);
-                  onSuggestions([]);
-                  return;
-              } else {
-                  speak(`Sorry, I could not find a store named "${storeName}".`);
-                  onSuggestions([]);
-                  return;
+                  
+                  const packageResult = await generateMonthlyPackage({ memberCount });
+                  
+                  if (packageResult && packageResult.items) {
+                      onOpenCart();
+                      speak(`Adding ${packageResult.items.length} items to your cart.`);
+                      let notFoundCount = 0;
+                      
+                      for (const item of packageResult.items) {
+                          const { product, variant } = await findProductAndVariant(item);
+                          if (product && variant) {
+                              addItemToCart(product, variant, 1);
+                          } else {
+                              notFoundCount++;
+                              console.warn(`Could not find a matching product/variant for: ${item.name} (${item.quantity})`);
+                          }
+                      }
+                      
+                      if (notFoundCount > 0) {
+                           toast({ variant: 'destructive', title: "Some Items Not Found", description: `${notFoundCount} item(s) from the generated list could not be found in the product catalog.`});
+                      }
+                       toast({ title: "Items Added!", description: `A monthly grocery list has been added to your cart.`});
+                       return;
+                  } else {
+                      throw new Error('Failed to generate monthly package AI flow.');
+                  }
               }
-          }
-      }
+            }
       
-      // Fuzzy matching for suggestions
-      const potentialMatches = allCommands
-        .map((c) => ({
-          ...c,
-          similarity: calculateSimilarity(command, c.command),
-        }))
-        .filter((c) => c.similarity > 0.7) // Increased threshold for better accuracy
-        .sort((a, b) => b.similarity - a.similarity)
-        .filter(
-          (value, index, self) =>
-            self.findIndex((v) => v.action.toString() === value.action.toString()) ===
-            index
-        )
-        .slice(0, 3);
-
-      if (potentialMatches.length > 0) {
-        speak("I'm not sure. Did you mean one of these?");
-        onSuggestions(potentialMatches);
-      } else {
-        speak(`Sorry, I didn't understand "${command}".`);
-        onSuggestions([]);
-        toast({
-          variant: 'destructive',
-          title: 'Command not recognized',
-          description: `Heard: "${command}"`,
-        });
+            // Voice order from a specific store
+            const orderTriggers = ['order ', 'buy ', 'get ', 'purchase ', 'i want '];
+            const orderTriggerFound = orderTriggers.find(t => command.startsWith(t));
+            let fromKeyword = ' from ';
+            let fromIndex = command.lastIndexOf(fromKeyword);
+            if (orderTriggerFound && fromIndex > -1) {
+                onStatusUpdate('Processing...');
+                const shoppingList = command.substring(orderTriggerFound.length, fromIndex).trim();
+                const storeName = command.substring(fromIndex + fromKeyword.length).trim();
+      
+                if (shoppingList && storeName) {
+                    const matchingStores = allStores.filter(s => s.name.toLowerCase().includes(storeName));
+      
+                    if (matchingStores.length === 1) {
+                        const targetStore = matchingStores[0];
+                        speak(`Creating your shopping list for ${targetStore.name}.`);
+                        onVoiceOrder({ shoppingList, storeId: targetStore.id });
+                        onSuggestions([]);
+                        return; 
+                    } else if (matchingStores.length > 1) {
+                        speak(`I found multiple stores named "${storeName}". Please be more specific.`);
+                        onSuggestions([]);
+                        return;
+                    } else {
+                       throw new Error(`Could not find a store named "${storeName}".`);
+                    }
+                }
+            }
+            
+            // Fuzzy matching for suggestions
+            const potentialMatches = allCommands
+              .map((c) => ({
+                ...c,
+                similarity: calculateSimilarity(command, c.command),
+              }))
+              .filter((c) => c.similarity > 0.7) // Increased threshold for better accuracy
+              .sort((a, b) => b.similarity - a.similarity)
+              .filter(
+                (value, index, self) =>
+                  self.findIndex((v) => v.action.toString() === value.action.toString()) ===
+                  index
+              )
+              .slice(0, 3);
+      
+            if (potentialMatches.length > 0) {
+              speak("I'm not sure. Did you mean one of these?");
+              onSuggestions(potentialMatches);
+            } else {
+              throw new Error(`Command not recognized: "${command}"`);
+            }
+      } catch(e) {
+          console.error("Voice command execution failed:", e);
+          onStatusUpdate(`⚠️ Action failed. Please try again.`);
+          speak("Sorry, I couldn't do that. Please check your connection and try again.");
+          onSuggestions([]);
       }
     };
 
@@ -540,5 +541,3 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
 
   return null; // This component does not render anything itself.
 }
-
-    
