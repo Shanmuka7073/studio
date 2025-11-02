@@ -281,7 +281,7 @@ export function VoiceCommander({
             const orderItemTemplate = fileCommandsRef.current.orderItem;
             if (orderItemTemplate) {
                 for (const alias of orderItemTemplate.aliases) {
-                    const pattern = alias.replace('{quantity}', '(.+)').replace('{product}', '(.+)');
+                    const pattern = alias.replace(/{quantity}/g, '(.+)').replace(/{product}/g, '(.+)');
                     const regex = new RegExp(`^${pattern}$`);
                     const match = command.match(regex);
                     
