@@ -276,6 +276,26 @@ export function VoiceCommander({
                 handleProfileFormInteraction();
                 return;
             }
+
+            // NEW: Multi-part order command
+            const multiOrderPattern = /order\s(.+)\sfrom\s(.+)/i;
+            const multiOrderMatch = command.match(multiOrderPattern);
+            if (multiOrderMatch) {
+              const shoppingList = multiOrderMatch[1].trim();
+              const storeName = multiOrderMatch[2].trim();
+              const storeMatch = storesRef.current.find(s => s.name.toLowerCase() === storeName.toLowerCase());
+
+              if (storeMatch) {
+                speak(`Okay, preparing your order from ${storeName}.`);
+                onVoiceOrder({ shoppingList, storeId: storeMatch.id });
+                onSuggestions([]);
+                return; // Command handled
+              } else {
+                speak(`Sorry, I couldn't find a store named ${storeName}.`);
+                onSuggestions([]);
+                return;
+              }
+            }
             
             // --- NEW: Check for template-based orderItem match first ---
             const orderItemTemplate = fileCommandsRef.current.orderItem;
