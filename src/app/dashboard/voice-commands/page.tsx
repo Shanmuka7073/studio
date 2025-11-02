@@ -30,7 +30,7 @@ export default function VoiceCommandsPage() {
     }, []);
 
     const handleAddCommand = (actionKey: string) => {
-        const newAlias = newCommands[actionKey]?.trim();
+        const newAlias = newCommands[actionKey]?.trim().toLowerCase(); // Convert to lowercase
         if (!newAlias) {
             toast({
                 variant: 'destructive',
@@ -43,6 +43,12 @@ export default function VoiceCommandsPage() {
         if (!updatedCommands[actionKey].aliases.includes(newAlias)) {
              updatedCommands[actionKey].aliases.push(newAlias);
              setCommands(updatedCommands);
+        } else {
+            toast({
+                variant: 'destructive',
+                title: 'Duplicate Command',
+                description: `The command "${newAlias}" already exists for this action.`,
+            });
         }
 
         // Clear input
