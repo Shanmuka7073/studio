@@ -35,18 +35,22 @@ export function ProfileCompletionChecker() {
   const { data: userData, isLoading: isProfileLoading } = useDoc<AppUser>(userDocRef);
 
   useEffect(() => {
-    // Conditions to show the prompt:
-    // 1. User is logged in and auth loading is finished.
-    // 2. Profile data has been checked (isProfileLoading is false).
-    // 3. The user document does not exist (userData is null).
-    // 4. The user hasn't dismissed the prompt in the current session.
-    if (
-      !isUserLoading &&
-      user &&
-      !isProfileLoading &&
-      !userData &&
-      sessionStorage.getItem(SESSION_STORAGE_KEY) !== 'true'
-    ) {
+    if (isUserLoading || isProfileLoading) {
+      return;
+    }
+
+    if (!user || sessionStorage.getItem(SESSION_STORAGE_KEY) === 'true') {
+      return;
+    }
+    
+    const isProfileIncomplete = 
+        !userData || 
+        !userData.firstName || 
+        !userData.lastName || 
+        !userData.address || 
+        !userData.phoneNumber;
+
+    if (isProfileIncomplete) {
       setShowPrompt(true);
     }
   }, [user, isUserLoading, userData, isProfileLoading]);
