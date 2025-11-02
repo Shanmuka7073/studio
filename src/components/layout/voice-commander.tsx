@@ -434,7 +434,13 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
               speak("I'm not sure. Did you mean one of these?");
               onSuggestions(potentialMatches);
             } else {
-              throw new Error(`Command not recognized: "${command}"`);
+              speak(`Sorry, I don't recognize the command "${command}".`);
+              toast({
+                  variant: 'destructive',
+                  title: 'Command Not Recognized',
+                  description: `I heard "${command}", but I don't know what to do.`,
+              });
+              onSuggestions([]);
             }
       } catch(e) {
           console.error("Voice command execution failed:", e);
