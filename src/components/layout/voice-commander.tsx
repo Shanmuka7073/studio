@@ -330,7 +330,8 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
     if (typeof window === 'undefined' || !enabled) {
         if(recognitionRef.current) {
             try {
-                recognitionRef.current.stop();
+                recognitionRef.current.onend = null; // Important: remove the handler
+                recognitionRef.current.abort();
             } catch(e) {
                 // It might already be stopped
             }
