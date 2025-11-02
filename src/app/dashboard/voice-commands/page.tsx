@@ -6,11 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, PlusCircle, Save, X, Mic, MessageSquare } from 'lucide-react';
+import { Loader2, PlusCircle, Save, X, Mic, MessageSquare, Code } from 'lucide-react';
 import { getCommands, saveCommands } from '@/app/actions';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
 type CommandGroup = {
   display: string;
@@ -186,7 +187,7 @@ export default function VoiceCommandsPage() {
     const isTemplateKey = (key: string) => key === 'orderItem';
 
     return (
-        <div className="container mx-auto py-12 px-4 md:px-6">
+        <div className="container mx-auto py-12 px-4 md:px-6 space-y-8">
              <div className="text-center mb-12">
                 <h1 className="text-4xl font-bold font-headline">Voice Commands Control</h1>
                 <p className="text-lg text-muted-foreground mt-2">View and add new phrases (aliases) for voice-activated actions and edit their replies.</p>
@@ -291,6 +292,27 @@ export default function VoiceCommandsPage() {
                     </Button>
                 </CardContent>
             </Card>
+
+            <Card className="max-w-4xl mx-auto">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Code className="h-5 w-5" />
+                        Raw JSON View
+                    </CardTitle>
+                    <CardDescription>
+                        This is a read-only view of the `commands.json` file that powers the voice system.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Textarea 
+                        readOnly 
+                        value={JSON.stringify(commands, null, 2)}
+                        className="bg-muted font-mono text-xs h-96"
+                    />
+                </CardContent>
+            </Card>
         </div>
     );
 }
+
+    

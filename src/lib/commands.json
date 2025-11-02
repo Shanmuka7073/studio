@@ -25,7 +25,8 @@
       "open homepage",
       "return home",
       "show home",
-      "open home"
+      "open home",
+      "home"
     ]
   },
   "stores": {
@@ -173,7 +174,8 @@
       "reload page",
       "reload app",
       "refresh screen",
-      "restart page"
+      "restart page",
+      "refresh"
     ]
   }
 }
