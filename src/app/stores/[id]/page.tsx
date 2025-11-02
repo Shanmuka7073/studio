@@ -232,11 +232,15 @@ export default function StoreDetailPage() {
         const productNames = [...new Set(filteredProducts.map(p => p.name.toLowerCase()))];
         if (productNames.length === 0) return;
 
+        // Find which prices we haven't fetched yet
+        const namesToFetch = productNames.filter(name => !priceDataMap[name]);
+        if (namesToFetch.length === 0) return;
+
         const pricesRef = collection(firestore, 'productPrices');
         // Firestore 'in' query is limited to 30 items. We must batch the requests.
         const batches = [];
-        for (let i = 0; i < productNames.length; i += 30) {
-            batches.push(productNames.slice(i, i + 30));
+        for (let i = 0; i < namesToFetch.length; i += 30) {
+            batches.push(namesToFetch.slice(i, i + 30));
         }
 
         const pricePromises = batches.map(batch => 
@@ -259,7 +263,7 @@ export default function StoreDetailPage() {
     };
 
     fetchPrices();
-  }, [firestore, filteredProducts]);
+  }, [firestore, filteredProducts, priceDataMap]);
 
 
   if (loading) {
