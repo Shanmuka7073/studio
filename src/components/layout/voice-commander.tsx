@@ -85,13 +85,18 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
 
 
  const speak = useCallback((text: string, onEndCallback?: () => void) => {
-    if (typeof window === 'undefined' || !window.speechSynthesis || isSpeakingRef.current) {
+    if (typeof window === 'undefined' || !window.speechSynthesis) {
       if (onEndCallback) onEndCallback();
       return;
     }
     
+    // If it's already speaking, cancel the previous one to speak the new text.
+    if (isSpeakingRef.current) {
+        window.speechSynthesis.cancel();
+    }
     isSpeakingRef.current = true;
     
+    // Stop listening while speaking
     if (recognitionRef.current && listeningRef.current) {
         try {
             recognitionRef.current.stop();
@@ -100,7 +105,6 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
         }
     }
 
-    window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.pitch = 1;
     utterance.rate = 1.1;
@@ -108,13 +112,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
 
     utterance.onend = () => {
         isSpeakingRef.current = false;
-        if (listeningRef.current && recognitionRef.current) {
-            try {
-                recognitionRef.current.start();
-            } catch(e) {
-                console.warn("Could not restart recognition:", e);
-            }
-        }
+        // The main onend handler of the recognition service will restart it.
         if (onEndCallback) {
             onEndCallback();
         }
@@ -241,7 +239,6 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
           // 1. STATIC NAVIGATION COMMANDS (from commands.json)
           const staticNavCommands: Command[] = Object.entries(fileCommands).flatMap(
             ([key, { display, aliases, reply }]) => {
-              if (key === 'orderItem') return []; // Skip the special template command
               const action = commandActions[key];
               if (!action) return [];
               return aliases.map(alias => ({ command: alias, display, action, reply }));
@@ -264,45 +261,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
             }));
           });
           
-          // 3. DYNAMIC PRODUCT ORDERING COMMANDS (TEMPLATE-BASED)
-          const productOrderingCommands: Command[] = [];
-          const orderItemTemplate = fileCommands['orderItem'];
-
-          if (masterProducts.length > 0 && orderItemTemplate) {
-              const orderTemplates = orderItemTemplate.aliases;
-              // Common quantities to generate commands for
-              const quantities = ["1 kg", "2 kg", "500 grams", "250 grams", "1 piece"];
-
-              masterProducts.forEach(product => {
-                  orderTemplates.forEach(template => {
-                      quantities.forEach(quantity => {
-                          const commandString = template
-                              .replace('{product}', product.name.toLowerCase())
-                              .replace('{quantity}', quantity.toLowerCase());
-                          
-                          const [qtyValue, qtyUnit] = quantity.split(' ');
-
-                          productOrderingCommands.push({
-                              command: commandString,
-                              display: `Add ${quantity} ${product.name} to cart`,
-                              reply: orderItemTemplate.reply.replace('{quantity}', quantity).replace('{product}', product.name),
-                              action: async () => {
-                                  onOpenCart();
-                                  const { product: foundProduct, variant } = await findProductAndVariant({ name: product.name, quantity: qtyValue + (qtyUnit === 'kg' ? 'kg' : 'pc') });
-                                  if (foundProduct && variant) {
-                                      addItemToCart(foundProduct, variant, 1);
-                                  } else {
-                                      speak(`Sorry, I could not find a ${quantity} option for ${product.name}.`);
-                                      toast({ variant: 'destructive', title: "Variant not found", description: `Could not find a ${quantity} option for ${product.name}.` });
-                                  }
-                              }
-                          });
-                      });
-                  });
-              });
-          }
-
-          setAllCommands([...staticNavCommands, ...storeCommands, ...productOrderingCommands]);
+          setAllCommands([...staticNavCommands, ...storeCommands]);
         })
         .catch(console.error);
     }
@@ -326,7 +285,11 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
   useEffect(() => {
     if (typeof window === 'undefined' || !enabled) {
         if(recognitionRef.current) {
-            recognitionRef.current.stop();
+            try {
+                recognitionRef.current.stop();
+            } catch(e) {
+                // It might already be stopped
+            }
         }
         return;
     };
@@ -386,7 +349,6 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
                 return;
             }
             
-            // Check for perfect match on all commands (static, store, and dynamic product commands)
             const perfectMatch = allCommands.find((c) => command === c.command);
             if (perfectMatch) {
                 speak(perfectMatch.reply);
@@ -438,8 +400,9 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
             const orderTriggerFound = orderTriggers.find(t => command.startsWith(t));
             let fromKeyword = ' from ';
             let fromIndex = command.lastIndexOf(fromKeyword);
-            if (orderTriggerFound && fromIndex > -1) {
-                const shoppingList = command.substring(orderTriggerFound.length, fromIndex).trim();
+            if ((orderTriggerFound || true) && fromIndex > -1) {
+                const trigger = orderTriggerFound || '';
+                const shoppingList = command.substring(trigger.length, fromIndex).trim();
                 const storeName = command.substring(fromIndex + fromKeyword.length).trim();
       
                 if (shoppingList && storeName) {
@@ -515,6 +478,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
       if (listeningRef.current) {
         try {
           if (!isSpeakingRef.current) {
+            // Only restart if not in the middle of speaking
             recognition.start();
           }
         } catch (e) {
@@ -529,13 +493,23 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
     try {
       recognition.start();
     } catch (e) {
+      // This can happen if it's already started, which is fine.
       console.log('Could not start recognition, it may already be running.');
     }
 
     return () => {
-      recognition.stop();
+        if (recognitionRef.current) {
+            try {
+                recognitionRef.current.stop();
+            } catch(e) {
+                // Ignore errors on stop
+            }
+        }
     };
   }, [enabled, toast, onStatusUpdate, allCommands, onSuggestions, firestore, user, myStore, masterProductList, router, allStores, onVoiceOrder, findProductAndVariant, addItemToCart, onOpenCart, isCartOpen, onCloseCart, speak, pathname, profileForm, handleProfileFormInteraction, shouldPromptForLocation, handleGetLocation, getFinalTotal, placeOrderBtnRef]);
 
   return null; // This component does not render anything itself.
 }
+
+
+    
