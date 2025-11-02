@@ -1,11 +1,11 @@
 
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useFirebase, useDoc, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
-import { User as AppUser } from '@/lib/types';
+import type { User as AppUser } from '@/lib/types';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,6 +19,7 @@ import {
 import { Button } from './ui/button';
 
 const SESSION_STORAGE_KEY = 'profile-prompt-dismissed';
+const ADMIN_EMAIL = 'admin@gmail.com';
 
 export function ProfileCompletionChecker() {
   const { user, isUserLoading, firestore } = useFirebase();
@@ -35,14 +36,17 @@ export function ProfileCompletionChecker() {
   const { data: userData, isLoading: isProfileLoading } = useDoc<AppUser>(userDocRef);
 
   useEffect(() => {
+    // Wait until all loading is finished.
     if (isUserLoading || isProfileLoading) {
       return;
     }
 
-    if (!user || sessionStorage.getItem(SESSION_STORAGE_KEY) === 'true') {
+    // Don't show the prompt if the user is not logged in, is the admin, or has dismissed it this session.
+    if (!user || user.email === ADMIN_EMAIL || sessionStorage.getItem(SESSION_STORAGE_KEY) === 'true') {
       return;
     }
     
+    // Condition is now checked only after we're sure userData is loaded or confirmed to be null.
     const isProfileIncomplete = 
         !userData || 
         !userData.firstName || 
@@ -52,6 +56,8 @@ export function ProfileCompletionChecker() {
 
     if (isProfileIncomplete) {
       setShowPrompt(true);
+    } else {
+      setShowPrompt(false); // Explicitly hide if profile is complete
     }
   }, [user, isUserLoading, userData, isProfileLoading]);
 
