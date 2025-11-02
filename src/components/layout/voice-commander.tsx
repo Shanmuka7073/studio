@@ -153,7 +153,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
     }
   }, [profileForm, speak]);
 
-  const findProductAndVariant = useCallback(async (productName: string, desiredWeight: string): Promise<{ product: Product | null, variant: ProductVariant | null }> => {
+  const findProductAndVariant = useCallback(async (productName: string, desiredWeight?: string): Promise<{ product: Product | null, variant: ProductVariant | null }> => {
         const lowerProductName = productName.toLowerCase();
         const productMatch = masterProductList.find(p => p.name.toLowerCase() === lowerProductName);
 
@@ -167,12 +167,24 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
             }
         }
         
-        if (priceData && priceData.variants) {
-            const lowerDesiredWeight = desiredWeight.replace(/\s/g, '').toLowerCase();
-            const variantMatch = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === lowerDesiredWeight);
-            if (variantMatch) {
-                return { product: productMatch, variant: variantMatch };
+        if (priceData && priceData.variants && priceData.variants.length > 0) {
+            // If a specific weight is desired, find it
+            if (desiredWeight) {
+                const lowerDesiredWeight = desiredWeight.replace(/\s/g, '').toLowerCase();
+                const variantMatch = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === lowerDesiredWeight);
+                if (variantMatch) {
+                    return { product: productMatch, variant: variantMatch };
+                }
             }
+            
+            // If no desired weight or no match, try to find a '1 pc' default
+            const onePieceVariant = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === '1pc');
+            if (onePieceVariant) {
+                return { product: productMatch, variant: onePieceVariant };
+            }
+
+            // If still no match, return the first (often smallest) variant as a fallback
+            return { product: productMatch, variant: priceData.variants[0] };
         }
         
         return { product: null, variant: null };
@@ -222,15 +234,15 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
           }
         },
         refresh: () => window.location.reload(),
-        orderItem: async ({ product, quantity }: { product: string, quantity: string }) => {
-            speak(`Looking for ${quantity} of ${product}.`);
+        orderItem: async ({ product, quantity }: { product: string, quantity?: string }) => {
+            speak(`Looking for ${product}.`);
             const { product: foundProduct, variant } = await findProductAndVariant(product, quantity);
             if (foundProduct && variant) {
                 addItemToCart(foundProduct, variant, 1);
-                speak(`Added ${quantity} of ${product} to your cart.`);
+                speak(`Added ${variant.weight} of ${product} to your cart.`);
                 onOpenCart();
             } else {
-                speak(`Sorry, I could not find ${quantity} of ${product}.`);
+                speak(`Sorry, I could not find ${product}.`);
             }
         },
       };
@@ -277,20 +289,37 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
               masterProducts.forEach(product => {
                   const priceData = allPrices[product.name.toLowerCase()];
                   if (priceData && priceData.variants) {
+                      
+                      // Handle templates with quantity (e.g., "add 1kg of chicken")
                       priceData.variants.forEach(variant => {
                           orderItemTemplate.aliases.forEach(template => {
-                              const commandStr = template
-                                  .replace('{product}', product.name.toLowerCase())
-                                  .replace('{quantity}', variant.weight.toLowerCase());
-                              
-                              builtCommands.push({
-                                  command: commandStr,
-                                  display: `Order ${variant.weight} of ${product.name}`,
-                                  action: () => commandActions.orderItem({ product: product.name, quantity: variant.weight }),
-                                  reply: orderItemTemplate.reply,
-                              });
+                            if(template.includes('{quantity}')) {
+                                const commandStr = template
+                                    .replace('{product}', product.name.toLowerCase())
+                                    .replace('{quantity}', variant.weight.toLowerCase());
+                                
+                                builtCommands.push({
+                                    command: commandStr,
+                                    display: `Order ${variant.weight} of ${product.name}`,
+                                    action: () => commandActions.orderItem({ product: product.name, quantity: variant.weight }),
+                                    reply: orderItemTemplate.reply,
+                                });
+                            }
                           });
                       });
+
+                       // Handle templates without quantity (e.g., "add one chicken")
+                       orderItemTemplate.aliases.forEach(template => {
+                            if(!template.includes('{quantity}')) {
+                                const commandStr = template.replace('{product}', product.name.toLowerCase());
+                                builtCommands.push({
+                                    command: commandStr,
+                                    display: `Order one ${product.name}`,
+                                    action: () => commandActions.orderItem({ product: product.name }), // No quantity passed
+                                    reply: orderItemTemplate.reply,
+                                });
+                            }
+                       });
                   }
               });
           }

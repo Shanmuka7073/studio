@@ -10,7 +10,9 @@
       "buy {quantity} of {product}",
       "buy {quantity} {product}",
       "i want {quantity} of {product}",
-      "i want {quantity} {product}"
+      "i want {quantity} {product}",
+      "add one {product}",
+      "get one {product}"
     ]
   },
   "home": {
