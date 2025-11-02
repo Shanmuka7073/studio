@@ -32,6 +32,14 @@ interface VoiceCommanderProps {
   isCartOpen: boolean;
 }
 
+// This will be created only once.
+let recognition: SpeechRecognition | null = null;
+if (typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognition();
+}
+
+
 export function VoiceCommander({
   enabled,
   onStatusUpdate,
@@ -48,28 +56,31 @@ export function VoiceCommander({
   const { form: profileForm } = useProfileFormStore();
   const { shouldPromptForLocation, handleGetLocation, getFinalTotal, placeOrderBtnRef } = useCheckoutStore();
 
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const isSpeakingRef = useRef(false);
   const isEnabledRef = useRef(enabled);
   const commandsRef = useRef<Command[]>([]);
   const storesRef = useRef<Store[]>([]);
   const masterProductsRef = useRef<Product[]>([]);
   const productPricesRef = useRef<Record<string, ProductPrice>>({});
+  const commandActionsRef = useRef<Record<string, Function>>({});
+  const fileCommandsRef = useRef<any>({});
+  
   const formFieldToFillRef = useRef<keyof ProfileFormValues | null>(null);
   const checkoutStateRef = useRef<'idle' | 'promptingLocation' | 'promptingConfirmation'>('idle');
+
 
   // Update the enabled ref when the prop changes
   useEffect(() => {
     isEnabledRef.current = enabled;
-    if (recognitionRef.current) {
+    if (recognition) {
       if (enabled) {
         try {
-          recognitionRef.current.start();
+          recognition.start();
         } catch (e) {
-          // Ignore error if it's already started
+            // In case it's already started
         }
       } else {
-        recognitionRef.current.stop();
+        recognition.abort();
       }
     }
   }, [enabled]);
@@ -81,7 +92,7 @@ export function VoiceCommander({
     }
 
     isSpeakingRef.current = true;
-    recognitionRef.current?.stop(); // Stop listening while speaking
+    recognition?.abort(); // Stop listening while speaking
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.pitch = 1;
@@ -130,6 +141,10 @@ export function VoiceCommander({
         if (!desiredWeight || desiredWeight === 'one') {
           const onePieceVariant = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === '1pc');
           if (onePieceVariant) return { product: productMatch, variant: onePieceVariant };
+
+          // If no "1pc", fall back to the smallest available variant
+           const firstVariant = priceData.variants.sort((a,b) => a.price - b.price)[0];
+           if (firstVariant) return { product: productMatch, variant: firstVariant };
         }
 
         // Fallback to the first (often smallest) variant if no match found
@@ -165,48 +180,96 @@ export function VoiceCommander({
 
   // This useEffect runs only once to set up the recognition service and load commands
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      onStatusUpdate("⚠️ Voice recognition not supported in this browser.");
-      return;
+    if (!recognition) {
+        onStatusUpdate("⚠️ Voice recognition not supported in this browser.");
+        return;
     }
 
-    const recognition = new SpeechRecognition();
-    recognition.continuous = false; // Process one command at a time
+    // --- Define all possible actions ---
+    commandActionsRef.current = {
+      home: () => router.push('/'),
+      stores: () => router.push('/stores'),
+      dashboard: () => router.push('/dashboard'),
+      cart: () => router.push('/cart'),
+      orders: () => router.push('/dashboard/customer/my-orders'),
+      deliveries: () => router.push('/dashboard/delivery/deliveries'),
+      myStore: () => router.push('/dashboard/owner/my-store'),
+      voiceOrder: () => {
+        if (pathname !== '/checkout') {
+          router.push('/checkout?action=record');
+        } else {
+          // This is a bit of a hack, might need a more robust solution
+          const micButton = Array.from(document.querySelectorAll('button')).find(
+              btn => btn.textContent?.includes('Record List')
+          );
+          (micButton as HTMLButtonElement)?.click();
+        }
+      },
+      checkout: () => {
+        onCloseCart();
+        router.push('/checkout');
+      },
+      placeOrder: () => {
+        if (placeOrderBtnRef?.current) placeOrderBtnRef.current.click();
+        else speak("You can only place an order from the checkout page.");
+      },
+      saveChanges: () => {
+        if (pathname === '/dashboard/customer/my-profile' && profileForm) {
+          const formElement = document.querySelector('form');
+          if (formElement) formElement.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+        } else {
+          speak("There are no changes to save on this page.");
+        }
+      },
+      refresh: () => window.location.reload(),
+      orderItem: async ({ product, quantity }: { product: string, quantity?: string }) => {
+        speak(`Looking for ${product}.`);
+        const { product: foundProduct, variant } = await findProductAndVariant(product, quantity);
+        if (foundProduct && variant) {
+          addItemToCart(foundProduct, variant, 1);
+          speak(`Added ${variant.weight} of ${product} to your cart.`);
+          onOpenCart();
+        } else {
+          speak(`Sorry, I could not find ${product}.`);
+        }
+      },
+    };
+    
+    // --- Configure recognition ---
+    recognition.continuous = false;
     recognition.lang = 'en-IN';
     recognition.interimResults = false;
-    recognitionRef.current = recognition;
 
+    // --- Define event handlers ---
     const handleCommand = async (command: string) => {
         onStatusUpdate(`Processing: "${command}"`);
         try {
             if (!firestore || !user) return;
-            
-            if (command === 'yes') {
-                if (checkoutStateRef.current === 'promptingLocation') {
-                    handleGetLocation();
-                    checkoutStateRef.current = 'promptingConfirmation';
-                    speak("Great, location captured. One moment.", () => {
-                        setTimeout(() => { 
-                            const total = getFinalTotal();
-                            if (total > 0) {
-                                speak(`Your total is ${total.toFixed(2)} rupees. Shall I place the order?`);
-                            } else {
-                                speak("I couldn't calculate the total. Please check your cart or list.");
-                                checkoutStateRef.current = 'idle';
-                            }
-                        }, 2000);
-                    });
-                    return;
-                } else if (checkoutStateRef.current === 'promptingConfirmation') {
-                    placeOrderBtnRef?.current?.click();
-                    checkoutStateRef.current = 'idle';
-                    return;
-                }
+
+            // Handle contextual yes/no
+            if (command === 'yes' && shouldPromptForLocation) {
+                handleGetLocation();
+                checkoutStateRef.current = 'promptingConfirmation';
+                speak("Great, location captured. One moment.", () => {
+                    setTimeout(() => { 
+                        const total = getFinalTotal();
+                        if (total > 0) {
+                            speak(`Your total is ${total.toFixed(2)} rupees. Shall I place the order?`);
+                        } else {
+                            speak("I couldn't calculate the total. Please check your cart or list.");
+                            checkoutStateRef.current = 'idle';
+                        }
+                    }, 2000);
+                });
+                return;
             }
-      
+             if (command === 'yes' && checkoutStateRef.current === 'promptingConfirmation') {
+                placeOrderBtnRef?.current?.click();
+                checkoutStateRef.current = 'idle';
+                return;
+            }
+
+            // Handle profile form filling
             if (formFieldToFillRef.current && profileForm) {
                 profileForm.setValue(formFieldToFillRef.current, command, { shouldValidate: true });
                 formFieldToFillRef.current = null;
@@ -214,33 +277,34 @@ export function VoiceCommander({
                 return;
             }
             
+            // --- NEW: Check for template-based orderItem match first ---
+            const orderItemTemplate = fileCommandsRef.current.orderItem;
+            if (orderItemTemplate) {
+                for (const alias of orderItemTemplate.aliases) {
+                    const pattern = alias.replace('{quantity}', '(.+)').replace('{product}', '(.+)');
+                    const regex = new RegExp(`^${pattern}$`);
+                    const match = command.match(regex);
+                    
+                    if (match) {
+                        const quantity = match[1]?.trim();
+                        const product = match[2]?.trim();
+
+                        if(product && quantity) {
+                            await commandActionsRef.current.orderItem({ product, quantity });
+                            onSuggestions([]);
+                            return; // Command was handled
+                        }
+                    }
+                }
+            }
+
+
             const perfectMatch = commandsRef.current.find((c) => command === c.command);
             if (perfectMatch) {
                 speak(perfectMatch.reply);
                 await perfectMatch.action();
                 onSuggestions([]);
                 return;
-            }
-            
-            const fromKeyword = ' from ';
-            let fromIndex = command.lastIndexOf(fromKeyword);
-            if (fromIndex > -1) {
-                const shoppingList = command.substring(0, fromIndex).trim();
-                const storeName = command.substring(fromIndex + fromKeyword.length).trim();
-                const orderTriggers = ['order ', 'buy ', 'get ', 'purchase ', 'i want '];
-                const trigger = orderTriggers.find(t => shoppingList.startsWith(t));
-                const cleanList = trigger ? shoppingList.substring(trigger.length) : shoppingList;
-      
-                if (cleanList && storeName) {
-                    const matchingStores = storesRef.current.filter(s => s.name.toLowerCase().includes(storeName));
-                    if (matchingStores.length === 1) {
-                        const targetStore = matchingStores[0];
-                        speak(`Creating your shopping list for ${targetStore.name}.`);
-                        onVoiceOrder({ shoppingList: cleanList, storeId: targetStore.id });
-                        onSuggestions([]);
-                        return; 
-                    }
-                }
             }
             
             const potentialMatches = commandsRef.current
@@ -286,147 +350,73 @@ export function VoiceCommander({
     };
     
     recognition.onend = () => {
-      // This is the key change: always restart listening if the feature is enabled.
-      if (isEnabledRef.current) {
-        // A short delay helps prevent race conditions on some browsers.
+      if (isEnabledRef.current && !isSpeakingRef.current) {
         setTimeout(() => {
           try {
-            recognitionRef.current?.start();
+            recognition?.start();
           } catch (e) {
-            // This can happen if the component unmounts quickly.
             console.error('Could not restart recognition service: ', e);
           }
         }, 100);
       } else {
-        onStatusUpdate('Click the mic to start listening.');
+          if (!isEnabledRef.current) {
+              onStatusUpdate('Click the mic to start listening.');
+          }
       }
     };
 
-    // Load all commands and data
+    // Load all data and build commands
     if (firestore && user) {
-        const commandActions: { [key: string]: Function } = {
-          home: () => router.push('/'),
-          stores: () => router.push('/stores'),
-          dashboard: () => router.push('/dashboard'),
-          cart: () => router.push('/cart'),
-          orders: () => router.push('/dashboard/customer/my-orders'),
-          deliveries: () => router.push('/dashboard/delivery/deliveries'),
-          myStore: () => router.push('/dashboard/owner/my-store'),
-          voiceOrder: () => {
-              if (pathname !== '/checkout') {
-                  router.push('/checkout?action=record');
-              } else {
-                  const micButton = document.querySelector('button[aria-label="Toggle voice recording"]') as HTMLButtonElement;
-                  micButton?.click();
+      Promise.all([ getStores(firestore), getMasterProducts(firestore), getCommands() ])
+        .then(([stores, masterProducts, fileCommands]) => {
+          storesRef.current = stores;
+          masterProductsRef.current = masterProducts;
+          fileCommandsRef.current = fileCommands;
+
+          let builtCommands: Command[] = [];
+
+          // Add store navigation commands
+          stores.forEach((store) => {
+            const coreName = store.name.toLowerCase().replace(/shop|store|kirana/g, '').trim();
+            const variations = [...new Set([
+              store.name.toLowerCase(), coreName, `go to ${store.name.toLowerCase()}`, `open ${store.name.toLowerCase()}`,
+              `visit ${store.name.toLowerCase()}`, `show ${store.name.toLowerCase()}`
+            ])];
+            variations.forEach(variation => {
+              builtCommands.push({
+                command: variation,
+                display: `Go to ${store.name}`,
+                action: () => router.push(`/stores/${store.id}`),
+                reply: `Navigating to ${store.name}.`
+              });
+            });
+          });
+
+          // Add other static commands from the file
+          Object.entries(fileCommands).forEach(([key, { display, aliases, reply }]) => {
+            // The orderItem is a template, not a direct command, so we skip it here.
+            // All other non-template commands are added directly.
+            if (key !== 'orderItem') {
+              const action = commandActionsRef.current[key];
+              if (action) {
+                aliases.forEach(alias => {
+                  builtCommands.push({ command: alias, display, action, reply });
+                });
               }
-          },
-          checkout: () => { onCloseCart(); router.push('/checkout'); },
-          placeOrder: () => {
-            if (placeOrderBtnRef?.current) placeOrderBtnRef.current.click();
-            else speak("You can only place an order from the checkout page.");
-          },
-          saveChanges: () => {
-            if (pathname === '/dashboard/customer/my-profile' && profileForm) {
-              const formElement = document.querySelector('form');
-              if (formElement) formElement.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
-            } else {
-              speak("There are no changes to save on this page.");
             }
-          },
-          refresh: () => window.location.reload(),
-          orderItem: async ({ product, quantity }: { product: string, quantity?: string }) => {
-              speak(`Looking for ${product}.`);
-              const { product: foundProduct, variant } = await findProductAndVariant(product, quantity);
-              if (foundProduct && variant) {
-                  addItemToCart(foundProduct, variant, 1);
-                  speak(`Added ${variant.weight} of ${product} to your cart.`);
-                  onOpenCart();
-              } else {
-                  speak(`Sorry, I could not find ${product}.`);
-              }
-          },
-        };
-
-        Promise.all([ getStores(firestore), getMasterProducts(firestore), getCommands() ])
-            .then(([stores, masterProducts, fileCommands]) => {
-                storesRef.current = stores;
-                masterProductsRef.current = masterProducts;
-                
-                let builtCommands: Command[] = [];
-
-                stores.forEach((store) => {
-                    const coreName = store.name.toLowerCase().replace(/shop|store|kirana/g, '').trim();
-                    const variations = [...new Set([
-                        store.name.toLowerCase(), coreName, `go to ${store.name.toLowerCase()}`, `open ${store.name.toLowerCase()}`,
-                        `visit ${store.name.toLowerCase()}`, `show ${store.name.toLowerCase()}`
-                    ])];
-                    variations.forEach(variation => {
-                        builtCommands.push({
-                            command: variation,
-                            display: `Go to ${store.name}`,
-                            action: () => router.push(`/stores/${store.id}`),
-                            reply: `Navigating to ${store.name}.`
-                        });
-                    });
-                });
-
-                const orderItemTemplate = fileCommands.orderItem;
-                if (orderItemTemplate && masterProducts.length > 0) {
-                    masterProducts.forEach(product => {
-                         orderItemTemplate.aliases.forEach(template => {
-                            // Template for commands without a quantity, e.g., "add one {product}"
-                            if(!template.includes('{quantity}')) {
-                                const commandStr = template.replace('{product}', product.name.toLowerCase());
-                                builtCommands.push({
-                                    command: commandStr,
-                                    display: `Order one ${product.name}`,
-                                    action: () => commandActions.orderItem({ product: product.name, quantity: 'one' }),
-                                    reply: orderItemTemplate.reply,
-                                });
-                            }
-                            // Template for commands with a quantity
-                            else {
-                                const priceData = productPricesRef.current[product.name.toLowerCase()];
-                                priceData?.variants.forEach(variant => {
-                                    const commandStr = template
-                                        .replace('{quantity}', variant.weight)
-                                        .replace('{product}', product.name.toLowerCase());
-                                    builtCommands.push({
-                                        command: commandStr,
-                                        display: `Order ${variant.weight} of ${product.name}`,
-                                        action: () => commandActions.orderItem({ product: product.name, quantity: variant.weight }),
-                                        reply: orderItemTemplate.reply,
-                                    });
-                                });
-                            }
-                        });
-                    });
-                }
-                
-                Object.entries(fileCommands).forEach(([key, { display, aliases, reply }]) => {
-                    if (key === 'orderItem') return;
-                    const action = commandActions[key];
-                    if (action) {
-                      aliases.forEach(alias => {
-                          builtCommands.push({ command: alias, display, action, reply });
-                      });
-                    }
-                });
-                
-                commandsRef.current = builtCommands;
-            }).catch(console.error);
+          });
+          
+          commandsRef.current = builtCommands;
+        }).catch(console.error);
     }
     
-    // Cleanup on unmount
     return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.abort();
+      if (recognition) {
+        recognition.abort();
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firestore, user]); // This effect should only run once on mount
+  }, [firestore, user]); 
 
   return null;
 }
-
-    
