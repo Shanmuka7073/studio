@@ -1,3 +1,4 @@
+
 {
   "orderItem": {
     "display": "Order an Item (Template)",
@@ -11,8 +12,11 @@
       "buy {quantity} {product}",
       "i want {quantity} of {product}",
       "i want {quantity} {product}",
+      "had {quantity} of {product}",
+      "had {quantity} {product}",
       "add one {product}",
-      "get one {product}"
+      "get one {product}",
+      "had one {product}"
     ]
   },
   "orderChicken": {
@@ -193,3 +197,5 @@
     ]
   }
 }
+
+    

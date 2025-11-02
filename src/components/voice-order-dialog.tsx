@@ -72,13 +72,18 @@ async function matchItemsToCatalog(text: string, db: any): Promise<StructuredLis
     let cleanedText = text.replace(/(\d+\s*kg\s*)\1+/gi, '$1');
 
     const matchedItems: StructuredListItem[] = [];
-    const pattern = /(\d+)\s*(kg|kilogram|kilo)?\s*([a-zA-Z\s]+)/gi;
+    const pattern = /(\d+)\s*(kg|kilo|kilogram|grams|gm|g)?\s*([a-zA-Z\s]+)/gi;
     let match;
 
     while ((match = pattern.exec(cleanedText)) !== null) {
         const quantity = parseInt(match[1], 10);
+        let unit = (match[2] || 'kg').toLowerCase(); // Default to 'kg' if no unit
         const itemName = match[3].trim().toLowerCase();
-        const targetWeight = `${quantity}kg`;
+
+        if (unit.startsWith('g')) unit = 'gm';
+        if (unit.startsWith('kilo')) unit = 'kg';
+
+        const targetWeight = `${quantity}${unit}`;
         
         const productMatch = masterProductList.find(p => 
             itemName.includes(p.productName.toLowerCase())
@@ -457,3 +462,5 @@ export function VoiceOrderDialog({ isOpen, onClose, orderInfo }: { isOpen: boole
     </Dialog>
   );
 }
+
+    
