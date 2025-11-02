@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, PlusCircle, Save } from 'lucide-react';
+import { Loader2, PlusCircle, Save, X } from 'lucide-react';
 import { getCommands, saveCommands } from '@/app/actions';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -30,8 +30,8 @@ export default function VoiceCommandsPage() {
     }, []);
 
     const handleAddCommand = (actionKey: string) => {
-        const newAlias = newCommands[actionKey]?.trim().toLowerCase(); // Convert to lowercase
-        if (!newAlias) {
+        const newAliasInput = newCommands[actionKey]?.trim();
+        if (!newAliasInput) {
             toast({
                 variant: 'destructive',
                 title: 'Cannot add empty command',
@@ -39,20 +39,43 @@ export default function VoiceCommandsPage() {
             return;
         }
 
+        const aliasesToAdd = newAliasInput.split(',').map(alias => alias.trim().toLowerCase()).filter(Boolean);
+        let addedCount = 0;
+        let duplicates: string[] = [];
+
         const updatedCommands = { ...commands };
-        if (!updatedCommands[actionKey].aliases.includes(newAlias)) {
-             updatedCommands[actionKey].aliases.push(newAlias);
-             setCommands(updatedCommands);
-        } else {
-            toast({
-                variant: 'destructive',
-                title: 'Duplicate Command',
-                description: `The command "${newAlias}" already exists for this action.`,
-            });
+
+        aliasesToAdd.forEach(newAlias => {
+            if (!updatedCommands[actionKey].aliases.includes(newAlias)) {
+                updatedCommands[actionKey].aliases.push(newAlias);
+                addedCount++;
+            } else {
+                duplicates.push(newAlias);
+            }
+        });
+        
+        if (addedCount > 0) {
+            setCommands(updatedCommands);
         }
 
+        if (duplicates.length > 0) {
+             toast({
+                variant: 'destructive',
+                title: 'Duplicate Command(s)',
+                description: `The command(s) "${duplicates.join(', ')}" already exist.`,
+            });
+        }
+        
         // Clear input
         setNewCommands(prev => ({...prev, [actionKey]: ''}));
+    };
+
+    const handleRemoveCommand = (actionKey: string, aliasToRemove: string) => {
+        const updatedCommands = { ...commands };
+        updatedCommands[actionKey].aliases = updatedCommands[actionKey].aliases.filter(
+            alias => alias !== aliasToRemove
+        );
+        setCommands(updatedCommands);
     };
 
     const handleSaveAll = () => {
@@ -84,7 +107,7 @@ export default function VoiceCommandsPage() {
                 <CardHeader>
                     <CardTitle>Manage Command Aliases</CardTitle>
                     <CardDescription>
-                        Each action can be triggered by multiple phrases. Add new phrases to make voice navigation easier for your users. The "Go to [Store Name]" commands are generated automatically from your store list and cannot be edited here.
+                        Each action can be triggered by multiple phrases. Add new phrases (comma-separated) or remove existing ones. The "Go to [Store Name]" commands are generated automatically and cannot be edited here.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -104,15 +127,29 @@ export default function VoiceCommandsPage() {
                                         <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
                                             <div className="flex flex-wrap gap-2">
                                                 {group.aliases.map((alias, index) => (
-                                                    <Badge key={index} variant="secondary">{alias}</Badge>
+                                                    <Badge key={index} variant="secondary" className="relative pr-6 group">
+                                                        {alias}
+                                                         <button
+                                                            onClick={() => handleRemoveCommand(key, alias)}
+                                                            className="absolute top-1/2 -translate-y-1/2 right-1 rounded-full p-0.5 bg-background/50 hover:bg-background text-muted-foreground hover:text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        >
+                                                            <X className="h-3 w-3" />
+                                                            <span className="sr-only">Remove {alias}</span>
+                                                        </button>
+                                                    </Badge>
                                                 ))}
                                             </div>
                                              <div className="flex items-center gap-2 pt-4 border-t">
                                                 <Input
-                                                    placeholder="Add new phrase..."
+                                                    placeholder="Add new phrase(s), comma-separated..."
                                                     value={newCommands[key] || ''}
                                                     onChange={(e) => setNewCommands(prev => ({...prev, [key]: e.target.value}))}
-                                                    onKeyDown={(e) => e.key === 'Enter' && handleAddCommand(key)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            e.preventDefault();
+                                                            handleAddCommand(key);
+                                                        }
+                                                    }}
                                                 />
                                                 <Button size="sm" onClick={() => handleAddCommand(key)}>
                                                     <PlusCircle className="mr-2 h-4 w-4" /> Add
