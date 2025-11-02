@@ -24,6 +24,7 @@ interface VoiceCommanderProps {
   onSuggestions: (suggestions: Command[]) => void;
   onVoiceOrder: (orderInfo: VoiceOrderInfo) => void;
   onOpenCart: () => void;
+  onCloseCart: () => void; // New prop to close the cart
   isCartOpen: boolean;
   placeOrderBtnRef?: RefObject<HTMLButtonElement>;
 }
@@ -56,7 +57,7 @@ async function parseShoppingList(text: string): Promise<ParsedShoppingListItem[]
 }
 
 
-export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoiceOrder, onOpenCart, isCartOpen, placeOrderBtnRef }: VoiceCommanderProps) {
+export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoiceOrder, onOpenCart, onCloseCart, isCartOpen, placeOrderBtnRef }: VoiceCommanderProps) {
   const router = useRouter();
   const { toast } = useToast();
   const { firestore, user } = useFirebase();
@@ -81,7 +82,14 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
         deliveries: { display: 'View Deliveries', action: () => router.push('/dashboard/delivery/deliveries'), aliases: ['deliveries', 'my deliveries', 'go to deliveries', 'open deliveries', 'track deliveries', 'check delivery status', 'see my delivery list', 'delivery updates', 'delivery dashboard'] },
         myStore: { display: 'Create or Manage My Store', action: () => router.push('/dashboard/owner/my-store'), aliases: ['create my store', 'my store', 'manage my store', 'new store', 'register my store', 'make a store', 'open my shop', 'go to seller page', 'view my products', 'store dashboard', 'my store page'] },
         voiceOrder: { display: 'Create a Shopping List', action: () => router.push('/checkout?action=record'), aliases: ['create a shopping list', 'make a list', 'new shopping list', 'start my list', 'prepare my list', 'record my order', 'start voice order', 'start list', 'i want to shop', 'start recording', 'take my order', 'start voice shopping', 'record voice list', 'I\'ll say my list', 'speak my order', 'take my list', 'listen to my order', 'record shopping items', 'note down my list'] },
-        checkout: { display: 'Proceed to Checkout', action: () => router.push('/checkout'), aliases: ['proceed to checkout', 'go to checkout', 'checkout now', 'open checkout', 'start checkout', 'finish my order', 'complete purchase', 'pay now'] },
+        checkout: { 
+            display: 'Proceed to Checkout', 
+            action: () => {
+                onCloseCart();
+                router.push('/checkout');
+            }, 
+            aliases: ['proceed to checkout', 'go to checkout', 'checkout now', 'open checkout', 'start checkout', 'finish my order', 'complete purchase', 'pay now'] 
+        },
         placeOrder: {
           display: "Place the order",
           action: () => {
@@ -146,7 +154,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
         })
         .catch(console.error);
     }
-  }, [firestore, user, router, placeOrderBtnRef, toast]);
+  }, [firestore, user, router, placeOrderBtnRef, toast, onCloseCart]);
 
   useEffect(() => {
     listeningRef.current = enabled;
@@ -401,7 +409,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
       recognition.stop();
       recognition.onend = null; // Prevent restart on component unmount
     };
-  }, [enabled, toast, onStatusUpdate, allCommands, onSuggestions, firestore, user, myStore, masterProductList, router, allStores, onVoiceOrder, findProductAndVariant, addItemToCart, onOpenCart, isCartOpen]);
+  }, [enabled, toast, onStatusUpdate, allCommands, onSuggestions, firestore, user, myStore, masterProductList, router, allStores, onVoiceOrder, findProductAndVariant, addItemToCart, onOpenCart, isCartOpen, onCloseCart]);
 
   return null;
 }

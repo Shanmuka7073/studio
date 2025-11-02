@@ -167,6 +167,7 @@ export function Header({ placeOrderBtnRef }: HeaderProps) {
         onSuggestions={setSuggestedCommands}
         onVoiceOrder={setVoiceOrderInfo}
         onOpenCart={() => setIsCartOpen(true)}
+        onCloseCart={() => setIsCartOpen(false)}
         isCartOpen={isCartOpen}
         placeOrderBtnRef={placeOrderBtnRef}
       />
