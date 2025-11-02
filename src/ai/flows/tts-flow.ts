@@ -9,6 +9,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import wav from 'wav';
+import { googleAI } from '@genkit-ai/google-genai';
 
 const TTSInputSchema = z.string();
 const TTSOutputSchema = z.string().describe("An audio data URI in WAV format.");
@@ -53,15 +54,11 @@ const ttsFlow = ai.defineFlow(
     },
     async (query) => {
         const { media } = await ai.generate({
-            model: 'tts-1',
+            model: googleAI.model('gemini-2.5-flash-preview-tts'),
             config: {
                 responseModalities: ['AUDIO'],
                 speechConfig: {
                     voiceConfig: {
-                        // Switched from a "Studio" voice to a more cost-effective "WaveNet" voice.
-                        // This increases the free tier from 100k to 1M characters/month.
-                        // languageCode: 'en-US', // Optional: specify language
-                        // name: 'en-US-Wavenet-F', // Example of a high-quality, cheaper WaveNet voice
                         prebuiltVoiceConfig: { voiceName: 'en-US-Wavenet-F' },
                     },
                 },
