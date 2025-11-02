@@ -153,7 +153,7 @@ export default function CartPage() {
           </Button>
           <span className="text-muted-foreground font-medium">OR</span>
           <Button asChild variant="outline" size="lg">
-            <Link href="/checkout">
+            <Link href="/checkout?action=record">
               <Mic className="mr-2 h-5 w-5" />
               Record Your Shopping List
             </Link>

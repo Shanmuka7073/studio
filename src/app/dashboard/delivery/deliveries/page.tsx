@@ -599,7 +599,7 @@ export default function DeliveriesPage() {
 
                     toast({
                         title: "Delivery Complete!",
-                        description: `Order #${order.id.substring(0, 7)} marked as delivered. ₹${DELIVERY_FEE} added to your earnings.`
+                        description: `Order #${order.id.substring(0, 7)} marked as delivered. ₹${DELIVERY_FEE.toFixed(2)} added to your earnings.`
                     });
                 } catch (error) {
                     console.error("Failed to mark as delivered:", error);

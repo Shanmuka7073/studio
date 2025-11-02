@@ -169,7 +169,6 @@ export default function CheckoutPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [structuredList, setStructuredList] = useState<StructuredListItem[]>([]);
   const [availableStores, setAvailableStores] = useState<Store[]>([]);
-  const [voiceOrderInfo, setVoiceOrderInfo] = useState<VoiceOrderInfo | null>(null);
   
   const speechRecognitionRef = useRef<SpeechRecognition | null>(null);
 
@@ -203,7 +202,7 @@ export default function CheckoutPage() {
     }, [toast]);
     
    // This state now drives the voice prompt for location
-  const shouldPromptForLocation = !hasItemsInCart && structuredList.length === 0 && searchParams.get('action') === 'record' && !deliveryCoords;
+  const shouldPromptForLocation = (hasItemsInCart || structuredList.length > 0) && !deliveryCoords;
 
   useEffect(() => {
     setPlaceOrderBtnRef(placeOrderBtnRef);
@@ -377,21 +376,70 @@ export default function CheckoutPage() {
     }
   }, [toast, form, searchParams, handleToggleListening, handleUnderstandList]);
 
-
-    const handleConfirmVoiceOrder = () => {
-        const storeId = form.getValues('storeId');
-        const shoppingList = form.getValues('shoppingList');
-
+    const handleConfirmVoiceOrder = async (data: CheckoutFormValues) => {
+        if (!firestore || !user) return;
+        
+        const storeId = data.storeId;
         if (!storeId) {
             toast({ variant: 'destructive', title: 'Store Required', description: 'Please select a store to fulfill your voice order.' });
             return;
         }
-        if (!shoppingList) {
-            toast({ variant: 'destructive', title: 'List Required', description: 'Your shopping list is empty.' });
-            return;
-        }
 
-        setVoiceOrderInfo({ shoppingList, storeId });
+        startPlaceOrderTransition(async () => {
+            const storeData = await getStore(firestore, storeId);
+            if (!storeData) {
+                toast({ variant: 'destructive', title: 'Error', description: 'Selected store could not be found.' });
+                return;
+            }
+            
+            const totalAmount = voiceOrderSubtotal + DELIVERY_FEE;
+            
+            let orderData: any = {
+                userId: user.uid,
+                storeId: storeId,
+                storeOwnerId: storeData.ownerId,
+                customerName: data.name,
+                deliveryAddress: 'Delivery via captured GPS coordinates',
+                deliveryLat: deliveryCoords!.lat,
+                deliveryLng: deliveryCoords!.lng,
+                phone: data.phone,
+                email: user.email,
+                orderDate: serverTimestamp(),
+                status: 'Pending' as 'Pending',
+                totalAmount,
+                translatedList: data.shoppingList,
+                items: structuredList.map(item => ({
+                    productName: item.productName,
+                    variantWeight: item.variant.weight,
+                    price: item.price || 0,
+                    productId: item.variant.sku,
+                    variantSku: item.variant.sku,
+                    quantity: item.quantity,
+                })),
+            };
+
+            const colRef = collection(firestore, 'orders');
+            addDoc(colRef, orderData).then(() => {
+                clearCart();
+                setStructuredList([]);
+                setDeliveryCoords(null);
+                form.reset();
+
+                toast({
+                    title: "Order Placed!",
+                    description: "Thank you for your purchase.",
+                });
+                router.push('/order-confirmation');
+            }).catch((e) => {
+                console.error('Error placing voice order:', e);
+                const permissionError = new FirestorePermissionError({
+                    path: colRef.path,
+                    operation: 'create',
+                    requestResourceData: orderData
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            });
+        });
     };
 
   const onSubmit = (data: CheckoutFormValues) => {
@@ -407,7 +455,7 @@ export default function CheckoutPage() {
     const isVoiceOrder = cartItems.length === 0 && structuredList.length > 0;
     
     if (isVoiceOrder) {
-        handleConfirmVoiceOrder();
+        handleConfirmVoiceOrder(data);
         return;
     }
     
@@ -702,5 +750,3 @@ export default function CheckoutPage() {
     </div>
   );
 }
-
-    
