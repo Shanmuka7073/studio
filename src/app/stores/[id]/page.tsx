@@ -1,9 +1,9 @@
 
 'use client';
-import { getStore, getStoreImage, getProductImage, getProductPrice } from '@/lib/data';
+import { getStoreImage, getProductImage } from '@/lib/data';
 import Image from 'next/image';
 import ProductCard from '@/components/product-card';
-import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { Store, Product, ProductPrice } from '@/lib/types';
 import { useEffect, useState, useMemo } from 'react';
 import { notFound, useParams } from 'next/navigation';
@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { collection, query, where, documentId, getDocs, limit } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { useAppStore } from '@/lib/store';
 
 // Helper to create a URL-friendly slug from a string
 const createSlug = (text: string) => {
@@ -131,24 +132,37 @@ export default function StoreDetailPage() {
   const params = useParams();
   const id = params.id as string;
   const { firestore } = useFirebase();
-  const [store, setStore] = useState<Store | null>(null);
-  const [loading, setLoading] = useState(true);
+
+  // Get all data from the central Zustand store
+  const { stores, masterProducts, productPrices, loading, fetchInitialData } = useAppStore((state) => ({
+    stores: state.stores,
+    masterProducts: state.masterProducts,
+    productPrices: state.productPrices,
+    loading: state.loading,
+    fetchInitialData: state.fetchInitialData,
+  }));
+
   const [storeImage, setStoreImage] = useState({ imageUrl: 'https://placehold.co/250x250/E2E8F0/64748B?text=Loading...', imageHint: 'loading' });
   const [productImages, setProductImages] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
-  const [priceDataMap, setPriceDataMap] = useState<Record<string, ProductPrice>>({});
-  const [allStoreProducts, setAllStoreProducts] = useState<Product[]>([]);
-
-  // Fetch ALL products for the store just once to determine categories
+  
+  // Fetch initial data if not already present
   useEffect(() => {
-    if (firestore && id) {
-        const productsCol = collection(firestore, 'stores', id, 'products');
-        getDocs(productsCol).then(snapshot => {
-            const allProducts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
-            setAllStoreProducts(allProducts);
-        });
+    if (firestore) {
+      fetchInitialData(firestore);
     }
-  }, [firestore, id]);
+  }, [firestore, fetchInitialData]);
+
+  // Find the current store from the Zustand store
+  const store = useMemo(() => stores.find(s => s.id === id), [stores, id]);
+  
+  const allStoreProducts = useMemo(() => {
+    if (!store || masterProducts.length === 0) return [];
+    // This is a placeholder for a real implementation that would know which products belong to which store
+    // For now, we assume all master products are available at every store
+    return masterProducts;
+  }, [store, masterProducts]);
+
 
   const storeCategories = useMemo(() => {
     if (allStoreProducts.length === 0) return [];
@@ -164,46 +178,39 @@ export default function StoreDetailPage() {
     }
   }, [storeCategories, selectedCategory]);
 
-  const productsQuery = useMemoFirebase(() => {
-    if (!firestore || !id || !selectedCategory) return null;
-    
-    // Create a query for the selected category with a limit
-    const baseQuery = query(
-        collection(firestore, 'stores', id, 'products'),
-        where('category', '==', selectedCategory),
-        limit(20) // CRITICAL: Limit the number of products fetched
-    );
-
-    return baseQuery;
-  }, [firestore, id, selectedCategory]);
-  
-  const { data: products, isLoading: productsLoading } = useCollection<Product>(productsQuery);
-
   useEffect(() => {
-    if (firestore && id) {
-      const fetchStoreData = async () => {
-        setLoading(true);
-        const storeData = await getStore(firestore, id);
-        if (storeData) {
-          setStore(storeData as Store);
-          const image = await getStoreImage(storeData);
-          setStoreImage(image);
-        } else {
-          notFound();
-        }
-        setLoading(false);
+    if (store) {
+      const fetchStoreImage = async () => {
+        const image = await getStoreImage(store);
+        setStoreImage(image);
       };
-      fetchStoreData();
+      fetchStoreImage();
+    } else if (!loading) {
+      // If not loading and store is not found, redirect
+      notFound();
     }
-  }, [firestore, id]);
+  }, [store, loading]);
+
+  const filteredProducts = useMemo(() => {
+    if (allStoreProducts.length === 0) return [];
+    const productsInCategory = allStoreProducts.filter(p => p.category === selectedCategory);
+    
+    if (searchTerm) {
+      return productsInCategory.filter(product =>
+        product.name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    // Apply pagination limit
+    return productsInCategory.slice(0, 20);
+  }, [allStoreProducts, selectedCategory, searchTerm]);
 
   useEffect(() => {
     const fetchProductImages = async () => {
-        if (!products) return;
-        const imagePromises = products.map(p => getProductImage(p.imageId));
+        if (!filteredProducts) return;
+        const imagePromises = filteredProducts.map(p => getProductImage(p.imageId));
         try {
             const resolvedImages = await Promise.all(imagePromises);
-            const imageMap = products.reduce((acc, product, index) => {
+            const imageMap = filteredProducts.reduce((acc, product, index) => {
                 acc[product.id] = resolvedImages[index];
                 return acc;
             }, {});
@@ -213,57 +220,7 @@ export default function StoreDetailPage() {
         }
     };
     fetchProductImages();
-  }, [products]);
-  
-  const filteredProducts = useMemo(() => {
-    if (!products) return [];
-    if (searchTerm) {
-      return allStoreProducts.filter(product =>
-        product.name.toLowerCase().includes(searchTerm.toLowerCase()) && product.category === selectedCategory
-      );
-    }
-    return products;
-  }, [products, searchTerm, allStoreProducts, selectedCategory]);
-
-  useEffect(() => {
-    const fetchPrices = async () => {
-        if (!firestore || filteredProducts.length === 0) return;
-
-        const productNames = [...new Set(filteredProducts.map(p => p.name.toLowerCase()))];
-        if (productNames.length === 0) return;
-
-        // Find which prices we haven't fetched yet
-        const namesToFetch = productNames.filter(name => !priceDataMap[name]);
-        if (namesToFetch.length === 0) return;
-
-        const pricesRef = collection(firestore, 'productPrices');
-        // Firestore 'in' query is limited to 30 items. We must batch the requests.
-        const batches = [];
-        for (let i = 0; i < namesToFetch.length; i += 30) {
-            batches.push(namesToFetch.slice(i, i + 30));
-        }
-
-        const pricePromises = batches.map(batch => 
-            getDocs(query(pricesRef, where(documentId(), 'in', batch)))
-        );
-
-        try {
-            const snapshots = await Promise.all(pricePromises);
-            const newPriceDataMap = {};
-            snapshots.forEach(snapshot => {
-                 snapshot.forEach(doc => {
-                    newPriceDataMap[doc.id] = doc.data() as ProductPrice;
-                });
-            });
-           
-            setPriceDataMap(prev => ({...prev, ...newPriceDataMap}));
-        } catch (error) {
-            console.error("Error fetching product prices:", error);
-        }
-    };
-
-    fetchPrices();
-  }, [firestore, filteredProducts, priceDataMap]);
+  }, [filteredProducts]);
 
 
   if (loading) {
@@ -283,7 +240,7 @@ export default function StoreDetailPage() {
             <div className="flex justify-between items-start md:items-center mb-6 flex-col md:flex-row gap-4">
                 <div>
                   <h2 className="text-2xl font-bold font-headline">{selectedCategory}</h2>
-                  {!searchTerm && <p className="text-sm text-muted-foreground">Showing the first {products?.length || 0} products. Use search to find more.</p>}
+                  <p className="text-sm text-muted-foreground">Showing the first {filteredProducts.length} products in this category.</p>
                 </div>
                 <div className="w-full md:max-w-sm">
                     <Input 
@@ -295,12 +252,11 @@ export default function StoreDetailPage() {
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                {productsLoading && !searchTerm ? (
-                    <p>Loading products...</p>
-                ) : filteredProducts && filteredProducts.length > 0 ? (
+                {filteredProducts && filteredProducts.length > 0 ? (
                     filteredProducts.map((product) => {
                     const image = productImages[product.id] || { imageUrl: 'https://placehold.co/300x300/E2E8F0/64748B?text=...', imageHint: 'loading' };
-                    const priceData = priceDataMap[product.name.toLowerCase()];
+                    // Get price data directly from the cached productPrices map
+                    const priceData = productPrices[product.name.toLowerCase()];
                     return <ProductCard key={product.id} product={product} image={image} priceData={priceData} />
                     })
                 ) : (

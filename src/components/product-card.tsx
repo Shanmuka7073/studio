@@ -11,8 +11,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from './ui/skeleton';
-import { useFirebase } from '@/firebase';
-import { getProductPrice } from '@/lib/data';
 
 interface ProductCardProps {
   product: Product;
@@ -23,32 +21,15 @@ interface ProductCardProps {
   priceData?: ProductPrice | null; // Price data is now passed as a prop
 }
 
-export default function ProductCard({ product, image, priceData: initialPriceData }: ProductCardProps) {
+export default function ProductCard({ product, image, priceData }: ProductCardProps) {
   const { addItem } = useCart();
   const { toast } = useToast();
-  const { firestore } = useFirebase(); // Get firestore instance
-
-  const [priceData, setPriceData] = useState(initialPriceData);
-  const [isLoadingPrice, setIsLoadingPrice] = useState(initialPriceData === undefined);
-
+  
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
   
   // Memoize price variants to avoid re-computation
   const priceVariants = useMemo(() => priceData?.variants || [], [priceData]);
-
-  // Fetch prices only if they weren't provided initially
-  useEffect(() => {
-    async function fetchPrice() {
-      if (initialPriceData === undefined && firestore) {
-        setIsLoadingPrice(true);
-        const fetchedPriceData = await getProductPrice(firestore, product.name);
-        setPriceData(fetchedPriceData);
-        setIsLoadingPrice(false);
-      }
-    }
-    fetchPrice();
-  }, [initialPriceData, firestore, product.name]);
-
+  const isLoadingPrice = priceData === undefined;
 
   useEffect(() => {
     // Set the default selected variant once price variants are available
