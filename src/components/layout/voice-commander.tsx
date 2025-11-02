@@ -61,7 +61,6 @@ async function parseShoppingList(text: string): Promise<ParsedShoppingListItem[]
     return items;
 }
 
-
 export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoiceOrder, onOpenCart, onCloseCart, isCartOpen }: VoiceCommanderProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -155,7 +154,31 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
     }
   }, [profileForm, speak]);
 
-  // Fetch stores and build the full command list
+    const findProductAndVariant = useCallback(async (parsedItem: {name: string, quantity: string}): Promise<{ product: Product | null, variant: ProductVariant | null }> => {
+        if (!firestore) return { product: null, variant: null };
+        
+        // Find the master product that best matches the item name
+        const productMatch = masterProductList.find(p => p.name.toLowerCase() === parsedItem.name.toLowerCase());
+
+        if (productMatch) {
+            // Fetch its canonical pricing and variant info
+            const priceData = await getProductPrice(firestore, productMatch.name);
+            if (priceData && priceData.variants) {
+                // Find the specific variant (e.g., '1kg')
+                const targetWeight = parsedItem.quantity.replace(/\s/g, '').toLowerCase();
+                const variantMatch = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === targetWeight);
+
+                if (variantMatch) {
+                    return { product: productMatch, variant: variantMatch };
+                }
+            }
+        }
+        
+        return { product: null, variant: null };
+
+    }, [masterProductList, firestore]);
+
+  // Fetch static data and build the command list
   useEffect(() => {
     if (firestore && user) {
         
@@ -171,7 +194,6 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
             if (pathname !== '/checkout') {
                 router.push('/checkout?action=record');
             } else {
-                // If already on checkout, just start listening
                 const micButton = document.querySelector('button[aria-label="Toggle voice recording"]') as HTMLButtonElement;
                 micButton?.click();
             }
@@ -202,7 +224,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
         showMyProducts: () => router.push('/dashboard/owner/my-store'),
       };
 
-      // Fetch dynamic data: stores, master products, user's store, and commands from file
+      // Fetch dynamic data for commands
       Promise.all([
           getStores(firestore),
           getMasterProducts(firestore),
@@ -210,12 +232,13 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
           getCommands()
       ]).then(([stores, masterProducts, myStoreSnapshot, fileCommands]) => {
           setAllStores(stores);
+          setMasterProductList(masterProducts);
           
           if (!myStoreSnapshot.empty) {
               setMyStore({ id: myStoreSnapshot.docs[0].id, ...myStoreSnapshot.docs[0].data() } as Store);
           }
-          setMasterProductList(masterProducts);
 
+          // 1. STATIC NAVIGATION COMMANDS (from commands.json)
           const staticNavCommands: Command[] = Object.entries(fileCommands).flatMap(
             ([key, { display, aliases, reply }]) => {
               const action = commandActions[key];
@@ -224,47 +247,72 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
             }
           );
 
-
+          // 2. DYNAMIC STORE NAVIGATION COMMANDS
           const storeCommands: Command[] = stores.flatMap((store) => {
-            const coreName = store.name
-              .toLowerCase()
-              .replace(/shop|store|kirana/g, '')
-              .trim();
+            const coreName = store.name.toLowerCase().replace(/shop|store|kirana/g, '').trim();
+            const variations: string[] = [...new Set([
+              store.name.toLowerCase(), coreName, `go to ${store.name.toLowerCase()}`, `open ${store.name.toLowerCase()}`,
+              `visit ${store.name.toLowerCase()}`, `show ${store.name.toLowerCase()}`, `go to ${coreName}`, `open ${coreName}`
+            ])];
 
-            const variations: string[] = [
-              store.name.toLowerCase(),
-              coreName,
-              `go to ${store.name.toLowerCase()}`,
-              `open ${store.name.toLowerCase()}`,
-              `visit ${store.name.toLowerCase()}`,
-              `show ${store.name.toLowerCase()}`,
-              `go inside ${store.name.toLowerCase()}`,
-              `open shop ${store.name.toLowerCase()}`,
-              `go to ${coreName}`,
-              `open ${coreName}`,
-            ];
-            
-            const uniqueVariations = [...new Set(variations)];
-
-            return uniqueVariations.map((variation) => ({
+            return variations.map((variation) => ({
               command: variation,
               display: `Go to ${store.name}`,
               action: () => router.push(`/stores/${store.id}`),
               reply: `Navigating to ${store.name}.`
             }));
           });
-          setAllCommands([...staticNavCommands, ...storeCommands]);
+          
+          // 3. DYNAMIC PRODUCT ORDERING COMMANDS (TEMPLATE-BASED)
+          const productOrderingCommands: Command[] = [];
+          if (masterProducts.length > 0) {
+              const orderTemplates = [
+                  "add {quantity} {product}", "add {quantity} of {product}", "i want {quantity} {product}", "get me {quantity} {product}",
+                  "buy {quantity} {product}", "order {quantity} {product}", "add {product} {quantity}", "i need {quantity} {product}"
+              ];
+              // Common quantities to generate commands for
+              const quantities = ["1 kg", "2 kg", "500 grams", "250 grams", "1 piece"];
+
+              masterProducts.forEach(product => {
+                  orderTemplates.forEach(template => {
+                      quantities.forEach(quantity => {
+                          const commandString = template
+                              .replace('{product}', product.name.toLowerCase())
+                              .replace('{quantity}', quantity.toLowerCase());
+                          
+                          const [qtyValue, qtyUnit] = quantity.split(' ');
+
+                          productOrderingCommands.push({
+                              command: commandString,
+                              display: `Add ${quantity} ${product.name} to cart`,
+                              reply: `Adding ${quantity} of ${product.name} to your cart.`,
+                              action: async () => {
+                                  onOpenCart();
+                                  const { product: foundProduct, variant } = await findProductAndVariant({ name: product.name, quantity: qtyValue + (qtyUnit === 'kg' ? 'kg' : 'pc') });
+                                  if (foundProduct && variant) {
+                                      addItemToCart(foundProduct, variant, 1);
+                                  } else {
+                                      speak(`Sorry, I could not find a ${quantity} option for ${product.name}.`);
+                                      toast({ variant: 'destructive', title: "Variant not found", description: `Could not find a ${quantity} option for ${product.name}.` });
+                                  }
+                              }
+                          });
+                      });
+                  });
+              });
+          }
+
+          setAllCommands([...staticNavCommands, ...storeCommands, ...productOrderingCommands]);
         })
         .catch(console.error);
     }
-  }, [firestore, user, router, toast, onCloseCart, pathname, profileForm, speak]);
+  }, [firestore, user, router, toast, onCloseCart, pathname, profileForm, speak, onOpenCart, addItemToCart, findProductAndVariant]);
 
   useEffect(() => {
     listeningRef.current = enabled;
      if (enabled && pathname === '/dashboard/customer/my-profile') {
       handleProfileFormInteraction();
     }
-    // Handle checkout/dialog voice prompts
     if (enabled && shouldPromptForLocation) {
         checkoutState.current = 'promptingLocation';
         speak("For accurate delivery, please share your current location for this order. Say yes to confirm.");
@@ -274,27 +322,6 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
       checkoutState.current = 'idle';
     }
   }, [enabled, onSuggestions, pathname, speak, handleProfileFormInteraction, shouldPromptForLocation]);
-
-    const findProductAndVariant = useCallback(async (parsedItem: {name: string, quantity: string}): Promise<{ product: Product | null, variant: ProductVariant | null }> => {
-        if (!firestore) return { product: null, variant: null };
-        
-        const masterProductMatch = masterProductList.find(p => p.name.toLowerCase() === parsedItem.name.toLowerCase());
-
-        if (masterProductMatch) {
-            const priceData = await getProductPrice(firestore, masterProductMatch.name);
-            if (priceData && priceData.variants) {
-                const targetWeight = parsedItem.quantity.replace(/\s/g, '').toLowerCase();
-                const variantMatch = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === targetWeight);
-
-                if (variantMatch) {
-                    return { product: masterProductMatch, variant: variantMatch };
-                }
-            }
-        }
-        
-        return { product: null, variant: null };
-
-    }, [masterProductList, firestore]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !enabled) {
@@ -331,7 +358,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
               handleGetLocation(); // This is the function from the global store
               checkoutState.current = 'promptingConfirmation';
               speak("Great, location captured. I will calculate the total. One moment.", () => {
-                  setTimeout(() => { // Give time for state to update
+                  setTimeout(() => { 
                       const total = getFinalTotal();
                       if (total > 0) {
                           speak(`Your total is ${total.toFixed(2)} rupees. Shall I place the order?`);
@@ -339,7 +366,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
                           speak("I couldn't calculate the total. Please check your cart or list.");
                           checkoutState.current = 'idle';
                       }
-                  }, 2000); // 2-second delay to allow for total calculation
+                  }, 2000);
               });
               return;
           } else if (checkoutState.current === 'promptingConfirmation') {
@@ -356,8 +383,17 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
           handleProfileFormInteraction(); // Check for the next empty field
           return;
       }
-
-
+      
+      // Check for perfect match on all commands (static, store, and dynamic product commands)
+      const perfectMatch = allCommands.find((c) => command === c.command);
+      if (perfectMatch) {
+        speak(perfectMatch.reply);
+        perfectMatch.action();
+        onSuggestions([]);
+        return;
+      }
+      
+      // Fallback for less specific commands or parsing
       const monthlyListTriggers = ['one month groceries for', 'monthly list for', 'groceries for a month for'];
       const monthlyListTriggerFound = monthlyListTriggers.find(t => command.includes(t));
       if (monthlyListTriggerFound) {
@@ -396,24 +432,11 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
         }
       }
 
-      const orderTriggers = ['order ', 'buy ', 'get ', 'shop ', 'purchase ', 'i want '];
-      const addToCartTriggers = ['add '];
-
+      // Voice order from a specific store
+      const orderTriggers = ['order ', 'buy ', 'get ', 'purchase ', 'i want '];
       const orderTriggerFound = orderTriggers.find(t => command.startsWith(t));
-      const addTriggerFound = addToCartTriggers.find(t => command.startsWith(t));
-      
-      let fromKeyword = ' from shop ';
+      let fromKeyword = ' from ';
       let fromIndex = command.lastIndexOf(fromKeyword);
-      if (fromIndex === -1) {
-          fromKeyword = ' from ';
-          fromIndex = command.lastIndexOf(fromKeyword);
-      }
-      if (fromIndex === -1) {
-        fromKeyword = ' at ';
-        fromIndex = command.lastIndexOf(fromIndex);
-      }
-
-      // SCENARIO 1: Full order command with store ("order 1kg chicken from local basket")
       if (orderTriggerFound && fromIndex > -1) {
           const shoppingList = command.substring(orderTriggerFound.length, fromIndex).trim();
           const storeName = command.substring(fromIndex + fromKeyword.length).trim();
@@ -426,118 +449,26 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
                   speak(`Creating your shopping list for ${targetStore.name}.`);
                   onVoiceOrder({ shoppingList, storeId: targetStore.id });
                   onSuggestions([]);
-                  return; // Command handled
+                  return; 
               } else if (matchingStores.length > 1) {
-                  const message = `I found multiple stores named "${storeName}". Please be more specific, for example, by saying the store's full name or address.`;
-                  speak(message);
-                  toast({ variant: 'destructive', title: "Multiple Stores Found", description: message });
+                  speak(`I found multiple stores named "${storeName}". Please be more specific.`);
                   onSuggestions([]);
                   return;
               } else {
                   speak(`Sorry, I could not find a store named "${storeName}".`);
-                  toast({ variant: 'destructive', title: "Store Not Found", description: `Could not find a store named "${storeName}".` });
                   onSuggestions([]);
                   return;
               }
           }
       }
       
-      const listText = addTriggerFound
-        ? command.substring(addTriggerFound.length)
-        : orderTriggerFound && fromIndex === -1
-        ? command.substring(orderTriggerFound.length)
-        : isCartOpen // If cart is open, the whole command is the item
-        ? command
-        : null;
-
-      // SCENARIO 2: Iterative list building ("add 1 kg chicken and 2 kg tomatoes")
-      // OR SCENARIO 3: Cart is open, just say item ("1 kg chicken")
-      if (listText) {
-          const parsedItems = await parseShoppingList(listText);
-
-          if (parsedItems.length > 0) {
-              onOpenCart(); // Open the cart side panel
-              onSuggestions([]);
-              speak(`Adding items to your cart.`);
-              
-              for (const item of parsedItems) {
-                  const { product, variant } = await findProductAndVariant({ name: item.itemName, quantity: `${item.quantity}${item.unit}` });
-                  if (product && variant) {
-                      addItemToCart(product, variant, 1); // quantity is implicitly 1 of the variant (e.g. 1 x 1kg pack)
-                  } else {
-                      speak(`Sorry, I could not find "${item.itemName}".`);
-                      toast({ variant: 'destructive', title: "Item not found", description: `Could not find "${item.quantity}${item.unit} ${item.itemName}" in the catalog.`});
-                  }
-              }
-              return; // Command handled
-          }
-      }
-
-      const addProductTriggers = ['add product ', 'add new product ', 'list ', 'upload ', 'put ', 'new item ', 'post '];
-      const sellProductTriggers = ['sell ', 'start selling ', 'mark ', 'put on shelf ', 'list for buyers ', 'make available ', 'enable ', 'stock '];
-      
-      const addProdTriggerFound = addProductTriggers.find(t => command.startsWith(t));
-      const sellTriggerFound = sellProductTriggers.find(t => command.startsWith(t));
-
-      if ((addProdTriggerFound || sellTriggerFound) && myStore) {
-          const trigger = addProdTriggerFound || sellTriggerFound;
-          const productName = command.substring(trigger!.length).replace(/to my store|for sale|in my store/g, '').trim();
-          const productMatch = masterProductList.find(p => p.name.toLowerCase() === productName);
-
-          if (productMatch) {
-              const { id, variants, ...productData } = productMatch;
-              const newProductData = {
-                  ...productData,
-                  storeId: myStore.id,
-              };
-
-              addDocumentNonBlocking(collection(firestore, 'stores', myStore.id, 'products'), newProductData);
-              speak(`Okay, ${productMatch.name} has been added to your store.`);
-              toast({ title: "Product Added!", description: `${productMatch.name} has been added to your store.` });
-              onSuggestions([]);
-              return; // Command handled
-          }
-      }
-      
-      const removeProductTriggers = ['remove ', 'delete ', 'stop selling ', 'hide '];
-      const removeTriggerFound = removeProductTriggers.find(t => command.startsWith(t));
-      
-      if (removeTriggerFound && myStore) {
-          const productName = command.substring(removeTriggerFound.length).replace(/from my store|product/g, '').trim();
-          speak(`Okay, I'll remove ${productName}. This feature is not fully implemented yet.`);
-          toast({ title: "Command Acknowledged", description: `Logic to remove "${productName}" from your store is not yet implemented.` });
-          onSuggestions([]);
-          return;
-      }
-
-
-      // Check for perfect match on other commands
-      const perfectMatch = allCommands.find((c) => command === c.command);
-      if (perfectMatch) {
-        speak(perfectMatch.reply);
-        perfectMatch.action();
-        onSuggestions([]);
-        return;
-      }
-      
-      // Check for match ignoring spaces
-      const sanitizedCommand = command.replace(/\s/g, '');
-      const spaceInsensitiveMatch = allCommands.find(c => c.command.replace(/\s/g, '') === sanitizedCommand);
-      if(spaceInsensitiveMatch) {
-        speak(spaceInsensitiveMatch.reply);
-        spaceInsensitiveMatch.action();
-        onSuggestions([]);
-        return;
-      }
-
-
-      // Check for close matches if no perfect match found
+      // Fuzzy matching for suggestions
       const potentialMatches = allCommands
         .map((c) => ({
           ...c,
           similarity: calculateSimilarity(command, c.command),
         }))
-        .filter((c) => c.similarity > 0.6)
+        .filter((c) => c.similarity > 0.7) // Increased threshold for better accuracy
         .sort((a, b) => b.similarity - a.similarity)
         .filter(
           (value, index, self) =>
@@ -609,3 +540,5 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
 
   return null; // This component does not render anything itself.
 }
+
+    
