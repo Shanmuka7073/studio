@@ -58,7 +58,11 @@ const ttsFlow = ai.defineFlow(
                 responseModalities: ['AUDIO'],
                 speechConfig: {
                     voiceConfig: {
-                        prebuiltVoiceConfig: { voiceName: 'Algenib' },
+                        // Switched from a "Studio" voice to a more cost-effective "WaveNet" voice.
+                        // This increases the free tier from 100k to 1M characters/month.
+                        // languageCode: 'en-US', // Optional: specify language
+                        // name: 'en-US-Wavenet-F', // Example of a high-quality, cheaper WaveNet voice
+                        prebuiltVoiceConfig: { voiceName: 'en-US-Wavenet-F' },
                     },
                 },
             },
