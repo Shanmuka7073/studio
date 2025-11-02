@@ -2,7 +2,7 @@
 'use client';
 
 import { useFirebase, errorEmitter, useCollection, useMemoFirebase } from '@/firebase';
-import { Order } from '@/lib/types';
+import { Order, Store } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +14,8 @@ import { collection, query, where, orderBy, doc, writeBatch, increment } from 'f
 import { useState, useEffect, useMemo, useRef, useTransition } from 'react';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useToast } from '@/hooks/use-toast';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, Store as StoreIcon } from 'lucide-react';
+import { getStores } from '@/lib/data';
 
 const DELIVERY_FEE = 30;
 
@@ -40,6 +41,7 @@ export default function MyOrdersPage() {
   const { user, isUserLoading, firestore } = useFirebase();
   const { toast } = useToast();
   const [isUpdating, startUpdateTransition] = useTransition();
+  const [stores, setStores] = useState<Store[]>([]);
   
   const ordersQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
@@ -55,8 +57,23 @@ export default function MyOrdersPage() {
   const prevOrdersRef = useRef<Map<string, Order>>(new Map());
 
   useEffect(() => {
-    if (allOrders && allOrders.length > 0) {
-      const currentOrdersMap = new Map(allOrders.map(order => [order.id, order]));
+    if(firestore) {
+      getStores(firestore).then(setStores);
+    }
+  }, [firestore]);
+  
+  const ordersWithStores = useMemo(() => {
+    if (!allOrders || stores.length === 0) return [];
+    const storeMap = new Map(stores.map(s => [s.id, s.name]));
+    return allOrders.map(order => ({
+        ...order,
+        storeName: storeMap.get(order.storeId) || 'Unknown Store'
+    }));
+  }, [allOrders, stores]);
+
+  useEffect(() => {
+    if (ordersWithStores && ordersWithStores.length > 0) {
+      const currentOrdersMap = new Map(ordersWithStores.map(order => [order.id, order]));
       
       currentOrdersMap.forEach((currentOrder, orderId) => {
         const prevOrder = prevOrdersRef.current.get(orderId);
@@ -76,7 +93,7 @@ export default function MyOrdersPage() {
 
       prevOrdersRef.current = currentOrdersMap;
     }
-  }, [allOrders, toast]);
+  }, [ordersWithStores, toast]);
 
   const handleConfirmDelivery = (order: Order) => {
     if (!firestore || !user?.uid || !order.deliveryPartnerId) {
@@ -166,7 +183,7 @@ export default function MyOrdersPage() {
                     <Link href="/login">Login</Link>
                 </Button>
             </div>
-          ) : allOrders && allOrders.length === 0 ? (
+          ) : ordersWithStores && ordersWithStores.length === 0 ? (
             <div className="text-center py-12">
                 <p className="text-muted-foreground mb-4">You haven't placed any orders yet.</p>
                 <Button asChild>
@@ -175,12 +192,16 @@ export default function MyOrdersPage() {
             </div>
           ) : (
             <Accordion type="single" collapsible className="w-full">
-              {allOrders && allOrders.map((order) => (
+              {ordersWithStores && ordersWithStores.map((order) => (
                 <AccordionItem value={order.id} key={order.id}>
                   <AccordionTrigger>
-                    <div className="flex justify-between w-full pr-4">
-                        <div className="flex-1 text-left">
+                    <div className="flex justify-between w-full pr-4 items-center">
+                        <div className="flex-1 text-left space-y-1">
                             <p className="font-medium">Order #{order.id.substring(0, 7)}...</p>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <StoreIcon className="h-4 w-4" />
+                                <span>{order.storeName}</span>
+                            </div>
                             <p className="text-sm text-muted-foreground">{formatDate(order.orderDate)}</p>
                         </div>
                         <div className="flex-1 text-center">
