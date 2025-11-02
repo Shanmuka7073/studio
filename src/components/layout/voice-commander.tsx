@@ -11,6 +11,7 @@ import { calculateSimilarity } from '@/lib/calculate-similarity';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { VoiceOrderInfo } from '@/components/voice-order-dialog';
 import { useCart } from '@/lib/cart';
+import { getCommands } from '@/app/actions';
 
 export interface Command {
   command: string;
@@ -73,55 +74,52 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
   useEffect(() => {
     if (firestore && user) {
         
-      const commandMap: { [key: string]: { display: string, action: () => void, aliases: string[] } } = {
-        home: { display: 'Navigate to Home', action: () => router.push('/'), aliases: ['go home', 'home page', 'main screen', 'go to home', 'back to start', 'open homepage', 'return home', 'show home', 'open home', 'localbasket', 'local basket'] },
-        stores: { display: 'Browse All Stores', action: () => router.push('/stores'), aliases: ['go to stores', 'browse stores', 'show all stores', 'open store list', 'find stores', 'explore shops', 'nearby shops', 'shop list', 'view all shops'] },
-        dashboard: { display: 'View Dashboard', action: () => router.push('/dashboard'), aliases: ['go to dashboard', 'open dashboard', 'my dashboard', 'show my stats', 'open my panel', 'go to control panel', 'view dashboard'] },
-        cart: { display: 'View Your Cart', action: () => router.push('/cart'), aliases: ['go to cart', 'open cart', 'show cart', 'view my cart', 'see my basket', 'go to basket', 'open shopping cart', 'my items'] },
-        orders: { display: 'View My Orders', action: () => router.push('/dashboard/customer/my-orders'), aliases: ['my orders', 'go to my orders', 'open my orders', 'show my orders', 'view orders', 'check my orders', 'open order history', 'see past orders', 'my purchases'] },
-        deliveries: { display: 'View Deliveries', action: () => router.push('/dashboard/delivery/deliveries'), aliases: ['deliveries', 'my deliveries', 'go to deliveries', 'open deliveries', 'track deliveries', 'check delivery status', 'see my delivery list', 'delivery updates', 'delivery dashboard'] },
-        myStore: { display: 'Create or Manage My Store', action: () => router.push('/dashboard/owner/my-store'), aliases: ['create my store', 'my store', 'manage my store', 'new store', 'register my store', 'make a store', 'open my shop', 'go to seller page', 'view my products', 'store dashboard', 'my store page'] },
-        voiceOrder: { display: 'Create a Shopping List', action: () => router.push('/checkout?action=record'), aliases: ['create a shopping list', 'make a list', 'new shopping list', 'start my list', 'prepare my list', 'record my order', 'start voice order', 'start list', 'i want to shop', 'start recording', 'take my order', 'start voice shopping', 'record voice list', 'I\'ll say my list', 'speak my order', 'take my list', 'listen to my order', 'record shopping items', 'note down my list'] },
-        checkout: { 
-            display: 'Proceed to Checkout', 
-            action: () => {
-                onCloseCart();
-                router.push('/checkout');
-            }, 
-            aliases: ['proceed to checkout', 'go to checkout', 'checkout now', 'open checkout', 'start checkout', 'finish my order', 'complete purchase', 'pay now'] 
+      const commandActions: { [key: string]: () => void } = {
+        home: () => router.push('/'),
+        stores: () => router.push('/stores'),
+        dashboard: () => router.push('/dashboard'),
+        cart: () => router.push('/cart'),
+        orders: () => router.push('/dashboard/customer/my-orders'),
+        deliveries: () => router.push('/dashboard/delivery/deliveries'),
+        myStore: () => router.push('/dashboard/owner/my-store'),
+        voiceOrder: () => router.push('/checkout?action=record'),
+        checkout: () => {
+            onCloseCart();
+            router.push('/checkout');
         },
-        placeOrder: {
-          display: "Place the order",
-          action: () => {
-            if (placeOrderBtnRef?.current) {
-              placeOrderBtnRef.current.click();
-            } else {
-              toast({ variant: 'destructive', title: 'Not on checkout page', description: 'You can only place an order from the checkout page.' });
-            }
-          },
-          aliases: ['place order', 'confirm order', 'submit order', 'finish and pay', 'complete my order']
+        placeOrder: () => {
+          if (placeOrderBtnRef?.current) {
+            placeOrderBtnRef.current.click();
+          } else {
+            toast({ variant: 'destructive', title: 'Not on checkout page', description: 'You can only place an order from the checkout page.' });
+          }
         },
-        refresh: { display: 'Refresh the page', action: () => window.location.reload(), aliases: ['refresh the page', 'reload page', 'reload app', 'refresh screen', 'restart page', 'update screen', 'refresh everything', 'refresh'] },
-        showMyProducts: { display: "Show My Store's Products", action: () => router.push('/dashboard/owner/my-store'), aliases: ["show my products", "list my items", "open inventory", "what am I selling", "see store items", "view my listings"] },
+        refresh: () => window.location.reload(),
+        showMyProducts: () => router.push('/dashboard/owner/my-store'),
       };
 
-      const staticNavCommands: Command[] = Object.values(commandMap).flatMap(
-        ({ display, action, aliases }) =>
-          aliases.map(alias => ({ command: alias, display, action }))
-      );
-
-      // Fetch dynamic data: stores, master products, and the user's own store
+      // Fetch dynamic data: stores, master products, user's store, and commands from file
       Promise.all([
           getStores(firestore),
           getMasterProducts(firestore),
-          getDocs(query(collection(firestore, 'stores'), where('ownerId', '==', user.uid)))
-      ]).then(([stores, masterProducts, myStoreSnapshot]) => {
+          getDocs(query(collection(firestore, 'stores'), where('ownerId', '==', user.uid))),
+          getCommands()
+      ]).then(([stores, masterProducts, myStoreSnapshot, fileCommands]) => {
           setAllStores(stores);
           
           if (!myStoreSnapshot.empty) {
               setMyStore({ id: myStoreSnapshot.docs[0].id, ...myStoreSnapshot.docs[0].data() } as Store);
           }
           setMasterProductList(masterProducts);
+
+          const staticNavCommands: Command[] = Object.entries(fileCommands).flatMap(
+            ([key, { display, aliases }]) => {
+              const action = commandActions[key];
+              if (!action) return [];
+              return aliases.map(alias => ({ command: alias, display, action }));
+            }
+          );
+
 
           const storeCommands: Command[] = stores.flatMap((store) => {
             const coreName = store.name

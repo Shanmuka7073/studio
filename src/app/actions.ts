@@ -7,6 +7,39 @@ import * as path from 'path';
 import { getStores, getMasterProducts } from '@/lib/data';
 import { initServerApp } from '@/firebase/server-init';
 
+const COMMANDS_FILE_PATH = path.join(process.cwd(), 'src', 'lib', 'commands.json');
+
+type CommandGroup = {
+  display: string;
+  aliases: string[];
+};
+
+export async function getCommands(): Promise<Record<string, CommandGroup>> {
+    try {
+        const fileContent = await fs.readFile(COMMANDS_FILE_PATH, 'utf-8');
+        return JSON.parse(fileContent);
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+            console.log("commands.json not found, returning empty object.");
+            return {};
+        }
+        console.error("Error reading commands file:", error);
+        throw new Error("Could not load commands.");
+    }
+}
+
+export async function saveCommands(commands: Record<string, CommandGroup>): Promise<{ success: boolean; }> {
+    try {
+        const jsonContent = JSON.stringify(commands, null, 2);
+        await fs.writeFile(COMMANDS_FILE_PATH, jsonContent, 'utf-8');
+        return { success: true };
+    } catch (error) {
+        console.error("Error writing commands file:", error);
+        throw new Error("Could not save commands to file.");
+    }
+}
+
+
 export async function indexSiteContent() {
     try {
         const { firestore } = await initServerApp();

@@ -1,7 +1,7 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Users, Store, Truck, ShoppingBag, AlertCircle, ArrowRight, Settings } from 'lucide-react';
+import { Users, Store, Truck, ShoppingBag, AlertCircle, ArrowRight, Settings, Mic } from 'lucide-react';
 import Link from 'next/link';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
@@ -144,10 +144,10 @@ export default function AdminDashboardPage() {
                         icon={Store}
                     />
                     <AdminActionCard 
-                        title="Site Configuration"
-                        description="Index the site's content to generate and manage voice commands."
-                        href="/dashboard/site-config"
-                        icon={Settings}
+                        title="Voice Commands Control"
+                        description="View and manage the voice commands users can say to navigate the app."
+                        href="/dashboard/voice-commands"
+                        icon={Mic}
                     />
                 </div>
             </div>

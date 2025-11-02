@@ -1,0 +1,172 @@
+{
+  "home": {
+    "display": "Navigate to Home",
+    "aliases": [
+      "go home",
+      "home page",
+      "main screen",
+      "go to home",
+      "back to start",
+      "open homepage",
+      "return home",
+      "show home",
+      "open home",
+      "localbasket",
+      "local basket"
+    ]
+  },
+  "stores": {
+    "display": "Browse All Stores",
+    "aliases": [
+      "go to stores",
+      "browse stores",
+      "show all stores",
+      "open store list",
+      "find stores",
+      "explore shops",
+      "nearby shops",
+      "shop list",
+      "view all shops"
+    ]
+  },
+  "dashboard": {
+    "display": "View Dashboard",
+    "aliases": [
+      "go to dashboard",
+      "open dashboard",
+      "my dashboard",
+      "show my stats",
+      "open my panel",
+      "go to control panel",
+      "view dashboard"
+    ]
+  },
+  "cart": {
+    "display": "View Your Cart",
+    "aliases": [
+      "go to cart",
+      "open cart",
+      "show cart",
+      "view my cart",
+      "see my basket",
+      "go to basket",
+      "open shopping cart",
+      "my items"
+    ]
+  },
+  "orders": {
+    "display": "View My Orders",
+    "aliases": [
+      "my orders",
+      "go to my orders",
+      "open my orders",
+      "show my orders",
+      "view orders",
+      "check my orders",
+      "open order history",
+      "see past orders",
+      "my purchases"
+    ]
+  },
+  "deliveries": {
+    "display": "View Deliveries",
+    "aliases": [
+      "deliveries",
+      "my deliveries",
+      "go to deliveries",
+      "open deliveries",
+      "track deliveries",
+      "check delivery status",
+      "see my delivery list",
+      "delivery updates",
+      "delivery dashboard"
+    ]
+  },
+  "myStore": {
+    "display": "Create or Manage My Store",
+    "aliases": [
+      "create my store",
+      "my store",
+      "manage my store",
+      "new store",
+      "register my store",
+      "make a store",
+      "open my shop",
+      "go to seller page",
+      "view my products",
+      "store dashboard",
+      "my store page"
+    ]
+  },
+  "voiceOrder": {
+    "display": "Create a Shopping List",
+    "aliases": [
+      "create a shopping list",
+      "make a list",
+      "new shopping list",
+      "start my list",
+      "prepare my list",
+      "record my order",
+      "start voice order",
+      "start list",
+      "i want to shop",
+      "start recording",
+      "take my order",
+      "start voice shopping",
+      "record voice list",
+      "I'll say my list",
+      "speak my order",
+      "take my list",
+      "listen to my order",
+      "record shopping items",
+      "note down my list"
+    ]
+  },
+  "checkout": {
+    "display": "Proceed to Checkout",
+    "aliases": [
+      "proceed to checkout",
+      "go to checkout",
+      "checkout now",
+      "open checkout",
+      "start checkout",
+      "finish my order",
+      "complete purchase",
+      "pay now"
+    ]
+  },
+  "placeOrder": {
+    "display": "Place the order",
+    "aliases": [
+      "place order",
+      "confirm order",
+      "submit order",
+      "finish and pay",
+      "complete my order"
+    ]
+  },
+  "refresh": {
+    "display": "Refresh the page",
+    "aliases": [
+      "refresh the page",
+      "reload page",
+      "reload app",
+      "refresh screen",
+      "restart page",
+      "update screen",
+      "refresh everything",
+      "refresh"
+    ]
+  },
+  "showMyProducts": {
+    "display": "Show My Store's Products",
+    "aliases": [
+      "show my products",
+      "list my items",
+      "open inventory",
+      "what am I selling",
+      "see store items",
+      "view my listings"
+    ]
+  }
+}
