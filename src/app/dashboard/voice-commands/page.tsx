@@ -1,11 +1,12 @@
+
 'use client';
 
-import { useState, useTransition, useEffect } from 'react';
+import { useState, useTransition, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, PlusCircle, Save, X } from 'lucide-react';
+import { Loader2, PlusCircle, Save, X, Mic } from 'lucide-react';
 import { getCommands, saveCommands } from '@/app/actions';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -19,6 +20,8 @@ export default function VoiceCommandsPage() {
     const [isProcessing, startTransition] = useTransition();
     const [commands, setCommands] = useState<Record<string, CommandGroup>>({});
     const [newCommands, setNewCommands] = useState<Record<string, string>>({});
+    const [isListening, setIsListening] = useState(false);
+    const recognitionRef = useRef<SpeechRecognition | null>(null);
 
     const { toast } = useToast();
 
@@ -27,7 +30,33 @@ export default function VoiceCommandsPage() {
             const fetchedCommands = await getCommands();
             setCommands(fetchedCommands);
         });
-    }, []);
+
+        // Setup speech recognition
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            recognitionRef.current = new SpeechRecognition();
+            const recognition = recognitionRef.current;
+            recognition.continuous = false;
+            recognition.lang = 'en-IN';
+            recognition.interimResults = false;
+
+            recognition.onstart = () => {
+                setIsListening(true);
+            };
+
+            recognition.onend = () => {
+                setIsListening(false);
+            };
+
+            recognition.onerror = (event) => {
+                console.error("Speech recognition error:", event.error);
+                toast({ variant: 'destructive', title: 'Voice Error', description: `An error occurred: ${event.error}` });
+                setIsListening(false);
+            };
+        } else {
+            console.warn("Speech recognition not supported in this browser.");
+        }
+    }, [toast]);
 
     const handleAddCommand = (actionKey: string) => {
         const newAliasInput = newCommands[actionKey]?.trim();
@@ -39,24 +68,42 @@ export default function VoiceCommandsPage() {
             return;
         }
 
-        const aliasesToAdd = newAliasInput.split(',').map(alias => alias.trim().toLowerCase()).filter(Boolean);
+        addAlias(actionKey, newAliasInput);
+        
+        // Clear input
+        setNewCommands(prev => ({...prev, [actionKey]: ''}));
+    };
+
+    const addAlias = (actionKey: string, newAliasString: string) => {
+        const aliasesToAdd = newAliasString.split(',').map(alias => alias.trim().toLowerCase()).filter(Boolean);
+        if (aliasesToAdd.length === 0) return;
+
         let addedCount = 0;
         let duplicates: string[] = [];
-
-        const updatedCommands = { ...commands };
-
-        aliasesToAdd.forEach(newAlias => {
-            if (!updatedCommands[actionKey].aliases.includes(newAlias)) {
-                updatedCommands[actionKey].aliases.push(newAlias);
-                addedCount++;
-            } else {
-                duplicates.push(newAlias);
-            }
-        });
         
-        if (addedCount > 0) {
-            setCommands(updatedCommands);
-        }
+        setCommands(currentCommands => {
+            // Create a deep copy to avoid state mutation issues
+            const updatedCommands = JSON.parse(JSON.stringify(currentCommands));
+            
+            // Ensure the command group exists before trying to add to it
+            if (!updatedCommands[actionKey]) {
+                updatedCommands[actionKey] = {
+                    display: 'New Command Group', // Placeholder display name
+                    aliases: []
+                };
+            }
+            
+            aliasesToAdd.forEach(newAlias => {
+                if (!updatedCommands[actionKey].aliases.includes(newAlias)) {
+                    updatedCommands[actionKey].aliases.push(newAlias);
+                    addedCount++;
+                } else {
+                    duplicates.push(newAlias);
+                }
+            });
+
+            return updatedCommands;
+        });
 
         if (duplicates.length > 0) {
              toast({
@@ -65,17 +112,28 @@ export default function VoiceCommandsPage() {
                 description: `The command(s) "${duplicates.join(', ')}" already exist.`,
             });
         }
-        
-        // Clear input
-        setNewCommands(prev => ({...prev, [actionKey]: ''}));
+        if (addedCount > 0) {
+            toast({
+                title: 'Alias Added',
+                description: `Added "${aliasesToAdd.join(', ')}" to the list.`
+            })
+        }
     };
 
+
     const handleRemoveCommand = (actionKey: string, aliasToRemove: string) => {
-        const updatedCommands = { ...commands };
-        updatedCommands[actionKey].aliases = updatedCommands[actionKey].aliases.filter(
-            alias => alias !== aliasToRemove
-        );
-        setCommands(updatedCommands);
+        setCommands(currentCommands => {
+            const updatedCommands = { ...currentCommands };
+            if (updatedCommands[actionKey]) {
+                 updatedCommands[actionKey] = {
+                    ...updatedCommands[actionKey],
+                    aliases: updatedCommands[actionKey].aliases.filter(
+                        alias => alias !== aliasToRemove
+                    ),
+                 };
+            }
+            return updatedCommands;
+        });
     };
 
     const handleSaveAll = () => {
@@ -94,6 +152,22 @@ export default function VoiceCommandsPage() {
                 });
             }
         });
+    };
+
+    const handleVoiceAdd = (actionKey: string) => {
+        if (!recognitionRef.current) {
+            toast({ variant: 'destructive', title: 'Voice Not Supported', description: 'Your browser does not support speech recognition.' });
+            return;
+        }
+
+        const recognition = recognitionRef.current;
+
+        recognition.onresult = (event) => {
+            const newAlias = event.results[0][0].transcript.toLowerCase();
+            addAlias(actionKey, newAlias);
+        };
+
+        recognition.start();
     };
 
     return (
@@ -154,6 +228,12 @@ export default function VoiceCommandsPage() {
                                                 <Button size="sm" onClick={() => handleAddCommand(key)}>
                                                     <PlusCircle className="mr-2 h-4 w-4" /> Add
                                                 </Button>
+                                                {key === 'home' && (
+                                                    <Button size="sm" variant="outline" onClick={() => handleVoiceAdd(key)} disabled={isListening}>
+                                                        <Mic className="h-4 w-4" />
+                                                        <span className="sr-only">Add by voice</span>
+                                                    </Button>
+                                                )}
                                             </div>
                                         </div>
                                     </AccordionContent>
