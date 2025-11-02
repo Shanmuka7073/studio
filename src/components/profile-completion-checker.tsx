@@ -1,0 +1,85 @@
+
+'use client';
+
+import { useEffect, useState, useMemo } from 'react';
+import { useFirebase, useDoc, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import { useRouter } from 'next/navigation';
+import { User as AppUser } from '@/lib/types';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Button } from './ui/button';
+
+const SESSION_STORAGE_KEY = 'profile-prompt-dismissed';
+
+export function ProfileCompletionChecker() {
+  const { user, isUserLoading, firestore } = useFirebase();
+  const router = useRouter();
+  const [showPrompt, setShowPrompt] = useState(false);
+
+  // Memoize the document reference
+  const userDocRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user]);
+
+  // useDoc will fetch the user's profile data
+  const { data: userData, isLoading: isProfileLoading } = useDoc<AppUser>(userDocRef);
+
+  useEffect(() => {
+    // Conditions to show the prompt:
+    // 1. User is logged in and auth loading is finished.
+    // 2. Profile data has been checked (isProfileLoading is false).
+    // 3. The user document does not exist (userData is null).
+    // 4. The user hasn't dismissed the prompt in the current session.
+    if (
+      !isUserLoading &&
+      user &&
+      !isProfileLoading &&
+      !userData &&
+      sessionStorage.getItem(SESSION_STORAGE_KEY) !== 'true'
+    ) {
+      setShowPrompt(true);
+    }
+  }, [user, isUserLoading, userData, isProfileLoading]);
+
+  const handleDismiss = () => {
+    // Remember that the user dismissed the prompt for this session
+    sessionStorage.setItem(SESSION_STORAGE_KEY, 'true');
+    setShowPrompt(false);
+  };
+
+  const handleNavigate = () => {
+    setShowPrompt(false);
+    router.push('/dashboard/customer/my-profile');
+  };
+
+  return (
+    <AlertDialog open={showPrompt} onOpenChange={setShowPrompt}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Welcome to LocalBasket!</AlertDialogTitle>
+          <AlertDialogDescription>
+            To ensure a smooth delivery experience, please complete your profile with your name, address, and phone number.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel asChild>
+            <Button variant="outline" onClick={handleDismiss}>Later</Button>
+          </AlertDialogCancel>
+          <AlertDialogAction asChild>
+            <Button onClick={handleNavigate}>Complete Profile</Button>
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}

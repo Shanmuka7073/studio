@@ -14,6 +14,7 @@ import { usePathname } from 'next/navigation';
 import { VoiceCommander } from '@/components/layout/voice-commander';
 import { useState } from 'react';
 import { VoiceOrderDialog, type VoiceOrderInfo } from '@/components/voice-order-dialog';
+import { ProfileCompletionChecker } from '@/components/profile-completion-checker';
 
 const ptSans = PT_Sans({
   subsets: ['latin'],
@@ -78,6 +79,7 @@ export default function RootLayout({
                     orderInfo={voiceOrderInfo}
                   />
                 )}
+                <ProfileCompletionChecker />
                 <main className="flex-1 pb-10">{children}</main>
                 <NotificationPermissionManager />
                 <Footer />
