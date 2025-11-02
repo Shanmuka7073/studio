@@ -73,9 +73,9 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
 
   const { addItem: addItemToCart } = useCart();
   
-  const listeningRef = useRef(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const isSpeakingRef = useRef(false);
+  const isEnabledRef = useRef(enabled);
 
   // For profile form filling
   const { form: profileForm } = useProfileFormStore();
@@ -84,6 +84,16 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
   const { shouldPromptForLocation, handleGetLocation, getFinalTotal, placeOrderBtnRef } = useCheckoutStore();
   const checkoutState = useRef<'idle' | 'promptingLocation' | 'promptingConfirmation'>('idle');
 
+  // Update the ref whenever the `enabled` prop changes
+  useEffect(() => {
+    isEnabledRef.current = enabled;
+    if (enabled) {
+      recognitionRef.current?.start();
+    } else {
+      recognitionRef.current?.stop();
+    }
+  }, [enabled]);
+
 
  const speak = useCallback((text: string, onEndCallback?: () => void) => {
     if (typeof window === 'undefined' || !window.speechSynthesis) {
@@ -91,19 +101,11 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
       return;
     }
     
-    // If it's already speaking, cancel the previous one to speak the new text.
-    if (isSpeakingRef.current) {
-        window.speechSynthesis.cancel();
-    }
     isSpeakingRef.current = true;
     
     // Stop listening while speaking
-    if (recognitionRef.current && listeningRef.current) {
-        try {
-            recognitionRef.current.stop();
-        } catch (e) {
-            console.warn("Recognition stop error:", e);
-        }
+    if (recognitionRef.current) {
+        recognitionRef.current.stop();
     }
 
     const utterance = new SpeechSynthesisUtterance(text);
@@ -116,13 +118,19 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
         if (onEndCallback) {
             onEndCallback();
         }
-         // The main onend handler of the recognition service will restart it if enabled.
+        // The main onend handler of the recognition service will restart it if enabled.
+        if (isEnabledRef.current) {
+            recognitionRef.current?.start();
+        }
     };
     
     utterance.onerror = (e) => {
         isSpeakingRef.current = false;
         console.error("Speech synthesis error:", e);
         if (onEndCallback) onEndCallback();
+        if (isEnabledRef.current) {
+            recognitionRef.current?.start();
+        }
     }
 
     window.speechSynthesis.speak(utterance);
@@ -341,32 +349,7 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
   }, [firestore, user, router, toast, onCloseCart, pathname, profileForm, speak, onOpenCart, addItemToCart, findProductAndVariant]);
 
   useEffect(() => {
-    listeningRef.current = enabled;
-     if (enabled && pathname === '/dashboard/customer/my-profile') {
-      handleProfileFormInteraction();
-    }
-    if (enabled && shouldPromptForLocation) {
-        checkoutState.current = 'promptingLocation';
-        speak("For accurate delivery, please share your current location for this order. Say yes to confirm.");
-    }
-    if (!enabled) {
-      onSuggestions([]);
-      checkoutState.current = 'idle';
-    }
-  }, [enabled, onSuggestions, pathname, speak, handleProfileFormInteraction, shouldPromptForLocation]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !enabled) {
-        if(recognitionRef.current) {
-            try {
-                recognitionRef.current.onend = null; // Important: remove the handler
-                recognitionRef.current.abort();
-            } catch(e) {
-                // It might already be stopped
-            }
-        }
-        return;
-    };
+    if (typeof window === 'undefined') return;
 
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -497,39 +480,57 @@ export function VoiceCommander({ enabled, onStatusUpdate, onSuggestions, onVoice
         console.error('Speech recognition error', event.error);
         onStatusUpdate(`⚠️ Error: ${event.error}`);
       }
-       isSpeakingRef.current = false;
     };
 
     recognition.onend = () => {
-      if (listeningRef.current && !isSpeakingRef.current) {
+      if (isEnabledRef.current && !isSpeakingRef.current) {
         try {
             recognition.start();
         } catch (e) {
-          console.error('Could not restart recognition service: ', e);
-          onStatusUpdate('⚠️ Mic error, please toggle off and on.');
+          // This can happen if start() is called while it's already starting.
+          // It's generally safe to ignore.
+          if (!(e instanceof DOMException && e.name === 'InvalidStateError')) {
+            console.error('Could not restart recognition service: ', e);
+            onStatusUpdate('⚠️ Mic error, please toggle off and on.');
+          }
         }
       } else {
         onStatusUpdate('Click the mic to start listening.');
       }
     };
 
-    try {
-      recognition.start();
-    } catch (e) {
-      console.log('Could not start recognition, it may already be running.');
-    }
-
     return () => {
         if (recognitionRef.current) {
-            try {
-                recognitionRef.current.onend = null;
-                recognitionRef.current.stop();
-            } catch(e) {
-                // Ignore errors on stop
-            }
+            recognitionRef.current.onstart = null;
+            recognitionRef.current.onresult = null;
+            recognitionRef.current.onerror = null;
+            recognitionRef.current.onend = null;
+            recognitionRef.current.abort();
         }
     };
-  }, [enabled, toast, onStatusUpdate, allCommands, onSuggestions, firestore, user, allStores, onVoiceOrder, findProductAndVariant, addItemToCart, onOpenCart, speak, pathname, profileForm, handleProfileFormInteraction, shouldPromptForLocation, handleGetLocation, getFinalTotal, placeOrderBtnRef]);
+  }, [
+    toast, 
+    onStatusUpdate, 
+    allCommands, 
+    onSuggestions, 
+    firestore, 
+    user, 
+    allStores, 
+    onVoiceOrder, 
+    findProductAndVariant, 
+    addItemToCart, 
+    onOpenCart, 
+    speak, 
+    pathname, 
+    profileForm, 
+    handleProfileFormInteraction, 
+    shouldPromptForLocation, 
+    handleGetLocation, 
+    getFinalTotal, 
+    placeOrderBtnRef
+]);
 
   return null;
 }
+
+    
