@@ -82,11 +82,27 @@ export function VoiceCommander({
   const userProfileRef = useRef<User | null>(null);
 
   const [hasMounted, setHasMounted] = useState(false);
+  
+  const [speechSynthesisVoices, setSpeechSynthesisVoices] = useState<SpeechSynthesisVoice[]>([]);
 
   useEffect(() => {
     setHasMounted(true);
     if(firestore) {
       fetchInitialData(firestore);
+    }
+    // Populate voices
+    const getVoices = () => {
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length > 0) {
+        setSpeechSynthesisVoices(voices);
+      }
+    };
+    getVoices();
+    // Voices are loaded asynchronously, so we might need this event listener.
+    window.speechSynthesis.onvoiceschanged = getVoices;
+
+    return () => {
+      window.speechSynthesis.onvoiceschanged = null;
     }
   }, [firestore, fetchInitialData]);
   
@@ -108,40 +124,58 @@ export function VoiceCommander({
 
   const speak = useCallback((text: string, onEndCallback?: () => void) => {
     if (typeof window === 'undefined' || !window.speechSynthesis) {
-      if (onEndCallback) onEndCallback();
-      return;
+        if (onEndCallback) onEndCallback();
+        return;
     }
-    
-    window.speechSynthesis.cancel();
-    
-    isSpeakingRef.current = true;
-    recognition?.stop();
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.pitch = 1;
     utterance.rate = 1.1;
-    utterance.lang = language; // Use the dynamic language
+
+    // --- Safer Voice Selection ---
+    // Find a voice that matches the language. Fallback to the first available voice.
+    const desiredVoice = speechSynthesisVoices.find(voice => voice.lang === language);
+    if (desiredVoice) {
+        utterance.voice = desiredVoice;
+    } else {
+        // If no specific voice, just set the lang property. The browser will use its default.
+        utterance.lang = language;
+    }
 
     utterance.onend = () => {
-      isSpeakingRef.current = false;
-      if (onEndCallback) onEndCallback();
-      if (isEnabledRef.current) {
-        try {
-          recognition?.start();
-        } catch(e) {
-          // ignore
+        isSpeakingRef.current = false;
+        if (onEndCallback) onEndCallback();
+        if (isEnabledRef.current) {
+            try {
+                recognition?.start();
+            } catch(e) {
+                // ignore if already started
+            }
         }
-      }
-    };
-    
-    utterance.onerror = (e) => {
-      console.error("Speech synthesis error:", e);
-      isSpeakingRef.current = false;
-      if (onEndCallback) onEndCallback();
     };
 
-    window.speechSynthesis.speak(utterance);
-  }, [language]);
+    utterance.onerror = (e) => {
+        console.error("Speech synthesis error:", e);
+        isSpeakingRef.current = false;
+        if (onEndCallback) onEndCallback();
+    };
+
+    // --- Safer Speaking Logic ---
+    const speakNow = () => {
+        // Cancel any ongoing speech before starting a new one.
+        window.speechSynthesis.cancel();
+        isSpeakingRef.current = true;
+        recognition?.stop();
+        window.speechSynthesis.speak(utterance);
+    };
+
+    // If the speech synthesis engine is already speaking, wait a tiny bit.
+    if (window.speechSynthesis.speaking) {
+        setTimeout(speakNow, 100);
+    } else {
+        speakNow();
+    }
+  }, [language, speechSynthesisVoices]);
 
   const handleProfileFormInteraction = useCallback(() => {
     if (!profileForm) {
@@ -299,7 +333,6 @@ export function VoiceCommander({
             let detectedLang = 'en';
             if (/[అ-హ]/.test(commandText)) detectedLang = 'te';
             else if (/[क-ह]/.test(commandText)) detectedLang = 'hi';
-            // Add other language detections here
             
             if (detectedLang !== language.split('-')[0]) {
               setLanguage(`${detectedLang}-IN`);
@@ -378,17 +411,16 @@ export function VoiceCommander({
             }
             
             // --- PASS 1: Exact match on general commands ---
-            for (const key in fileCommandsRef.current) {
-                // Skip templates for this pass
-                if (key === 'orderItem' || key === 'quickOrder') continue;
-                
+             for (const key in fileCommandsRef.current) {
                 const commandGroup = fileCommandsRef.current[key];
                 const allCommandAliases: string[] = commandGroup.aliases || [];
                 
-                if (allCommandAliases.includes(commandText.toLowerCase())) {
+                if (allCommandAliases.some(alias => alias.toLowerCase() === commandText.toLowerCase())) {
                     const action = commandActionsRef.current[key];
                     if (typeof action === 'function') {
-                        speak(commandGroup.reply || `Executing ${key}`);
+                        // Use a dynamic reply if available, otherwise a generic one.
+                        const reply = commandGroup.reply || `Executing ${key}`;
+                        speak(reply);
                         action();
                         resetContext();
                         return; // Command handled
@@ -680,7 +712,3 @@ export function VoiceCommander({
 
   return null;
 }
-
-    
-
-    
