@@ -368,12 +368,13 @@ export function VoiceCommander({
             }
             
             // --- Primary Command Matching Logic ---
-            let bestMatch: { commandKey: string, fileCommand: any, similarity: number } | null = null;
             const lowerCommandText = commandText.toLowerCase();
 
+            // Pass 1: Check for a high-confidence match on a general command
+            let bestMatch: { commandKey: string, fileCommand: any, similarity: number } | null = null;
             for (const key in fileCommandsRef.current) {
                 const fileCommand = fileCommandsRef.current[key];
-                // Skip template commands in this first pass
+                // Skip template commands in this pass
                 if (key === 'orderItem' || key === 'quickOrder') continue;
 
                 for (const alias of fileCommand.aliases) {
@@ -384,7 +385,6 @@ export function VoiceCommander({
                 }
             }
 
-            // If we found a strong match for a general command, execute it and stop.
             if (bestMatch && bestMatch.similarity > 0.85) {
                 const { commandKey, fileCommand } = bestMatch;
                 const action = commandActionsRef.current[commandKey];
