@@ -158,18 +158,12 @@ export function VoiceCommander({
 
 
   const findProductAndVariant = useCallback(async (productName: string, desiredWeight?: string): Promise<{ product: Product | null, variant: ProductVariant | null, storeId: string | null }> => {
-    // If no store is active, we can't find a product. Guide the user.
-    if (!activeStoreId) {
-        speak("Please go to a specific store's page before adding items to your cart.");
-        router.push('/stores');
-        return { product: null, variant: null, storeId: null };
-    }
-    
     const lowerProductName = productName.toLowerCase();
     const productMatch = masterProductsRef.current.find(p => p.name.toLowerCase() === lowerProductName);
 
     if (!productMatch) return { product: null, variant: null, storeId: null };
     
+    // We don't need a storeId to add to cart anymore, so product is fine as is.
     const finalProduct = { ...productMatch }; 
 
     let priceData = productPricesRef.current[lowerProductName];
@@ -199,7 +193,7 @@ export function VoiceCommander({
     }
     
     return { product: null, variant: null, storeId: null };
-  }, [activeStoreId, firestore, speak, router]);
+  }, [activeStoreId, firestore]);
 
 
   const handleProfileFormInteraction = useCallback(() => {
@@ -360,10 +354,7 @@ export function VoiceCommander({
           speak(`Added ${variant.weight} of ${product} to your cart.`);
           onOpenCart();
         } else {
-          // The findProductAndVariant function will speak the error message if store is not selected
-          if (activeStoreId) {
-            speak(`Sorry, I could not find ${product} in the store.`);
-          }
+          speak(`Sorry, I could not find ${product} in the store.`);
         }
       },
     };
