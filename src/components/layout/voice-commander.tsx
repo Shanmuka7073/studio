@@ -276,7 +276,7 @@ export function VoiceCommander({
 
   useEffect(() => {
     if (!recognition) {
-        onStatusUpdate("⚠️ Voice recognition not supported in this browser.");
+        onStatusUpdate("🎧 Listening...");
         return;
     }
     
@@ -367,16 +367,19 @@ export function VoiceCommander({
                 return;
             }
             
-            let allPossibleCommands: {command: Command | {alias: string, fileCommand: any, key: string}, similarity: number}[] = [];
+            // --- Primary Command Matching Logic ---
+
+            // Check for a high-confidence match on a general command first.
+            let bestGeneralCommandMatch: { command: any, similarity: number } | null = null;
 
             // 1. Check file commands (aliases)
             Object.entries(fileCommandsRef.current).forEach(([key, fileCommand]: [string, any]) => {
-                // Templates are handled separately
+                // Templates are handled separately, so ignore them here
                 if (key !== 'orderItem' && key !== 'quickOrder') { 
                     fileCommand.aliases.forEach((alias: string) => {
                         const similarity = calculateSimilarity(commandText, alias);
-                        if (similarity > 0.7) {
-                            allPossibleCommands.push({ command: {alias, fileCommand, key}, similarity });
+                        if (!bestGeneralCommandMatch || similarity > bestGeneralCommandMatch.similarity) {
+                            bestGeneralCommandMatch = { command: { alias, fileCommand, key }, similarity };
                         }
                     });
                 }
@@ -385,13 +388,27 @@ export function VoiceCommander({
             // 2. Check built commands (for stores)
             commandsRef.current.forEach(c => {
                 const similarity = calculateSimilarity(commandText, c.command);
-                if (similarity > 0.7) {
-                    allPossibleCommands.push({ command: c, similarity });
+                if (!bestGeneralCommandMatch || similarity > bestGeneralCommandMatch.similarity) {
+                    bestGeneralCommandMatch = { command: c, similarity };
                 }
             });
             
-            // --- Template Command Matching ---
-
+            // If we found a good match for a general command, execute it and STOP.
+            if (bestGeneralCommandMatch && bestGeneralCommandMatch.similarity > 0.85) {
+                if ('key' in bestGeneralCommandMatch.command) { // It's a file command
+                    const { fileCommand, key } = bestGeneralCommandMatch.command;
+                    speak(fileCommand.reply);
+                    commandActionsRef.current[key]();
+                } else { // It's a built command
+                    const cmd = bestGeneralCommandMatch.command as Command;
+                    speak(cmd.reply);
+                    cmd.action();
+                }
+                resetContext();
+                return; // IMPORTANT: Prevents fallback to product search
+            }
+            
+            // --- Template Command Matching (for ordering) ---
             const templates = [
               { key: 'quickOrder', template: fileCommandsRef.current.quickOrder },
               { key: 'orderItem', template: fileCommandsRef.current.orderItem },
@@ -424,7 +441,7 @@ export function VoiceCommander({
                                 if (extracted.product) {
                                     await commandActionsRef.current[key](extracted);
                                     resetContext();
-                                    return;
+                                    return; // Command handled
                                 }
                             }
                         }
@@ -433,25 +450,7 @@ export function VoiceCommander({
             }
 
 
-            allPossibleCommands.sort((a, b) => b.similarity - a.similarity);
-
-            const bestMatch = allPossibleCommands[0];
-
-            if (bestMatch && bestMatch.similarity > 0.9) {
-                if ('key' in bestMatch.command) { // It's a file command
-                    const { fileCommand, key } = bestMatch.command;
-                    speak(fileCommand.reply);
-                    commandActionsRef.current[key]();
-                } else { // It's a built command
-                    const cmd = bestMatch.command as Command;
-                    speak(cmd.reply);
-                    cmd.action();
-                }
-                resetContext();
-                return;
-            }
-
-            // Fallback to checking if the command is just a product name
+            // --- Final Fallback: Assume the command is a product to be added ---
             const productAsCommandMatch = await findProductAndVariant(commandText);
             if (productAsCommandMatch.product && productAsCommandMatch.variant) {
                 await commandActionsRef.current.orderItem({ product: commandText });
@@ -459,31 +458,15 @@ export function VoiceCommander({
                 return;
             }
             
-            if (allPossibleCommands.length > 0) {
-              const suggestions = allPossibleCommands.slice(0, 3).map(m => {
-                  if ('key' in m.command) {
-                      const { fileCommand, key } = m.command;
-                      return {
-                          command: m.command.alias,
-                          display: fileCommand.display,
-                          action: commandActionsRef.current[key],
-                          reply: fileCommand.reply,
-                      }
-                  }
-                  return m.command as Command;
-              }).filter((value, index, self) => self.findIndex((v) => v.display === value.display) === index)
+            // If we're here, no match was found.
+            speak(`Sorry, I don't recognize the command "${commandText}".`);
+            toast({
+                variant: 'destructive',
+                title: 'Command Not Recognized',
+                description: `I heard "${commandText}", but I don't know what to do.`,
+            });
+            onSuggestions([]);
 
-              speak("I'm not sure. Did you mean one of these?");
-              onSuggestions(suggestions);
-            } else {
-              speak(`Sorry, I don't recognize the command "${commandText}".`);
-              toast({
-                  variant: 'destructive',
-                  title: 'Command Not Recognized',
-                  description: `I heard "${commandText}", but I don't know what to do.`,
-              });
-              onSuggestions([]);
-            }
       } catch(e) {
           console.error("Voice command execution failed:", e);
           onStatusUpdate(`⚠️ Action failed. Please try again.`);
@@ -505,6 +488,7 @@ export function VoiceCommander({
         router.push('/checkout');
       },
       recordOrder: () => {
+        speak("I'm ready. Please list the items you need for your order.");
         setIsWaitingForVoiceOrder(true);
       },
       createVoiceOrder: async (list: string) => {
