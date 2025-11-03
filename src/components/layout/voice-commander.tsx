@@ -276,7 +276,7 @@ export function VoiceCommander({
 
   useEffect(() => {
     if (!recognition) {
-        onStatusUpdate("🎧 Listening...");
+        onStatusUpdate("Listening...");
         return;
     }
     
@@ -368,44 +368,28 @@ export function VoiceCommander({
             }
             
             // --- Primary Command Matching Logic ---
+            let bestMatch: { commandKey: string, fileCommand: any, similarity: number } | null = null;
 
-            // Check for a high-confidence match on a general command first.
-            let bestGeneralCommandMatch: { command: any, similarity: number } | null = null;
-
-            // 1. Check file commands (aliases)
             Object.entries(fileCommandsRef.current).forEach(([key, fileCommand]: [string, any]) => {
-                // Templates are handled separately, so ignore them here
-                if (key !== 'orderItem' && key !== 'quickOrder') { 
-                    fileCommand.aliases.forEach((alias: string) => {
-                        const similarity = calculateSimilarity(commandText, alias);
-                        if (!bestGeneralCommandMatch || similarity > bestGeneralCommandMatch.similarity) {
-                            bestGeneralCommandMatch = { command: { alias, fileCommand, key }, similarity };
-                        }
-                    });
-                }
+                if (key === 'orderItem' || key === 'quickOrder') return; // Skip templates
+                fileCommand.aliases.forEach((alias: string) => {
+                    const similarity = calculateSimilarity(commandText, alias);
+                    if (!bestMatch || similarity > bestMatch.similarity) {
+                        bestMatch = { commandKey: key, fileCommand, similarity };
+                    }
+                });
             });
 
-            // 2. Check built commands (for stores)
-            commandsRef.current.forEach(c => {
-                const similarity = calculateSimilarity(commandText, c.command);
-                if (!bestGeneralCommandMatch || similarity > bestGeneralCommandMatch.similarity) {
-                    bestGeneralCommandMatch = { command: c, similarity };
-                }
-            });
-            
-            // If we found a good match for a general command, execute it and STOP.
-            if (bestGeneralCommandMatch && bestGeneralCommandMatch.similarity > 0.85) {
-                if ('key' in bestGeneralCommandMatch.command) { // It's a file command
-                    const { fileCommand, key } = bestGeneralCommandMatch.command;
+            // Consider a match if similarity is high enough
+            if (bestMatch && bestMatch.similarity > 0.85) {
+                const { commandKey, fileCommand } = bestMatch;
+                const action = commandActionsRef.current[commandKey];
+                if (typeof action === 'function') {
                     speak(fileCommand.reply);
-                    commandActionsRef.current[key]();
-                } else { // It's a built command
-                    const cmd = bestGeneralCommandMatch.command as Command;
-                    speak(cmd.reply);
-                    cmd.action();
+                    action();
+                    resetContext();
+                    return; // Command handled
                 }
-                resetContext();
-                return; // IMPORTANT: Prevents fallback to product search
             }
             
             // --- Template Command Matching (for ordering) ---
@@ -616,7 +600,7 @@ export function VoiceCommander({
     recognition.interimResults = false;
 
     recognition.onstart = () => {
-      onStatusUpdate(`🎧 Listening...`);
+      onStatusUpdate(`Listening...`);
     };
 
     recognition.onresult = (event) => {
