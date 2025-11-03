@@ -306,10 +306,6 @@ export function VoiceCommander({
                         extractedValues.quantity = match[1]?.trim();
                     } else if (productPlaceholderIndex !== -1) {
                         extractedValues.product = match[1]?.trim();
-                    } else {
-                        // This case handles aliases with no placeholders, like "add chicken"
-                        // The entire alias is effectively the product.
-                        extractedValues.product = alias.replace(/add|get|buy|i want/gi, '').trim();
                     }
                     
                     if (extractedValues.product) {
@@ -373,8 +369,16 @@ export function VoiceCommander({
                 handleProfileFormInteraction();
                 return;
             }
+
+            // Priority 3: Check if the command itself is a product name.
+            const productAsCommandMatch = await findProductAndVariant(commandText);
+            if (productAsCommandMatch.product && productAsCommandMatch.variant) {
+                await commandActionsRef.current.orderItem({ product: commandText });
+                onSuggestions([]);
+                return;
+            }
             
-            // Priority 3: Fuzzy matching for suggestions if no direct match is found.
+            // Priority 4: Fuzzy matching for suggestions if no direct match is found.
             const potentialMatches = commandsRef.current
               .map((c) => ({ ...c, similarity: calculateSimilarity(commandText, c.command) }))
               .filter((c) => c.similarity > 0.7)
@@ -553,5 +557,3 @@ export function VoiceCommander({
 
   return null;
 }
-
-    
