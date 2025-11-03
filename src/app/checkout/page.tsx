@@ -71,11 +71,15 @@ function OrderSummaryItem({ item, image }) {
 interface PassThroughState {
   placeOrderBtnRef: RefObject<HTMLButtonElement> | null;
   setPlaceOrderBtnRef: (ref: RefObject<HTMLButtonElement> | null) => void;
+  isWaitingForQuickOrderConfirmation: boolean;
+  setIsWaitingForQuickOrderConfirmation: (isWaiting: boolean) => void;
 }
 
 export const useCheckoutStore = create<PassThroughState>((set) => ({
   placeOrderBtnRef: null,
   setPlaceOrderBtnRef: (placeOrderBtnRef) => set({ placeOrderBtnRef }),
+  isWaitingForQuickOrderConfirmation: false,
+  setIsWaitingForQuickOrderConfirmation: (isWaiting) => set({ isWaitingForQuickOrderConfirmation: isWaiting }),
 }));
 
 export default function CheckoutPage() {
@@ -94,7 +98,7 @@ export default function CheckoutPage() {
     fetchInitialData: state.fetchInitialData,
   }));
 
-  const { setPlaceOrderBtnRef } = useCheckoutStore();
+  const { setPlaceOrderBtnRef, setIsWaitingForQuickOrderConfirmation } = useCheckoutStore();
 
   const hasItemsInCart = cartItems.length > 0;
   const finalTotal = hasItemsInCart ? cartTotal + DELIVERY_FEE : 0;
@@ -135,10 +139,12 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     setPlaceOrderBtnRef(placeOrderBtnRef);
+    // When the component unmounts, reset the confirmation state.
     return () => {
       setPlaceOrderBtnRef(null);
+      setIsWaitingForQuickOrderConfirmation(false);
     }
-  }, [setPlaceOrderBtnRef]);
+  }, [setPlaceOrderBtnRef, setIsWaitingForQuickOrderConfirmation]);
 
 
    const userDocRef = useMemoFirebase(() => {

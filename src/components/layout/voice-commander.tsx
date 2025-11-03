@@ -35,13 +35,6 @@ interface VoiceCommanderProps {
   cartItems: CartItem[]; // Receive cart items as a prop
 }
 
-interface QuickOrderState {
-    product: Product;
-    variant: ProductVariant;
-    store: Store;
-    userProfile: User;
-}
-
 let recognition: SpeechRecognition | null = null;
 if (typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -63,9 +56,9 @@ export function VoiceCommander({
   const pathname = usePathname();
   const { toast } = useToast();
   const { firestore, user } = useFirebase();
-  const { addItem: addItemToCart, updateQuantity, activeStoreId, setActiveStoreId } = useCart();
+  const { clearCart, addItem: addItemToCart, updateQuantity, activeStoreId, setActiveStoreId } = useCart();
   const { form: profileForm } = useProfileFormStore();
-  const { placeOrderBtnRef } = useCheckoutStore();
+  const { placeOrderBtnRef, setIsWaitingForQuickOrderConfirmation, isWaitingForQuickOrderConfirmation } = useCheckoutStore();
 
   const isSpeakingRef = useRef(false);
   const isEnabledRef = useRef(enabled);
@@ -85,8 +78,6 @@ export function VoiceCommander({
   const [isWaitingForQuantity, setIsWaitingForQuantity] = useState(false);
   const itemToUpdateSkuRef = useRef<string | null>(null);
 
-  const [isWaitingForQuickOrderConfirmation, setIsWaitingForQuickOrderConfirmation] = useState(false);
-  const quickOrderDetailsRef = useRef<QuickOrderState | null>(null);
   const userProfileRef = useRef<User | null>(null);
 
   const [hasMounted, setHasMounted] = useState(false);
@@ -183,24 +174,31 @@ export function VoiceCommander({
 
     if (enabled && !hasSpokenCheckoutPrompt.current) {
       const speakTimeout = setTimeout(() => {
-        const actionAlert = document.getElementById('action-required-alert');
-        if (actionAlert) {
-          speak(`Action required. Please select a store to continue, or tell me the store name.`);
-          setIsWaitingForStoreName(true);
+        if (isWaitingForQuickOrderConfirmation) {
+            const totalAmountEl = document.getElementById('final-total-amount');
+            if (totalAmountEl) {
+                const totalText = totalAmountEl.innerText;
+                speak(`Your total is ${totalText}. Please say "confirm order" to place your order.`);
+            }
         } else {
-          const totalAmountEl = document.getElementById('final-total-amount');
-          if (totalAmountEl) {
-            const totalText = totalAmountEl.innerText;
-            speak(`Your total is ${totalText}. Please say "place order" to confirm.`);
-          }
-          setIsWaitingForStoreName(false);
+            const actionAlert = document.getElementById('action-required-alert');
+            if (actionAlert) {
+                speak(`Action required. Please select a store to continue, or tell me the store name.`);
+                setIsWaitingForStoreName(true);
+            } else {
+                const totalAmountEl = document.getElementById('final-total-amount');
+                if (totalAmountEl) {
+                    const totalText = totalAmountEl.innerText;
+                    speak(`Your total is ${totalText}. Please say "place order" to confirm.`);
+                }
+            }
         }
         hasSpokenCheckoutPrompt.current = true;
       }, 1500);
 
       return () => clearTimeout(speakTimeout);
     }
-  }, [pathname, enabled, speak, hasMounted]);
+  }, [pathname, enabled, speak, hasMounted, isWaitingForQuickOrderConfirmation]);
 
   // Proactive prompt on profile page
   useEffect(() => {
@@ -289,54 +287,17 @@ export function VoiceCommander({
                 setClarificationStores([]);
                 onSuggestions([]);
                 setIsWaitingForQuickOrderConfirmation(false);
-                quickOrderDetailsRef.current = null;
             };
 
             // Priority -1: Handle direct confirmation for quick order
-            if (isWaitingForQuickOrderConfirmation && quickOrderDetailsRef.current) {
-                if (commandText.toLowerCase() === 'confirm order' || commandText.toLowerCase() === 'confirm') {
-                    const { product, variant, store, userProfile } = quickOrderDetailsRef.current;
-                    const totalAmount = variant.price + DELIVERY_FEE;
-                    
-                    const orderData = {
-                        userId: user.uid,
-                        storeId: store.id,
-                        storeOwnerId: store.ownerId,
-                        customerName: `${userProfile.firstName} ${userProfile.lastName}`,
-                        deliveryAddress: userProfile.address,
-                        deliveryLat: 0, // Placeholder, requires location capture
-                        deliveryLng: 0, // Placeholder, requires location capture
-                        phone: userProfile.phoneNumber,
-                        email: user.email,
-                        orderDate: serverTimestamp(),
-                        status: 'Pending' as 'Pending',
-                        totalAmount: totalAmount,
-                        items: [{
-                            productId: product.id,
-                            productName: product.name,
-                            variantSku: variant.sku,
-                            variantWeight: variant.weight,
-                            quantity: 1, // Assuming 1 for quick order for now
-                            price: variant.price,
-                        }],
-                    };
-
-                    speak("Placing your order now.");
-                    const colRef = collection(firestore, 'orders');
-                    addDoc(colRef, orderData).then(() => {
-                       toast({
-                           title: "Quick Order Placed!",
-                           description: `Your order from ${store.name} is confirmed.`
-                       });
-                       router.push('/order-confirmation');
-                    }).catch((e) => {
-                        const permissionError = new FirestorePermissionError({ path: colRef.path, operation: 'create', requestResourceData: orderData });
-                        errorEmitter.emit('permission-error', permissionError);
-                        speak("Sorry, I couldn't place the order due to a permissions issue.");
-                    });
-
+            if (isWaitingForQuickOrderConfirmation) {
+                const confirmAliases = fileCommandsRef.current.quickOrderConfirm?.aliases || [];
+                if (confirmAliases.includes(commandText.toLowerCase())) {
+                    placeOrderBtnRef?.current?.click();
                 } else {
                     speak("Okay, cancelling the order.");
+                    clearCart();
+                    router.push('/stores');
                 }
                 resetContext();
                 return;
@@ -635,15 +596,13 @@ export function VoiceCommander({
             return;
         }
         
-        const total = variant.price + DELIVERY_FEE;
-        quickOrderDetailsRef.current = {
-            product: foundProduct,
-            variant: variant,
-            store: foundStore,
-            userProfile: userProfileRef.current,
-        };
+        // Clear the cart and add just this one item.
+        clearCart();
+        addItemToCart(foundProduct, variant, 1);
+        setActiveStoreId(foundStore.id);
+        
         setIsWaitingForQuickOrderConfirmation(true);
-        speak(`The total for ${variant.weight} of ${t(foundProduct.name.toLowerCase().replace(/ /g, '-')).split(' / ')[0]} from ${foundStore.name} is ₹${total}. Say 'confirm order' to place it now.`);
+        router.push('/checkout');
       },
     };
     
@@ -735,7 +694,7 @@ export function VoiceCommander({
           });
 
           Object.entries(fileCommands).forEach(([key, { display, aliases, reply }]: [string, any]) => {
-            if (key !== 'orderItem' && key !== 'quickOrder') { // The orderItem is handled separately as a template
+            if (key !== 'orderItem' && key !== 'quickOrder' && key !== 'quickOrderConfirm') { // The orderItem is handled separately as a template
                 const action = commandActionsRef.current[key];
                 if (action) {
                     aliases.forEach((alias: string) => {
@@ -756,7 +715,7 @@ export function VoiceCommander({
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firestore, user, cartItems, profileForm, isWaitingForStoreName, activeStoreId, placeOrderBtnRef, enabled, pathname, findProductAndVariant, handleProfileFormInteraction, speak, toast, router, onSuggestions, onStatusUpdate, onCloseCart, onOpenCart, setActiveStoreId, clarificationStores, isWaitingForQuantity, updateQuantity, isWaitingForQuickOrderConfirmation]);
+  }, [firestore, user, cartItems, profileForm, isWaitingForStoreName, activeStoreId, placeOrderBtnRef, enabled, pathname, findProductAndVariant, handleProfileFormInteraction, speak, toast, router, onSuggestions, onStatusUpdate, onCloseCart, onOpenCart, setActiveStoreId, clarificationStores, isWaitingForQuantity, updateQuantity, isWaitingForQuickOrderConfirmation, clearCart, setIsWaitingForQuickOrderConfirmation]);
 
   return null;
 }

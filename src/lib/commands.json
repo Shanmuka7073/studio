@@ -1,12 +1,24 @@
-
 {
   "quickOrder": {
     "display": "Order an Item from a specific store",
-    "reply": "Checking...",
+    "reply": "One moment...",
     "aliases": [
       "order {quantity} of {product} from {store}",
       "get {quantity} of {product} from {store}",
       "buy {quantity} of {product} from {store}"
+    ]
+  },
+  "quickOrderConfirm": {
+    "display": "Confirm the quick order",
+    "reply": "Placing your order now.",
+    "aliases": [
+      "confirm order",
+      "confirm",
+      "ok",
+      "done",
+      "alright",
+      "yes",
+      "place order"
     ]
   },
   "orderItem": {
@@ -178,7 +190,6 @@
     "reply": "Placing your order now.",
     "aliases": [
       "place order",
-      "confirm order",
       "submit order",
       "finish and pay",
       "complete my order",
@@ -196,9 +207,7 @@
       "confirm changes",
       "save my profile",
       "update profile",
-      "save",
-      "ok",
-      "done"
+      "save"
     ]
   },
   "refresh": {
