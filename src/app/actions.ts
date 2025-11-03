@@ -8,12 +8,17 @@ import { getStores, getMasterProducts } from '@/lib/data';
 import { initServerApp } from '@/firebase/server-init';
 
 const COMMANDS_FILE_PATH = path.join(process.cwd(), 'src', 'lib', 'commands.json');
+const LOCALES_FILE_PATH = path.join(process.cwd(), 'src', 'lib', 'locales.json');
 
 type CommandGroup = {
   display: string;
   reply: string;
   aliases: string[];
 };
+
+type LocaleEntry = string | string[];
+type Locales = Record<string, Record<string, LocaleEntry>>;
+
 
 export async function getCommands(): Promise<Record<string, CommandGroup>> {
     try {
@@ -37,6 +42,31 @@ export async function saveCommands(commands: Record<string, CommandGroup>): Prom
     } catch (error) {
         console.error("Error writing commands file:", error);
         throw new Error("Could not save commands to file.");
+    }
+}
+
+export async function getLocales(): Promise<Locales> {
+    try {
+        const fileContent = await fs.readFile(LOCALES_FILE_PATH, 'utf-8');
+        return JSON.parse(fileContent);
+    } catch (error) {
+         if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+            console.log("locales.json not found, returning empty object.");
+            return {};
+        }
+        console.error("Error reading locales file:", error);
+        throw new Error("Could not load locales.");
+    }
+}
+
+export async function saveLocales(locales: Locales): Promise<{ success: boolean; }> {
+     try {
+        const jsonContent = JSON.stringify(locales, null, 2);
+        await fs.writeFile(LOCALES_FILE_PATH, jsonContent, 'utf-8');
+        return { success: true };
+    } catch (error) {
+        console.error("Error writing locales file:", error);
+        throw new Error("Could not save locales to file.");
     }
 }
 
