@@ -253,39 +253,50 @@ export function VoiceCommander({
                 return;
             }
 
-            // Priority 2: Check if it's an "order item" command using a two-stage parse.
+            // Priority 2: Check if it's an "order item" command.
             const orderItemTemplate = fileCommandsRef.current.orderItem;
             if (orderItemTemplate) {
               for (const alias of orderItemTemplate.aliases) {
-                // This alias is a template like "add {product}" or "get {quantity} of {product}"
-                // We'll use it to find the *action* part, not for a regex.
-                const actionPart = alias.replace(/\{quantity\}/g, '').replace(/\{product\}/g, '').trim();
+                const isTemplate = /\{product\}/.test(alias);
+                let product, quantity;
 
-                if (commandText.startsWith(actionPart)) {
-                  // We found a match like "add..." or "i want..."
-                  // Now, let's intelligently parse the rest of the string.
-                  let restOfString = commandText.substring(actionPart.length).trim();
-                  
-                  // More robust parsing logic
-                  const quantityRegex = /^(one|two|three|four|five|six|seven|eight|nine|ten|[\d\.]+)\s*(kg|kilo|kilos|gram|grams|gm|g)?/i;
-                  const quantityMatch = restOfString.match(quantityRegex);
-                  
-                  let quantity: string | undefined = undefined;
-                  let product: string | undefined = undefined;
+                if (isTemplate) {
+                    // It's a template like "add {quantity} of {product}"
+                    const actionPart = alias.replace(/\{quantity\}/g, '').replace(/\{product\}/g, '').trim();
+                    if (commandText.startsWith(actionPart) && actionPart !== '') {
+                        const restOfString = commandText.substring(actionPart.length).trim();
+                        
+                        const quantityRegex = /^(one|two|three|four|five|six|seven|eight|nine|ten|[\d\.]+)\s*(kg|kilo|kilos|gram|grams|gm|g)?/i;
+                        const quantityMatch = restOfString.match(quantityRegex);
 
-                  if (quantityMatch) {
-                    quantity = quantityMatch[0].trim();
-                    product = restOfString.substring(quantity.length).trim();
-                  } else {
-                    // No quantity found at the start, assume the whole string is the product
-                    product = restOfString;
-                  }
-                  
-                  if(product) {
-                     commandActionsRef.current.orderItem({ product, quantity });
-                     onSuggestions([]);
-                     return; 
-                  }
+                        if (quantityMatch) {
+                            quantity = quantityMatch[0].trim();
+                            product = restOfString.substring(quantity.length).trim();
+                        } else {
+                            product = restOfString; // No quantity, just product
+                        }
+                    } else if (actionPart === '') { // Handles cases like "{quantity} {product}"
+                        const quantityRegex = /^(one|two|three|four|five|six|seven|eight|nine|ten|[\d\.]+)\s*(kg|kilo|kilos|gram|grams|gm|g)?/i;
+                        const quantityMatch = commandText.match(quantityRegex);
+                         if (quantityMatch) {
+                            quantity = quantityMatch[0].trim();
+                            product = commandText.substring(quantity.length).trim();
+                        }
+                    }
+                } else {
+                    // It's a simple alias like "add chicken"
+                    if (commandText.startsWith(alias)) {
+                         product = commandText.substring(alias.length).trim() || alias;
+                    } else if (commandText.endsWith(alias)) {
+                         product = alias;
+                         quantity = commandText.replace(alias, '').trim();
+                    }
+                }
+
+                if (product) {
+                    await commandActionsRef.current.orderItem({ product, quantity });
+                    onSuggestions([]);
+                    return; 
                 }
               }
             }

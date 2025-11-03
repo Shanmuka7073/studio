@@ -18,21 +18,11 @@
       "had one {product}",
       "{quantity} {product}",
       "oka product quantity",
-      "oka {product} {quantity}"
-    ]
-  },
-  "orderChicken": {
-    "display": "Order Chicken (Specific)",
-    "reply": "Adding chicken to your cart.",
-    "aliases": [
-      "add 1kg chicken",
-      "add one kilo chicken",
-      "i want chicken",
+      "oka {product} {quantity}",
       "add chicken",
-      "had one kg chicken",
-      "add 1 kg chicken",
-      "oka kg chicken",
-      "kg chicken"
+      "i want chicken",
+      "chicken kavali",
+      "naaku chicken kavali"
     ]
   },
   "home": {
