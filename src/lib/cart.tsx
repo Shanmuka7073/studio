@@ -13,37 +13,66 @@ interface CartContextType {
   clearCart: () => void;
   cartCount: number;
   cartTotal: number;
+  activeStoreId: string | null;
+  mismatchedStoreInfo: { product: Product; variant: ProductVariant } | null;
+  confirmClearCart: () => void;
+  cancelClearCart: () => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [activeStoreId, setActiveStoreId] = useState<string | null>(null);
+  const [mismatchedStoreInfo, setMismatchedStoreInfo] = useState<{ product: Product; variant: ProductVariant } | null>(null);
+
   const { toast } = useToast();
 
   // Load cart from localStorage on initial render
   useEffect(() => {
     try {
       const storedCart = localStorage.getItem('localbasket-cart');
+      const storedStoreId = localStorage.getItem('localbasket-active-store');
       if (storedCart) {
-        setCartItems(JSON.parse(storedCart));
+        const parsedCart = JSON.parse(storedCart);
+        setCartItems(parsedCart);
+        if (parsedCart.length > 0) {
+            setActiveStoreId(parsedCart[0].product.storeId);
+        } else if (storedStoreId) {
+            setActiveStoreId(JSON.parse(storedStoreId));
+        }
       }
     } catch (error) {
       console.error("Failed to parse cart from localStorage", error);
     }
   }, []);
 
-  // Save cart to localStorage whenever it changes
+  // Save cart and active store to localStorage whenever they change
   useEffect(() => {
     try {
       localStorage.setItem('localbasket-cart', JSON.stringify(cartItems));
+      if (activeStoreId) {
+        localStorage.setItem('localbasket-active-store', JSON.stringify(activeStoreId));
+      } else {
+        localStorage.removeItem('localbasket-active-store');
+      }
     } catch (error) {
       console.error("Failed to save cart to localStorage", error);
     }
-  }, [cartItems]);
+  }, [cartItems, activeStoreId]);
 
 
   const addItem = useCallback((product: Product, variant: ProductVariant, quantity = 1) => {
+    // If the cart is empty, set the active store ID
+    if (cartItems.length === 0) {
+        setActiveStoreId(product.storeId);
+    } 
+    // If the item's store is different from the active store, show confirmation
+    else if (activeStoreId && product.storeId !== activeStoreId) {
+        setMismatchedStoreInfo({ product, variant });
+        return;
+    }
+    
     setCartItems((prevItems) => {
       const existingItem = prevItems.find((item) => item.variant.sku === variant.sku);
       if (existingItem) {
@@ -55,14 +84,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }
       return [...prevItems, { product, variant, quantity }];
     });
+
     toast({
       title: 'Item added to cart',
       description: `${product.name} (${variant.weight}) has been added.`,
     });
-  }, [toast]);
+  }, [cartItems, activeStoreId, toast]);
 
   const removeItem = useCallback((variantSku: string) => {
-    setCartItems((prevItems) => prevItems.filter((item) => item.variant.sku !== variantSku));
+    setCartItems((prevItems) => {
+        const newItems = prevItems.filter((item) => item.variant.sku !== variantSku);
+        if (newItems.length === 0) {
+            setActiveStoreId(null);
+        }
+        return newItems;
+    });
     toast({
       title: 'Item removed from cart',
       variant: 'destructive'
@@ -83,6 +119,27 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clearCart = useCallback(() => {
     setCartItems([]);
+    setActiveStoreId(null);
+  }, []);
+  
+  const confirmClearCart = useCallback(() => {
+    if (mismatchedStoreInfo) {
+      clearCart();
+      const { product, variant } = mismatchedStoreInfo;
+      // Use a timeout to ensure state updates before adding the new item
+      setTimeout(() => {
+        addItem(product, variant, 1);
+        setMismatchedStoreInfo(null);
+        toast({
+          title: "New Cart Started",
+          description: `Your previous cart was cleared. Started a new cart with items from ${product.name}.`
+        })
+      }, 0);
+    }
+  }, [mismatchedStoreInfo, clearCart, addItem, toast]);
+
+  const cancelClearCart = useCallback(() => {
+    setMismatchedStoreInfo(null);
   }, []);
   
   const cartCount = cartItems.reduce((count, item) => count + item.quantity, 0);
@@ -102,6 +159,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
         clearCart,
         cartCount,
         cartTotal,
+        activeStoreId,
+        mismatchedStoreInfo,
+        confirmClearCart,
+        cancelClearCart,
       }}
     >
       {children}
@@ -116,4 +177,3 @@ export function useCart() {
   }
   return context;
 }
-    

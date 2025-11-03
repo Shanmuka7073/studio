@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/toaster';
 import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
-import { CartProvider } from '@/lib/cart';
+import { CartProvider, useCart } from '@/lib/cart';
 import { FirebaseClientProvider } from '@/firebase';
 import { NotificationPermissionManager } from '@/components/layout/notification-permission-manager';
 import { usePathname } from 'next/navigation';
@@ -15,12 +15,52 @@ import { VoiceCommander } from '@/components/layout/voice-commander';
 import { useState } from 'react';
 import { VoiceOrderDialog, type VoiceOrderInfo } from '@/components/voice-order-dialog';
 import { ProfileCompletionChecker } from '@/components/profile-completion-checker';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+
 
 const ptSans = PT_Sans({
   subsets: ['latin'],
   weight: ['400', '700'],
   variable: '--font-pt-sans',
 });
+
+function StoreMismatchDialog() {
+    const { mismatchedStoreInfo, confirmClearCart, cancelClearCart } = useCart();
+    
+    if (!mismatchedStoreInfo) {
+        return null;
+    }
+
+    const { product } = mismatchedStoreInfo;
+
+    return (
+        <AlertDialog open={!!mismatchedStoreInfo} onOpenChange={(open) => !open && cancelClearCart()}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Start a New Cart?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Your cart currently has items from a different store. You can only order from one store at a time.
+                        <br /><br />
+                        Would you like to clear your current cart and start a new one with items from <strong>{product.storeId}</strong>?
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel onClick={cancelClearCart}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={confirmClearCart}>Clear Cart & Add</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    );
+}
 
 
 export default function RootLayout({
@@ -80,6 +120,7 @@ export default function RootLayout({
                   />
                 )}
                 <ProfileCompletionChecker />
+                <StoreMismatchDialog />
                 <main className="flex-1 pb-10">{children}</main>
                 <NotificationPermissionManager />
                 <Footer />

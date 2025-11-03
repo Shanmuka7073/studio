@@ -50,7 +50,7 @@ export function VoiceCommander({
   const pathname = usePathname();
   const { toast } = useToast();
   const { firestore, user } = useFirebase();
-  const { addItem: addItemToCart } = useCart();
+  const { addItem: addItemToCart, activeStoreId } = useCart();
   const { form: profileForm } = useProfileFormStore();
   const { shouldPromptForLocation, handleGetLocation, getFinalTotal, placeOrderBtnRef } = useCheckoutStore();
 
@@ -113,11 +113,34 @@ export function VoiceCommander({
     window.speechSynthesis.speak(utterance);
   }, []);
 
-  const findProductAndVariant = useCallback(async (productName: string, desiredWeight?: string): Promise<{ product: Product | null, variant: ProductVariant | null }> => {
+  const findProductAndVariant = useCallback(async (productName: string, desiredWeight?: string): Promise<{ product: Product | null, variant: ProductVariant | null, storeId: string | null }> => {
     const lowerProductName = productName.toLowerCase();
     const productMatch = masterProductsRef.current.find(p => p.name.toLowerCase() === lowerProductName);
 
-    if (!productMatch) return { product: null, variant: null };
+    if (!productMatch) return { product: null, variant: null, storeId: null };
+
+    let storeIdToUse = productMatch.storeId;
+
+    if (activeStoreId) {
+      storeIdToUse = activeStoreId;
+    } else if (storesRef.current.length > 0) {
+      // If no active store, default to the first one available that might have the product.
+      // A more complex logic could find the nearest store. For now, we assume the master product store context.
+      const productInStores = storesRef.current.find(s => s.id === productMatch.storeId);
+      if (productInStores) {
+        storeIdToUse = productInStores.id;
+      } else {
+        // Fallback to the first store if no specific logic matches.
+        storeIdToUse = storesRef.current[0].id;
+      }
+    }
+
+    if (!storeIdToUse) {
+       return { product: null, variant: null, storeId: null };
+    }
+
+    // Product object needs to be updated with the correct storeId for the cart
+    const finalProduct = { ...productMatch, storeId: storeIdToUse };
 
     let priceData = productPricesRef.current[lowerProductName];
     if (!priceData && firestore) {
@@ -131,22 +154,22 @@ export function VoiceCommander({
         if (desiredWeight) {
             const lowerDesiredWeight = desiredWeight.replace(/\s/g, '').toLowerCase();
             const variantMatch = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === lowerDesiredWeight);
-            if (variantMatch) return { product: productMatch, variant: variantMatch };
+            if (variantMatch) return { product: finalProduct, variant: variantMatch, storeId: storeIdToUse };
         }
         
         if (!desiredWeight || desiredWeight === 'one') {
           const onePieceVariant = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === '1pc');
-          if (onePieceVariant) return { product: productMatch, variant: onePieceVariant };
+          if (onePieceVariant) return { product: finalProduct, variant: onePieceVariant, storeId: storeIdToUse };
 
            const firstVariant = priceData.variants.sort((a,b) => a.price - b.price)[0];
-           if (firstVariant) return { product: productMatch, variant: firstVariant };
+           if (firstVariant) return { product: finalProduct, variant: firstVariant, storeId: storeIdToUse };
         }
 
-        return { product: productMatch, variant: priceData.variants[0] };
+        return { product: finalProduct, variant: priceData.variants[0], storeId: storeIdToUse };
     }
     
-    return { product: null, variant: null };
-  }, [firestore]);
+    return { product: null, variant: null, storeId: null };
+  }, [firestore, activeStoreId]);
 
 
   const handleProfileFormInteraction = useCallback(() => {
@@ -329,7 +352,7 @@ export function VoiceCommander({
           speak(`Added ${variant.weight} of ${product} to your cart.`);
           onOpenCart();
         } else {
-          speak(`Sorry, I could not find ${product}.`);
+          speak(`Sorry, I could not find ${product} in the currently active store or any store.`);
         }
       },
     };
@@ -434,5 +457,3 @@ export function VoiceCommander({
 
   return null;
 }
-
-    
