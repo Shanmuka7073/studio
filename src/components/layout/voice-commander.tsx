@@ -163,12 +163,18 @@ export function VoiceCommander({
 
   const findProductAndVariant = useCallback(async (productName: string, desiredWeight?: string): Promise<{ product: Product | null, variant: ProductVariant | null }> => {
     const lowerProductName = productName.toLowerCase();
-    
-    // Find product in master list by matching english name
-    const productMatch = masterProductsRef.current.find(p => 
-        t(p.name.toLowerCase().replace(/ /g, '-')).toLowerCase().split(' / ')[0].trim() === lowerProductName ||
-        t(p.name.toLowerCase().replace(/ /g, '-')).toLowerCase().split(' / ')[1].trim() === lowerProductName
-    );
+
+    const productMatch = masterProductsRef.current.find(p => {
+        const translation = t(p.name.toLowerCase().replace(/ /g, '-')).toLowerCase();
+        const parts = translation.split(' / ');
+        const englishName = parts[0]?.trim();
+        const teluguName = parts[1]?.trim();
+
+        if (englishName === lowerProductName) return true;
+        if (teluguName && teluguName === lowerProductName) return true;
+        
+        return false;
+    });
 
     if (!productMatch) return { product: null, variant: null };
     
@@ -247,6 +253,45 @@ export function VoiceCommander({
                 return;
             }
 
+            // Priority 2: Check if it's an "order item" command using the template.
+            const orderItemTemplate = fileCommandsRef.current.orderItem;
+            if (orderItemTemplate) {
+                for (const alias of orderItemTemplate.aliases) {
+                    const pattern = alias
+                        .replace('{quantity}', '(.+?)') // Non-greedy quantity
+                        .replace('{product}', '(.+)');
+                    const regex = new RegExp(`^${pattern}$`, 'i');
+                    const match = commandText.match(regex);
+                    
+                    if (match) {
+                        let quantity: string | undefined = undefined;
+                        let product: string | undefined = undefined;
+                        
+                        const quantityIndex = alias.indexOf('{quantity}');
+                        const productIndex = alias.indexOf('{product}');
+
+                        if (quantityIndex !== -1 && productIndex !== -1) {
+                            if (quantityIndex < productIndex) {
+                                quantity = match[1]?.trim();
+                                product = match[2]?.trim();
+                            } else {
+                                product = match[1]?.trim();
+                                quantity = match[2]?.trim();
+                            }
+                        } else if (productIndex !== -1) {
+                            product = match[1]?.trim();
+                        }
+                        
+                        if(product) {
+                           commandActionsRef.current.orderItem({ product, quantity });
+                           onSuggestions([]);
+                           return; 
+                        }
+                    }
+                }
+            }
+
+
             // Handle multi-store clarification
             if (clarificationStores.length > 0) {
                 const chosenIndex = parseInt(commandText.replace(/[^0-9]/g, ''), 10) - 1;
@@ -299,44 +344,6 @@ export function VoiceCommander({
                 return;
             }
             
-            // Priority 2: Check if it's an "order item" command using the template.
-            const orderItemTemplate = fileCommandsRef.current.orderItem;
-            if (orderItemTemplate) {
-                for (const alias of orderItemTemplate.aliases) {
-                    const pattern = alias
-                        .replace('{quantity}', '(.+?)') // Non-greedy quantity
-                        .replace('{product}', '(.+)');
-                    const regex = new RegExp(`^${pattern}$`, 'i');
-                    const match = commandText.match(regex);
-                    
-                    if (match) {
-                        let quantity: string | undefined = undefined;
-                        let product: string | undefined = undefined;
-                        
-                        const quantityIndex = alias.indexOf('{quantity}');
-                        const productIndex = alias.indexOf('{product}');
-
-                        if (quantityIndex !== -1 && productIndex !== -1) {
-                            if (quantityIndex < productIndex) {
-                                quantity = match[1]?.trim();
-                                product = match[2]?.trim();
-                            } else {
-                                product = match[1]?.trim();
-                                quantity = match[2]?.trim();
-                            }
-                        } else if (productIndex !== -1) {
-                            product = match[1]?.trim();
-                        }
-                        
-                        if(product) {
-                           commandActionsRef.current.orderItem({ product, quantity });
-                           onSuggestions([]);
-                           return; 
-                        }
-                    }
-                }
-            }
-
             // Priority 3: Fuzzy matching for suggestions if no direct match is found.
             const potentialMatches = commandsRef.current
               .map((c) => ({ ...c, similarity: calculateSimilarity(commandText, c.command) }))
