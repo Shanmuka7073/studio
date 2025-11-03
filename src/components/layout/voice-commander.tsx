@@ -9,7 +9,6 @@ import { useFirebase } from '@/firebase';
 import { getStores, getMasterProducts, getProductPrice } from '@/lib/data';
 import type { Store, Product, ProductPrice, ProductVariant } from '@/lib/types';
 import { calculateSimilarity } from '@/lib/calculate-similarity';
-import { VoiceOrderInfo } from '@/components/voice-order-dialog';
 import { useCart } from '@/lib/cart';
 import { getCommands } from '@/app/actions';
 import { useProfileFormStore } from '@/lib/store';
@@ -27,7 +26,6 @@ interface VoiceCommanderProps {
   enabled: boolean;
   onStatusUpdate: (status: string) => void;
   onSuggestions: (suggestions: Command[]) => void;
-  onVoiceOrder: (orderInfo: VoiceOrderInfo) => void;
   onOpenCart: () => void;
   onCloseCart: () => void;
   isCartOpen: boolean;
@@ -43,7 +41,6 @@ export function VoiceCommander({
   enabled,
   onStatusUpdate,
   onSuggestions,
-  onVoiceOrder,
   onOpenCart,
   onCloseCart,
 }: VoiceCommanderProps) {
@@ -53,7 +50,7 @@ export function VoiceCommander({
   const { firestore, user } = useFirebase();
   const { cartItems, addItem: addItemToCart, activeStoreId } = useCart();
   const { form: profileForm } = useProfileFormStore();
-  const { shouldPromptForLocation, handleGetLocation, getFinalTotal, placeOrderBtnRef } = useCheckoutStore();
+  const { placeOrderBtnRef } = useCheckoutStore();
 
   const isSpeakingRef = useRef(false);
   const isEnabledRef = useRef(enabled);
@@ -65,7 +62,6 @@ export function VoiceCommander({
   const fileCommandsRef = useRef<any>({});
   
   const formFieldToFillRef = useRef<keyof ProfileFormValues | null>(null);
-  const checkoutStateRef = useRef<'idle' | 'promptingLocation' | 'promptingConfirmation'>('idle');
 
 
   useEffect(() => {
@@ -207,28 +203,6 @@ export function VoiceCommander({
         try {
             if (!firestore || !user) return;
 
-            if (command === 'yes' && shouldPromptForLocation) {
-                handleGetLocation();
-                checkoutStateRef.current = 'promptingConfirmation';
-                speak("Great, location captured. One moment.", () => {
-                    setTimeout(() => { 
-                        const total = getFinalTotal();
-                        if (total > 0) {
-                            speak(`Your total is ${total.toFixed(2)} rupees. Shall I place the order?`);
-                        } else {
-                            speak("I couldn't calculate the total. Please check your cart or list.");
-                            checkoutStateRef.current = 'idle';
-                        }
-                    }, 2000);
-                });
-                return;
-            }
-             if (command === 'yes' && checkoutStateRef.current === 'promptingConfirmation') {
-                placeOrderBtnRef?.current?.click();
-                checkoutStateRef.current = 'idle';
-                return;
-            }
-
             if (formFieldToFillRef.current && profileForm) {
                 profileForm.setValue(formFieldToFillRef.current, command, { shouldValidate: true });
                 formFieldToFillRef.current = null;
@@ -238,14 +212,36 @@ export function VoiceCommander({
 
             const multiOrderPattern = /order\s(.+)\sfrom\s(.+)/i;
             const multiOrderMatch = command.match(multiOrderPattern);
+
             if (multiOrderMatch) {
-              const shoppingList = multiOrderMatch[1].trim();
+              const shoppingListText = multiOrderMatch[1].trim();
               const storeName = multiOrderMatch[2].trim();
               const storeMatch = storesRef.current.find(s => s.name.toLowerCase() === storeName.toLowerCase());
 
               if (storeMatch) {
-                speak(`Okay, preparing your order from ${storeName}.`);
-                onVoiceOrder({ shoppingList, storeId: storeMatch.id });
+                speak(`Okay, adding items from ${storeName} to your cart.`);
+                
+                const productNames = shoppingListText.split(/and|,/i).map(s => s.trim()).filter(Boolean);
+
+                let itemsAddedCount = 0;
+                for (const productName of productNames) {
+                    const { product, variant } = await findProductAndVariant(productName);
+                    if(product && variant) {
+                        // Override the storeId to match the one from the voice command
+                        const productForCart = {...product, storeId: storeMatch.id};
+                        addItemToCart(productForCart, variant, 1);
+                        itemsAddedCount++;
+                    } else {
+                        speak(`Sorry, I could not find ${productName}.`);
+                    }
+                }
+
+                if (itemsAddedCount > 0) {
+                  speak(`Added ${itemsAddedCount} items. Taking you to checkout.`, () => {
+                      router.push('/checkout');
+                  });
+                }
+                
                 onSuggestions([]);
                 return;
               } else {
@@ -323,20 +319,17 @@ export function VoiceCommander({
         router.push('/checkout');
       },
       placeOrder: () => {
-        // Priority 1: A specific button is active (in a dialog or on the checkout page)
         if (placeOrderBtnRef?.current) {
             placeOrderBtnRef.current.click();
             return;
         }
 
-        // Priority 2: Cart has items, but we're not on the checkout page
         if (cartItems.length > 0) {
             speak("Okay, taking you to checkout.");
             router.push('/checkout');
             return;
         }
-
-        // Fallback: Cart is empty
+        
         speak("Your cart is empty. Please add some items first.");
       },
       saveChanges: () => {

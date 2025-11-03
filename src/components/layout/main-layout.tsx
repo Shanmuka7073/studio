@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -6,7 +5,6 @@ import { useCart } from '@/lib/cart';
 import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
 import { VoiceCommander } from '@/components/layout/voice-commander';
-import { VoiceOrderDialog, type VoiceOrderInfo } from '@/components/voice-order-dialog';
 import { ProfileCompletionChecker } from '@/components/profile-completion-checker';
 import { NotificationPermissionManager } from '@/components/layout/notification-permission-manager';
 import {
@@ -53,7 +51,6 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [voiceStatus, setVoiceStatus] = useState('Click the mic to start listening.');
   const [suggestedCommands, setSuggestedCommands] = useState<any[]>([]);
-  const [voiceOrderInfo, setVoiceOrderInfo] = useState<VoiceOrderInfo | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
 
   return (
@@ -70,18 +67,10 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
         enabled={voiceEnabled} 
         onStatusUpdate={setVoiceStatus}
         onSuggestions={setSuggestedCommands}
-        onVoiceOrder={setVoiceOrderInfo}
         onOpenCart={() => setIsCartOpen(true)}
         onCloseCart={() => setIsCartOpen(false)}
         isCartOpen={isCartOpen}
       />
-      {voiceOrderInfo && (
-        <VoiceOrderDialog
-          isOpen={!!voiceOrderInfo}
-          onClose={() => setVoiceOrderInfo(null)}
-          orderInfo={voiceOrderInfo}
-        />
-      )}
       <ProfileCompletionChecker />
       <StoreMismatchDialog />
       <main className="flex-1 pb-10">{children}</main>
