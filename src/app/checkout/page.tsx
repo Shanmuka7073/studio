@@ -98,7 +98,7 @@ export default function CheckoutPage() {
     fetchInitialData: state.fetchInitialData,
   }));
 
-  const { setPlaceOrderBtnRef, setIsWaitingForQuickOrderConfirmation } = useCheckoutStore();
+  const { isWaitingForQuickOrderConfirmation, setPlaceOrderBtnRef, setIsWaitingForQuickOrderConfirmation } = useCheckoutStore();
 
   const hasItemsInCart = cartItems.length > 0;
   const finalTotal = hasItemsInCart ? cartTotal + DELIVERY_FEE : 0;
@@ -269,7 +269,7 @@ export default function CheckoutPage() {
     });
   };
 
-  if (!hasItemsInCart) {
+  if (!hasItemsInCart && !isWaitingForQuickOrderConfirmation) {
       return (
           <div className="container mx-auto py-24 text-center">
               <h1 className="text-4xl font-bold mb-4 font-headline">
@@ -358,12 +358,21 @@ export default function CheckoutPage() {
                                     ))}
                                 </SelectContent>
                             </Select>
-                            {!activeStoreId && (
+                            {!activeStoreId && !isWaitingForQuickOrderConfirmation && (
                                 <Alert variant="destructive" id="action-required-alert">
                                     <AlertCircle className="h-4 w-4" />
                                     <AlertTitle>{t('action-required')}</AlertTitle>
                                     <AlertDescription>
                                         {t('please-select-a-store-to-continue')}
+                                    </AlertDescription>
+                                </Alert>
+                            )}
+                             {isWaitingForQuickOrderConfirmation && !activeStoreId && (
+                                <Alert variant="default" id="action-required-alert">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <AlertTitle>{t('waiting-for-store')}</AlertTitle>
+                                    <AlertDescription>
+                                       {t('the-store-you-selected-with-your-voice-is-being-set')}
                                     </AlertDescription>
                                 </Alert>
                             )}
@@ -385,6 +394,12 @@ export default function CheckoutPage() {
                             const image = images[item.variant.sku] || { imageUrl: 'https://placehold.co/48x48/E2E8F0/64748B?text=...', imageHint: 'loading' };
                             return <OrderSummaryItem key={item.variant.sku} item={item} image={image} />
                         })}
+                         {cartItems.length === 0 && (
+                            <div className="text-center text-muted-foreground py-8">
+                                <Loader2 className="mx-auto h-6 w-6 animate-spin" />
+                                <p className="mt-2">{t('loading-your-quick-order-item')}</p>
+                            </div>
+                        )}
                         <div className="flex justify-between items-center border-t pt-4">
                             <p className="font-medium">{t('subtotal')}</p>
                             <p>₹{cartTotal.toFixed(2)}</p>

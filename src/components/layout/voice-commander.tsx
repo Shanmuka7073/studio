@@ -228,10 +228,11 @@ export function VoiceCommander({
 
     for (const p of masterProducts) {
         if (!p.name) continue;
+        // Check against all aliases for all languages
         const allAliasValues = Object.values(getAllAliases(p.name.toLowerCase().replace(/ /g, '-'))).flat().map(name => name.toLowerCase());
 
         for (const alias of allAliasValues) {
-            if (lowerProductName.includes(alias)) {
+             if (lowerProductName.includes(alias)) {
                 const similarity = calculateSimilarity(lowerProductName, alias);
                 if (!bestMatch || similarity > bestMatch.similarity) {
                     bestMatch = { product: p, alias: alias, similarity: similarity };
@@ -604,17 +605,26 @@ export function VoiceCommander({
             return;
         }
 
-        speak(`Okay, starting a quick order for ${quantity || ''} ${product} from ${bestMatch.name}.`);
+        const qty = quantity || '1';
+        speak(`Okay, starting a quick order for ${qty} of ${product} from ${bestMatch.name}.`);
         
         // Perform actions
         clearCart();
         addItemToCart(foundProduct, variant, 1);
         setActiveStoreId(bestMatch.id);
         
+        setIsWaitingForQuickOrderConfirmation(true);
         // Wait a moment for state to update, then navigate
         setTimeout(() => {
             router.push('/checkout');
         }, 500);
+
+        // After another delay, click the final button
+        setTimeout(() => {
+            if (placeOrderBtnRef?.current) {
+                placeOrderBtnRef.current.click();
+            }
+        }, 3000); // 3-second delay to allow checkout page to load
       },
     };
     

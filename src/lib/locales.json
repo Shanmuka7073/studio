@@ -1,3 +1,4 @@
+
 {
   "home": {
     "en": "Home",
@@ -1347,6 +1348,18 @@
     "en": [
       "chicken skinless"
     ]
+  },
+  "waiting-for-store": {
+    "en": "Waiting for Store",
+    "te": "స్టోర్ కోసం వేచి ఉంది"
+  },
+  "the-store-you-selected-with-your-voice-is-being-set": {
+    "en": "The store you selected with your voice is being set...",
+    "te": "మీరు మీ వాయిస్‌తో ఎంచుకున్న స్టోర్ సెట్ చేయబడుతోంది..."
+  },
+  "loading-your-quick-order-item": {
+    "en": "Loading your quick order item...",
+    "te": "మీ త్వరిత ఆర్డర్ అంశం లోడ్ అవుతోంది..."
   }
 }
     
