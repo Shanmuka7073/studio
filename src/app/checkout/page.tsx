@@ -237,18 +237,28 @@ export default function CheckoutPage() {
         };
 
         const colRef = collection(firestore, 'orders');
-        addDoc(colRef, orderData).then(() => {
-            clearCart();
-            setDeliveryCoords(null);
-            form.reset();
+        
+        // --- OPTIMIZATION: Non-blocking write ---
+        // 1. Immediately update UI for a snappy experience.
+        clearCart();
+        setDeliveryCoords(null);
+        form.reset();
+        toast({
+            title: "Order Placed!",
+            description: "Thank you for your purchase.",
+        });
+        router.push('/order-confirmation');
 
-            toast({
-                title: "Order Placed!",
-                description: "Thank you for your purchase.",
-            });
-            router.push('/order-confirmation');
-        }).catch((e) => {
+        // 2. Perform the database write in the background.
+        addDoc(colRef, orderData).catch((e) => {
              console.error('Error placing order:', e);
+             // If the write fails, we should inform the user.
+             // This toast will appear on the confirmation page.
+             toast({
+                 variant: 'destructive',
+                 title: "Order Sync Failed",
+                 description: "Your order was not saved correctly. Please contact support."
+             })
              const permissionError = new FirestorePermissionError({
                 path: colRef.path,
                 operation: 'create',
