@@ -52,6 +52,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   const [voiceStatus, setVoiceStatus] = useState('Click the mic to start listening.');
   const [suggestedCommands, setSuggestedCommands] = useState<any[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const { cartItems } = useCart(); // Get cart items here
 
   return (
     <div className="relative flex min-h-dvh flex-col bg-background">
@@ -70,6 +71,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
         onOpenCart={() => setIsCartOpen(true)}
         onCloseCart={() => setIsCartOpen(false)}
         isCartOpen={isCartOpen}
+        cartItems={cartItems} // Pass cart items as a prop
       />
       <ProfileCompletionChecker />
       <StoreMismatchDialog />

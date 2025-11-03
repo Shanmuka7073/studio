@@ -7,7 +7,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { useFirebase } from '@/firebase';
 import { getStores, getMasterProducts, getProductPrice } from '@/lib/data';
-import type { Store, Product, ProductPrice, ProductVariant } from '@/lib/types';
+import type { Store, Product, ProductPrice, ProductVariant, CartItem } from '@/lib/types';
 import { calculateSimilarity } from '@/lib/calculate-similarity';
 import { useCart } from '@/lib/cart';
 import { getCommands } from '@/app/actions';
@@ -29,6 +29,7 @@ interface VoiceCommanderProps {
   onOpenCart: () => void;
   onCloseCart: () => void;
   isCartOpen: boolean;
+  cartItems: CartItem[]; // Receive cart items as a prop
 }
 
 let recognition: SpeechRecognition | null = null;
@@ -43,12 +44,13 @@ export function VoiceCommander({
   onSuggestions,
   onOpenCart,
   onCloseCart,
+  cartItems, // Use the prop
 }: VoiceCommanderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { toast } = useToast();
   const { firestore, user } = useFirebase();
-  const { cartItems, addItem: addItemToCart, activeStoreId } = useCart();
+  const { addItem: addItemToCart, activeStoreId } = useCart();
   const { form: profileForm } = useProfileFormStore();
   const { placeOrderBtnRef } = useCheckoutStore();
 
@@ -214,41 +216,41 @@ export function VoiceCommander({
             const multiOrderMatch = command.match(multiOrderPattern);
 
             if (multiOrderMatch) {
-              const shoppingListText = multiOrderMatch[1].trim();
-              const storeName = multiOrderMatch[2].trim();
-              const storeMatch = storesRef.current.find(s => s.name.toLowerCase() === storeName.toLowerCase());
+                const shoppingListText = multiOrderMatch[1].trim();
+                const storeName = multiOrderMatch[2].trim();
+                const storeMatch = storesRef.current.find(s => s.name.toLowerCase() === storeName.toLowerCase());
 
-              if (storeMatch) {
-                speak(`Okay, adding items from ${storeName} to your cart.`);
-                
-                const productNames = shoppingListText.split(/and|,/i).map(s => s.trim()).filter(Boolean);
+                if (storeMatch) {
+                    speak(`Okay, adding items from ${storeName} to your cart.`);
+                    
+                    const productNames = shoppingListText.split(/and|,/i).map(s => s.trim()).filter(Boolean);
 
-                let itemsAddedCount = 0;
-                for (const productName of productNames) {
-                    const { product, variant } = await findProductAndVariant(productName);
-                    if(product && variant) {
-                        // Override the storeId to match the one from the voice command
-                        const productForCart = {...product, storeId: storeMatch.id};
-                        addItemToCart(productForCart, variant, 1);
-                        itemsAddedCount++;
-                    } else {
-                        speak(`Sorry, I could not find ${productName}.`);
+                    let itemsAddedCount = 0;
+                    for (const productName of productNames) {
+                        const { product, variant } = await findProductAndVariant(productName);
+                        if(product && variant) {
+                            // Override the storeId to match the one from the voice command
+                            const productForCart = {...product, storeId: storeMatch.id};
+                            addItemToCart(productForCart, variant, 1);
+                            itemsAddedCount++;
+                        } else {
+                            speak(`Sorry, I could not find ${productName}.`);
+                        }
                     }
-                }
 
-                if (itemsAddedCount > 0) {
-                  speak(`Added ${itemsAddedCount} items. Taking you to checkout.`, () => {
-                      router.push('/checkout');
-                  });
+                    if (itemsAddedCount > 0) {
+                        speak(`Added ${itemsAddedCount} items. Taking you to checkout.`, () => {
+                            router.push('/checkout');
+                        });
+                    }
+                    
+                    onSuggestions([]);
+                    return;
+                } else {
+                    speak(`Sorry, I couldn't find a store named ${storeName}.`);
+                    onSuggestions([]);
+                    return;
                 }
-                
-                onSuggestions([]);
-                return;
-              } else {
-                speak(`Sorry, I couldn't find a store named ${storeName}.`);
-                onSuggestions([]);
-                return;
-              }
             }
             
             const orderItemTemplate = fileCommandsRef.current.orderItem;
@@ -323,7 +325,7 @@ export function VoiceCommander({
             placeOrderBtnRef.current.click();
             return;
         }
-
+        
         if (cartItems.length > 0) {
             speak("Okay, taking you to checkout.");
             router.push('/checkout');
@@ -450,7 +452,7 @@ export function VoiceCommander({
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firestore, user]); 
+  }, [firestore, user, cartItems]); // Add cartItems to dependency array
 
   return null;
 }
