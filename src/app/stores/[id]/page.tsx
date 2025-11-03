@@ -37,17 +37,12 @@ function CategorySidebar({ categories, selectedCategory, onSelectCategory }) {
         const fetchCategoryImages = async () => {
             const imageMap = {};
             for (const category of categories) {
-                // Find first item in category to use for image
-                const firstItem = Array.isArray(category.items) ? category.items[0] : null;
-                if (firstItem) {
-                    const imageId = `prod-${createSlug(firstItem)}`;
-                    try {
-                        imageMap[category.categoryName] = await getProductImage(imageId);
-                    } catch (e) {
-                         imageMap[category.categoryName] = { imageUrl: 'https://placehold.co/64x64/E2E8F0/64748B?text=Img', imageHint: 'placeholder' };
-                    }
-                } else {
-                    imageMap[category.categoryName] = { imageUrl: 'https://placehold.co/64x64/E2E8F0/64748B?text=Img', imageHint: 'placeholder' };
+                // Correctly use a dedicated category image ID
+                const imageId = `cat-${createSlug(category.categoryName)}`;
+                try {
+                    imageMap[category.categoryName] = await getProductImage(imageId);
+                } catch (e) {
+                     imageMap[category.categoryName] = { imageUrl: 'https://placehold.co/64x64/E2E8F0/64748B?text=Img', imageHint: 'placeholder' };
                 }
             }
             setImages(imageMap);

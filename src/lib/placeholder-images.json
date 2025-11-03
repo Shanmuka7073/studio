@@ -16,6 +16,101 @@
       "imageHint": "corner store"
     },
     {
+      "id": "cat-fresh-cut",
+      "imageUrl": "https://images.unsplash.com/photo-1604503468822-261545d07802?w=128&h=128&fit=crop&q=80",
+      "imageHint": "raw chicken"
+    },
+    {
+      "id": "cat-vegetables",
+      "imageUrl": "https://images.unsplash.com/photo-1590165482129-1b8b217c7a8b?w=128&h=128&fit=crop&q=80",
+      "imageHint": "potatoes"
+    },
+    {
+      "id": "cat-fruits",
+      "imageUrl": "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=128&h=128&fit=crop&q=80",
+      "imageHint": "apples"
+    },
+    {
+      "id": "cat-grains-&-cereals",
+      "imageUrl": "https://images.unsplash.com/photo-1501430654243-c934cec2e1c0?w=128&h=128&fit=crop&q=80",
+      "imageHint": "wheat"
+    },
+    {
+      "id": "cat-dals-&-pulses",
+      "imageUrl": "https://images.unsplash.com/photo-1600271886743-f59b6634c44e?w=128&h=128&fit=crop&q=80",
+      "imageHint": "lentils"
+    },
+    {
+      "id": "cat-spices-&-masalas",
+      "imageUrl": "https://images.unsplash.com/photo-1599529454101-b5a8b832a85a?w=128&h=128&fit=crop&q=80",
+      "imageHint": "spices"
+    },
+    {
+      "id": "cat-oils-&-ghee",
+      "imageUrl": "https://images.unsplash.com/photo-1610547939489-73202bc6afda?w=128&h=128&fit=crop&q=80",
+      "imageHint": "olive oil"
+    },
+    {
+      "id": "cat-sauces-&-condiments",
+      "imageUrl": "https://images.unsplash.com/photo-1611100369029-c0d5ddb80a51?w=128&h=128&fit=crop&q=80",
+      "imageHint": "ketchup"
+    },
+    {
+      "id": "cat-dairy-&-bakery",
+      "imageUrl": "https://images.unsplash.com/photo-1598151528659-1785a9a8c2f8?w=128&h=128&fit=crop&q=80",
+      "imageHint": "milk"
+    },
+    {
+      "id": "cat-snacks-&-breakfast",
+      "imageUrl": "https://images.unsplash.com/photo-1507000958184-343468453479?w=128&h=128&fit=crop&q=80",
+      "imageHint": "cereal"
+    },
+    {
+      "id": "cat-beverages",
+      "imageUrl": "https://images.unsplash.com/photo-1600271886742-f549cd4a2b53?w=128&h=128&fit=crop&q=80",
+      "imageHint": "juice"
+    },
+    {
+      "id": "cat-meat-&-fish",
+      "imageUrl": "https://images.unsplash.com/photo-1534951333318-c9f2c6082acb?w=128&h=128&fit=crop&q=80",
+      "imageHint": "raw fish"
+    },
+    {
+      "id": "cat-frozen-food",
+      "imageUrl": "https://images.unsplash.com/photo-1621800971860-72ffb1a83f6b?w=128&h=128&fit=crop&q=80",
+      "imageHint": "frozen vegetables"
+    },
+    {
+      "id": "cat-instant-mixes",
+      "imageUrl": "https://images.unsplash.com/photo-1612929633738-8fe44f7ec841?w=128&h=128&fit=crop&q=80",
+      "imageHint": "noodles"
+    },
+    {
+      "id": "cat-home-care",
+      "imageUrl": "https://images.unsplash.com/photo-1584949169720-6f73e86c15ac?w=128&h=128&fit=crop&q=80",
+      "imageHint": "cleaning supplies"
+    },
+    {
+      "id": "cat-personal-care",
+      "imageUrl": "https://images.unsplash.com/photo-1584305574647-0cc949a2bb9f?w=128&h=128&fit=crop&q=80",
+      "imageHint": "soap"
+    },
+    {
+      "id": "cat-pooja-needs",
+      "imageUrl": "https://images.unsplash.com/photo-1599030032319-d78295597e0d?w=128&h=128&fit=crop&q=80",
+      "imageHint": "incense sticks"
+    },
+    {
+      "id": "cat-pet-care",
+      "imageUrl": "https://images.unsplash.com/photo-1598134493179-51332e56807f?w=128&h=128&fit=crop&q=80",
+      "imageHint": "pet food"
+    },
+    {
+      "id": "cat-kitchen-essentials",
+      "imageUrl": "https://images.unsplash.com/photo-1618615580649-1a4bc3bea1e5?w=128&h=128&fit=crop&q=80",
+      "imageHint": "aluminium foil"
+    },
+    {
       "id": "prod-potatoes",
       "imageUrl": "https://images.unsplash.com/photo-1590165482129-1b8b217c7a8b?w=400&h=300&fit=crop&q=80",
       "imageHint": "potatoes"
@@ -46,7 +141,7 @@
       "imageHint": "cauliflower"
     },
     {
-      "id": "prod-capsicum-bell-pepper",
+      "id": "prod-capsicum-(bell-pepper)",
       "imageUrl": "https://images.unsplash.com/photo-1557871319-3e054b1f8c14?w=400&h=300&fit=crop&q=80",
       "imageHint": "bell pepper"
     },
@@ -76,12 +171,12 @@
       "imageHint": "peas"
     },
     {
-      "id": "prod-brinjal-eggplant",
+      "id": "prod-brinjal-(eggplant)",
       "imageUrl": "https://images.unsplash.com/photo-1614143431697-a4c33c3756a5?w=400&h=300&fit=crop&q=80",
       "imageHint": "eggplant"
     },
     {
-      "id": "prod-okra-ladys-finger",
+      "id": "prod-okra-(lady’s-finger)",
       "imageUrl": "https://images.unsplash.com/photo-1621643211197-2a44d852c206?w=400&h=300&fit=crop&q=80",
       "imageHint": "okra"
     },
@@ -266,7 +361,7 @@
       "imageHint": "lemons"
     },
     {
-      "id": "prod-rice-raw-boiled-basmati-brown-etc",
+      "id": "prod-rice-(raw,-boiled,-basmati,-brown-etc)",
       "imageUrl": "https://images.unsplash.com/photo-1586201375765-c124a953c8de?w=400&h=300&fit=crop&q=80",
       "imageHint": "rice"
     },
@@ -276,17 +371,17 @@
       "imageHint": "wheat"
     },
     {
-      "id": "prod-maida-refined-flour",
+      "id": "prod-maida-(refined-flour)",
       "imageUrl": "https://images.unsplash.com/photo-1565607052745-35f8c6ba59b1?w=400&h=300&fit=crop&q=80",
       "imageHint": "refined flour"
     },
     {
-      "id": "prod-suji-rava-semolina",
+      "id": "prod-suji-(rava/semolina)",
       "imageUrl": "https://images.unsplash.com/photo-1683553942811-bb8c39424fa2?w=400&h=300&fit=crop&q=80",
       "imageHint": "semolina"
     },
     {
-      "id": "prod-poha-flattened-rice",
+      "id": "prod-poha-(flattened-rice)",
       "imageUrl": "https://images.unsplash.com/photo-1505216980056-a7b7b1c6e000?w=400&h=300&fit=crop&q=80",
       "imageHint": "flattened rice"
     },
@@ -301,27 +396,27 @@
       "imageHint": "cornflakes"
     },
     {
-      "id": "prod-millets-jowar-bajra-ragi-foxtail-etc",
+      "id": "prod-millets-(jowar,-bajra,-ragi,-foxtail,-etc.)",
       "imageUrl": "https://images.unsplash.com/photo-1627907222415-385258908383?w=400&h=300&fit=crop&q=80",
       "imageHint": "millets"
     },
     {
-      "id": "prod-broken-wheat-dalia",
+      "id": "prod-broken-wheat-(dalia)",
       "imageUrl": "https://images.unsplash.com/photo-1620046732598-b5ff29bc4270?w=400&h=300&fit=crop&q=80",
       "imageHint": "broken wheat"
     },
     {
-      "id": "prod-toor-dal-arhar-dal",
+      "id": "prod-toor-dal-(arhar-dal)",
       "imageUrl": "https://images.unsplash.com/photo-1601055811726-ce8e00184b90?w=400&h=300&fit=crop&q=80",
       "imageHint": "toor dal"
     },
     {
-      "id": "prod-moong-dal-yellow-split",
+      "id": "prod-moong-dal-(yellow-split)",
       "imageUrl": "https://images.unsplash.com/photo-1600271886743-f59b6634c44e?w=400&h=300&fit=crop&q=80",
       "imageHint": "moong dal"
     },
     {
-      "id": "prod-masoor-dal-red-lentil",
+      "id": "prod-masoor-dal-(red-lentil)",
       "imageUrl": "https://images.unsplash.com/photo-1585447240394-583b2b89f21f?w=400&h=300&fit=crop&q=80",
       "imageHint": "masoor dal"
     },
@@ -336,17 +431,17 @@
       "imageHint": "urad dal"
     },
     {
-      "id": "prod-rajma-kidney-beans",
+      "id": "prod-rajma-(kidney-beans)",
       "imageUrl": "https://images.unsplash.com/photo-1579705745811-a32bef7856a3?w=400&h=300&fit=crop&q=80",
       "imageHint": "kidney beans"
     },
     {
-      "id": "prod-kabuli-chana-white-chickpeas",
+      "id": "prod-kabuli-chana-(white-chickpeas)",
       "imageUrl": "https://images.unsplash.com/photo-1585449767223-c20a483a985f?w=400&h=300&fit=crop&q=80",
       "imageHint": "chickpeas"
     },
     {
-      "id": "prod-kala-chana-black-chickpeas",
+      "id": "prod-kala-chana-(black-chickpeas)",
       "imageUrl": "https://images.unsplash.com/photo-1628445550863-18735b48d1eb?w=400&h=300&fit=crop&q=80",
       "imageHint": "black chickpeas"
     },
@@ -356,7 +451,7 @@
       "imageHint": "green gram"
     },
     {
-      "id": "prod-lobia-black-eyed-peas",
+      "id": "prod-lobia-(black-eyed-peas)",
       "imageUrl": "https://images.unsplash.com/photo-1515347272087-685ce5a1fc8b?w=400&h=300&fit=crop&q=80",
       "imageHint": "black-eyed peas"
     },
@@ -436,7 +531,7 @@
       "imageHint": "bay leaf"
     },
     {
-      "id": "prod-fennel-seeds-saunf",
+      "id": "prod-fennel-seeds-(saunf)",
       "imageUrl": "https://images.unsplash.com/photo-1599529454045-8f6451a44e59?w=400&h=300&fit=crop&q=80",
       "imageHint": "fennel seeds"
     },
@@ -446,12 +541,12 @@
       "imageHint": "curry leaves"
     },
     {
-      "id": "prod-hing-asafoetida",
+      "id": "prod-hing-(asafoetida)",
       "imageUrl": "https://images.unsplash.com/photo-1601289133917-578f24404a3f?w=400&h=300&fit=crop&q=80",
       "imageHint": "asafoetida"
     },
     {
-      "id": "prod-kasuri-methi-dried-fenugreek",
+      "id": "prod-kasuri-methi-(dried-fenugreek)",
       "imageUrl": "https://images.unsplash.com/photo-1551848739-00f229d30d81?w=400&h=300&fit=crop&q=80",
       "imageHint": "dried fenugreek"
     },
@@ -501,7 +596,7 @@
       "imageHint": "rice bran oil"
     },
     {
-      "id": "prod-ghee-clarified-butter",
+      "id": "prod-ghee-(clarified-butter)",
       "imageUrl": "https://images.unsplash.com/photo-1606103823521-8742c82e4e13?w=400&h=300&fit=crop&q=80",
       "imageHint": "ghee"
     },
@@ -546,12 +641,12 @@
       "imageHint": "mayonnaise"
     },
     {
-      "id": "prod-pickles-mango-lime-mixed-etc",
+      "id": "prod-pickles-(mango,-lime,-mixed,-etc.)",
       "imageUrl": "https://images.unsplash.com/photo-1576020301507-5d5a00982053?w=400&h=300&fit=crop&q=80",
       "imageHint": "pickles"
     },
     {
-      "id": "prod-chutneys-coconut-mint-tamarind",
+      "id": "prod-chutneys-(coconut,-mint,-tamarind)",
       "imageUrl": "https://images.unsplash.com/photo-1591465619339-60fce055bc82?w=400&h=300&fit=crop&q=80",
       "imageHint": "chutneys"
     },
@@ -561,12 +656,12 @@
       "imageHint": "milk"
     },
     {
-      "id": "prod-curd-yogurt",
+      "id": "prod-curd/yogurt",
       "imageUrl": "https://images.unsplash.com/photo-1632832363065-a46a11a84f3a?w=400&h=300&fit=crop&q=80",
       "imageHint": "yogurt"
     },
     {
-      "id": "prod-paneer-cottage-cheese",
+      "id": "prod-paneer-(cottage-cheese)",
       "imageUrl": "https://images.unsplash.com/photo-1588612218075-96c1d8617de7?w=400&h=300&fit=crop&q=80",
       "imageHint": "cottage cheese"
     },
@@ -581,7 +676,7 @@
       "imageHint": "fresh cream"
     },
     {
-      "id": "prod-bread-white-brown-multigrain",
+      "id": "prod-bread-(white,-brown,-multigrain)",
       "imageUrl": "https://images.unsplash.com/photo-1584776140026-c5f43142d160?w=400&h=300&fit=crop&q=80",
       "imageHint": "bread"
     },
@@ -632,7 +727,7 @@
     },
     {
       "id": "prod-tea-powder",
-      "imageUrl": "https://images.unsplash.com/photo-1631149206144-4549c0468787?w=400&h=300&fit=crop&q=80",
+      "imageUrl": "https://images.unsplash.com/photo-1631782110266-76a7e5be9f7f?w=400&h=300&fit=crop&q=80",
       "imageHint": "tea powder"
     },
     {
@@ -706,7 +801,7 @@
       "imageHint": "frozen vegetables"
     },
     {
-      "id": "prod-nuggets-cutlets",
+      "id": "prod-nuggets/cutlets",
       "imageUrl": "https://images.unsplash.com/photo-1569691899455-88464f6d3ab1?w=400&h=300&fit=crop&q=80",
       "imageHint": "nuggets"
     },
@@ -716,7 +811,7 @@
       "imageHint": "sausages"
     },
     {
-      "id": "prod-maggi-noodles",
+      "id": "prod-maggi/noodles",
       "imageUrl": "https://images.unsplash.com/photo-1612929633738-8fe44f7ec841?w=400&h=300&fit=crop&q=80",
       "imageHint": "noodles"
     },
@@ -736,7 +831,7 @@
       "imageHint": "soup packets"
     },
     {
-      "id": "prod-instant-upma-poha-mix",
+      "id": "prod-instant-upma/poha-mix",
       "imageUrl": "https://images.unsplash.com/photo-1601289133917-578f24404a3f?w=400&h=300&fit=crop&q=80",
       "imageHint": "instant mix"
     },
@@ -751,7 +846,7 @@
       "imageHint": "frozen pizzas"
     },
     {
-      "id": "prod-ready-curries-gravies",
+      "id": "prod-ready-curries/gravies",
       "imageUrl": "https://images.unsplash.com/photo-1637194502510-09d5a08e7535?w=400&h=300&fit=crop&q=80",
       "imageHint": "ready curries"
     },
@@ -836,7 +931,7 @@
       "imageHint": "moisturizer"
     },
     {
-      "id": "prod-shaving-cream-razor",
+      "id": "prod-shaving-cream/razor",
       "imageUrl": "https://images.unsplash.com/photo-1621607512022-6aecc4fed814?w=400&h=300&fit=crop&q=80",
       "imageHint": "shaving cream"
     },
@@ -851,7 +946,7 @@
       "imageHint": "hand wash"
     },
     {
-      "id": "prod-agarbatti-incense-sticks",
+      "id": "prod-agarbatti-(incense-sticks)",
       "imageUrl": "https://images.unsplash.com/photo-1599030032319-d78295597e0d?w=400&h=300&fit=crop&q=80",
       "imageHint": "incense sticks"
     },
@@ -871,12 +966,12 @@
       "imageHint": "kumkum"
     },
     {
-      "id": "prod-matchbox-candle",
+      "id": "prod-matchbox/candle",
       "imageUrl": "https://images.unsplash.com/photo-1611176682835-871a38ddc9d3?w=400&h=300&fit=crop&q=80",
       "imageHint": "matchbox"
     },
     {
-      "id": "prod-dog-food-cat-food",
+      "id": "prod-dog-food/cat-food",
       "imageUrl": "https://images.unsplash.com/photo-1598134493179-51332e56807f?w=400&h=300&fit=crop&q=80",
       "imageHint": "pet food"
     },
@@ -921,32 +1016,32 @@
       "imageHint": "lighter"
     },
     {
-      "id": "prod-whole-chicken-with-skin",
+      "id": "prod-whole-chicken-(with-skin)",
       "imageUrl": "https://images.unsplash.com/photo-1604503468822-261545d07802?w=400&h=300&fit=crop&q=80",
       "imageHint": "whole chicken"
     },
     {
-      "id": "prod-whole-chicken-without-skin",
+      "id": "prod-whole-chicken-(without-skin)",
       "imageUrl": "https://images.unsplash.com/photo-1604503468822-261545d07802?w=400&h=300&fit=crop&q=80",
       "imageHint": "skinless chicken"
     },
     {
-      "id": "prod-country-chicken-desi",
+      "id": "prod-country-chicken-(desi)",
       "imageUrl": "https://images.unsplash.com/photo-1559812497-6b21475c8b18?w=400&h=300&fit=crop&q=80",
       "imageHint": "country chicken"
     },
     {
-      "id": "prod-chicken-breast-boneless",
+      "id": "prod-chicken-breast-(boneless)",
       "imageUrl": "https://images.unsplash.com/photo-1604503468822-261545d07802?w=400&h=300&fit=crop&q=80",
       "imageHint": "chicken breast"
     },
     {
-      "id": "prod-chicken-thigh-boneless",
+      "id": "prod-chicken-thigh-(boneless)",
       "imageUrl": "https://images.unsplash.com/photo-1604503468822-261545d07802?w=400&h=300&fit=crop&q=80",
       "imageHint": "chicken thigh"
     },
     {
-      "id": "prod-chicken-leg-drumstick",
+      "id": "prod-chicken-leg-(drumstick)",
       "imageUrl": "https://images.unsplash.com/photo-1604503468822-261545d07802?w=400&h=300&fit=crop&q=80",
       "imageHint": "chicken leg"
     },
@@ -971,7 +1066,7 @@
       "imageHint": "chicken gizzard"
     },
     {
-      "id": "prod-chicken-mince-keema",
+      "id": "prod-chicken-mince-(keema)",
       "imageUrl": "https://images.unsplash.com/photo-1604503468822-261545d07802?w=400&h=300&fit=crop&q=80",
       "imageHint": "chicken mince"
     },
