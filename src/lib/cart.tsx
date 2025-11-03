@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
@@ -67,16 +68,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
             : item
         );
       }
-      // Add the storeId to the product object when adding to cart
-      const productWithStore = { ...product, storeId: activeStoreId || product.storeId };
-      return [...prevItems, { product: productWithStore, variant, quantity }];
+      // Product no longer needs storeId at this stage, it will be associated at checkout
+      return [...prevItems, { product, variant, quantity }];
     });
 
     toast({
       title: 'Item added to cart',
       description: `${product.name} (${variant.weight}) has been added.`,
     });
-  }, [toast, activeStoreId]);
+  }, [toast]);
 
   const removeItem = useCallback((variantSku: string) => {
     setCartItems((prevItems) => {

@@ -66,7 +66,6 @@ export function VoiceCommander({
   
   const formFieldToFillRef = useRef<keyof ProfileFormValues | null>(null);
   const [isWaitingForStoreName, setIsWaitingForStoreName] = useState(false);
-  const checkoutStateRef = useRef({ pathname: '', activeStoreId: '', hasCartItems: false });
   const hasSpokenCheckoutPrompt = useRef(false);
 
   useEffect(() => {
@@ -123,9 +122,9 @@ export function VoiceCommander({
       return;
     }
 
-    // Only speak once per page visit
+    // Only speak once per page visit and if voice is enabled
     if (enabled && !hasSpokenCheckoutPrompt.current) {
-      // Use a timeout to ensure the DOM is ready
+      // Use a timeout to ensure the DOM is ready for querying
       const speakTimeout = setTimeout(() => {
         const actionAlert = document.getElementById('action-required-alert');
         if (actionAlert) {
@@ -253,36 +252,6 @@ export function VoiceCommander({
                 handleProfileFormInteraction();
                 return;
             }
-
-            const multiOrderPattern = /order\s(.+)\sfrom\s(.+)/i;
-            const multiOrderMatch = command.match(multiOrderPattern);
-
-            if (multiOrderMatch) {
-                const itemsString = multiOrderMatch[1];
-                const storeName = multiOrderMatch[2];
-                const store = storesRef.current.find(s => s.name.toLowerCase() === storeName.toLowerCase());
-
-                if (!store) {
-                    speak(`Sorry, I couldn't find a store named ${storeName}.`);
-                    return;
-                }
-                
-                setActiveStoreId(store.id);
-
-                const itemPromises = itemsString.split(/, and |, | and /).map(itemStr => {
-                    const [quantity, ...productWords] = itemStr.trim().split(' ');
-                    const product = productWords.join(' ');
-                    return commandActionsRef.current.orderItem({ product, quantity });
-                });
-                await Promise.all(itemPromises);
-                
-                // Speak after all items are processed
-                speak(`Okay, ordering from ${store.name}. Taking you to checkout.`);
-                
-                router.push('/checkout');
-                onSuggestions([]);
-                return;
-            }
             
             const orderItemTemplate = fileCommandsRef.current.orderItem;
             if (orderItemTemplate) {
@@ -381,9 +350,7 @@ export function VoiceCommander({
           speak(`Added ${variant.weight} of ${product} to your cart.`);
           onOpenCart();
         } else {
-            if (activeStoreId) {
-                speak(`Sorry, I could not find ${product} in the product catalog.`);
-            }
+            speak(`Sorry, I could not find ${product} in the store's product catalog.`);
         }
       },
     };
@@ -409,12 +376,15 @@ export function VoiceCommander({
     };
     
     recognition.onend = () => {
+      // Ensure we only restart listening if the feature is still enabled by the user
+      // and we are not currently trying to speak.
       if (isEnabledRef.current && !isSpeakingRef.current) {
         setTimeout(() => {
           try {
             recognition?.start();
           } catch (e) {
-            console.error('Could not restart recognition service: ', e);
+            // This can happen if start() is called while it's already starting.
+            // console.error('Could not restart recognition service: ', e);
           }
         }, 250); // Add a short delay before restarting
       }
@@ -448,11 +418,11 @@ export function VoiceCommander({
             });
           });
 
-          Object.entries(fileCommands).forEach(([key, { display, aliases, reply }]) => {
+          Object.entries(fileCommands).forEach(([key, { display, aliases, reply }]: [string, any]) => {
             if (key !== 'orderItem') { // Exclude template item orders
               const action = commandActionsRef.current[key];
               if (action) {
-                aliases.forEach(alias => {
+                aliases.forEach((alias: string) => {
                   builtCommands.push({ command: alias, display, action, reply });
                 });
               }
@@ -465,6 +435,7 @@ export function VoiceCommander({
     
     return () => {
       if (recognition) {
+        recognition.onend = null; // Prevent restart on component unmount
         recognition.abort();
       }
     };

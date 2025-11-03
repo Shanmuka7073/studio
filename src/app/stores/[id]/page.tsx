@@ -1,4 +1,5 @@
 
+
 'use client';
 import { getStoreImage, getProductImage } from '@/lib/data';
 import Image from 'next/image';
@@ -206,15 +207,19 @@ export default function StoreDetailPage() {
 
   const filteredProducts = useMemo(() => {
     if (allStoreProducts.length === 0) return [];
-    const productsInCategory = allStoreProducts.filter(p => p.category === selectedCategory);
     
     if (searchTerm) {
-      return productsInCategory.filter(product =>
-        product.name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+        return allStoreProducts.filter(product =>
+            product.name.toLowerCase().includes(searchTerm.toLowerCase())
+        );
     }
-    // Apply pagination limit
-    return productsInCategory.slice(0, 20);
+
+    if(selectedCategory) {
+        return allStoreProducts.filter(p => p.category === selectedCategory).slice(0, 20);
+    }
+    
+    // If no category is selected (e.g. during initial load), show nothing.
+    return [];
   }, [allStoreProducts, selectedCategory, searchTerm]);
   
   // Effect to fetch prices for visible products
@@ -261,12 +266,14 @@ export default function StoreDetailPage() {
           <main className="p-4 md:p-6">
             <div className="flex justify-between items-start md:items-center mb-6 flex-col md:flex-row gap-4">
                 <div>
-                  <h2 className="text-2xl font-bold font-headline">{selectedCategory}</h2>
-                  <p className="text-sm text-muted-foreground">Showing the first {filteredProducts.length} products in this category.</p>
+                  <h2 className="text-2xl font-bold font-headline">{searchTerm ? "Search Results" : selectedCategory}</h2>
+                  <p className="text-sm text-muted-foreground">
+                    {searchTerm ? `Found ${filteredProducts.length} products` : `Showing first ${filteredProducts.length} products in this category.`}
+                 </p>
                 </div>
                 <div className="w-full md:max-w-sm">
                     <Input 
-                        placeholder={`Search in ${selectedCategory}...`}
+                        placeholder={`Search all products in ${store.name}...`}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
