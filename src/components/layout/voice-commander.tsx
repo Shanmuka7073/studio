@@ -258,8 +258,8 @@ export function VoiceCommander({
             if (orderItemTemplate) {
                 for (const alias of orderItemTemplate.aliases) {
                     const pattern = alias
-                        .replace('{quantity}', '(.+?)') // Non-greedy quantity
-                        .replace('{product}', '(.+)');
+                        .replace('{quantity}', '([\\d\\w\\s]+?)') // More flexible quantity (numbers, words, spaces)
+                        .replace('{product}', '([\\w\\s]+)');    // Product name
                     const regex = new RegExp(`^${pattern}$`, 'i');
                     const match = commandText.match(regex);
                     
@@ -267,18 +267,18 @@ export function VoiceCommander({
                         let quantity: string | undefined = undefined;
                         let product: string | undefined = undefined;
                         
-                        const quantityIndex = alias.indexOf('{quantity}');
-                        const productIndex = alias.indexOf('{product}');
+                        const quantityIndexInAlias = alias.indexOf('{quantity}');
+                        const productIndexInAlias = alias.indexOf('{product}');
 
-                        if (quantityIndex !== -1 && productIndex !== -1) {
-                            if (quantityIndex < productIndex) {
+                        if (quantityIndexInAlias !== -1 && productIndexInAlias !== -1) {
+                            if (quantityIndexInAlias < productIndexInAlias) {
                                 quantity = match[1]?.trim();
                                 product = match[2]?.trim();
                             } else {
                                 product = match[1]?.trim();
                                 quantity = match[2]?.trim();
                             }
-                        } else if (productIndex !== -1) {
+                        } else if (productIndexInAlias !== -1) {
                             product = match[1]?.trim();
                         }
                         
