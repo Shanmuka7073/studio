@@ -1,4 +1,3 @@
-
 {
   "orderItem": {
     "display": "Order an Item (Template)",
@@ -159,7 +158,12 @@
       "start checkout",
       "finish my order",
       "complete purchase",
-      "pay now"
+      "pay now",
+      "check out",
+      "checkout",
+      "proceedcheck out",
+      "proceed to check out",
+      "proceed checkout"
     ]
   },
   "placeOrder": {
@@ -170,7 +174,10 @@
       "confirm order",
       "submit order",
       "finish and pay",
-      "complete my order"
+      "complete my order",
+      "place the order",
+      "placeorder",
+      "orderplace"
     ]
   },
   "saveChanges": {
@@ -197,5 +204,3 @@
     ]
   }
 }
-
-    
