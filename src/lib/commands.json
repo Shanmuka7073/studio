@@ -1,4 +1,19 @@
 {
+  "quickOrder": {
+    "display": "Quick Order an Item from a Store",
+    "reply": "Okay, preparing your quick order.",
+    "aliases": [
+      "order {quantity} of {product} from {store}",
+      "order {quantity} {product} from {store}",
+      "get {quantity} of {product} from {store}",
+      "get {quantity} {product} from {store}",
+      "buy {quantity} of {product} from {store}",
+      "buy {quantity} {product} from {store}",
+      "order {product} from {store}",
+      "get {product} from {store}",
+      "buy {product} from {store}"
+    ]
+  },
   "quickOrderConfirm": {
     "display": "Confirm the quick order",
     "reply": "Placing your order now.",

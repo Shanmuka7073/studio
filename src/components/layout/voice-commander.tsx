@@ -370,7 +370,8 @@ export function VoiceCommander({
 
             // 1. Check file commands (aliases)
             Object.entries(fileCommandsRef.current).forEach(([key, fileCommand]: [string, any]) => {
-                if (key !== 'orderItem') { // orderItem is handled separately
+                // Templates are handled separately
+                if (key !== 'orderItem' && key !== 'quickOrder') { 
                     fileCommand.aliases.forEach((alias: string) => {
                         const similarity = calculateSimilarity(commandText, alias);
                         if (similarity > 0.7) {
@@ -387,52 +388,47 @@ export function VoiceCommander({
                     allPossibleCommands.push({ command: c, similarity });
                 }
             });
+            
+            // --- Template Command Matching ---
 
-            // 3. Handle orderItem template separately
-            const orderItemTemplate = fileCommandsRef.current.orderItem;
-             if (orderItemTemplate) {
-                 for (const alias of orderItemTemplate.aliases) {
-                    const aliasParts = alias.split(/(\{product\}|\{quantity\})/g).filter(Boolean);
-                    const isTemplate = aliasParts.some(p => p === '{product}' || p === '{quantity}');
-                    
-                    if (isTemplate) {
-                        const regexString = alias
-                            .replace(/\{quantity\}/g, '([\\w\\s\\d]+?)')
-                            .replace(/\{product\}/g, '([\\w\\s]+)');
+            const templates = [
+              { key: 'quickOrder', template: fileCommandsRef.current.quickOrder },
+              { key: 'orderItem', template: fileCommandsRef.current.orderItem },
+            ];
+
+            for (const { key, template } of templates) {
+                if (template) {
+                    for (const alias of template.aliases) {
+                        const aliasParts = alias.split(/(\{product\}|\{quantity\}|\{store\})/g).filter(Boolean);
+                        const isTemplate = aliasParts.some(p => p.startsWith('{') && p.endsWith('}'));
                         
-                        const regex = new RegExp(`^${regexString}$`, 'i');
-                        const match = commandText.match(regex);
+                        if (isTemplate) {
+                            const regexString = alias
+                                .replace(/\{quantity\}/g, '(.*?)')
+                                .replace(/\{product\}/g, '(.*?)')
+                                .replace(/\{store\}/g, '(.*)'); // Store name is greedy at the end
+                            
+                            const regex = new RegExp(`^${regexString}$`, 'i');
+                            const match = commandText.match(regex);
 
-                        if (match) {
-                            // This is a direct match, execute it.
-                             let quantity: string | undefined = undefined;
-                            let product: string | undefined = undefined;
-                            let quantityIndex = alias.indexOf('{quantity}');
-                            let productIndex = alias.indexOf('{product}');
-
-                            let matchIndex = 1;
-                            if (quantityIndex !== -1 && productIndex !== -1) {
-                                if(quantityIndex < productIndex) {
-                                    quantity = match[matchIndex++];
-                                    product = match[matchIndex];
-                                } else {
-                                    product = match[matchIndex++];
-                                    quantity = match[matchIndex];
+                            if (match) {
+                                const extracted: Record<string, string | undefined> = {};
+                                let matchIndex = 1;
+                                for (const part of aliasParts) {
+                                    if (part === '{quantity}') extracted.quantity = match[matchIndex++]?.trim();
+                                    else if (part === '{product}') extracted.product = match[matchIndex++]?.trim();
+                                    else if (part === '{store}') extracted.store = match[matchIndex++]?.trim();
                                 }
-                            } else if (quantityIndex !== -1) {
-                                quantity = match[matchIndex];
-                            } else if (productIndex !== -1) {
-                                product = match[matchIndex];
-                            }
-
-                            if (product) {
-                                await commandActionsRef.current.orderItem({ product: product.trim(), quantity: quantity?.trim() });
-                                resetContext();
-                                return;
+                                
+                                if (extracted.product) {
+                                    await commandActionsRef.current[key](extracted);
+                                    resetContext();
+                                    return;
+                                }
                             }
                         }
                     }
-                 }
+                }
             }
 
 
@@ -585,6 +581,40 @@ export function VoiceCommander({
         } else {
           speak(`Sorry, I could not find ${product} in the store.`);
         }
+      },
+      quickOrder: async ({ product, quantity, store: storeName }: { product: string, quantity?: string, store?: string }) => {
+        if (!storeName) {
+            speak("You need to specify a store for a quick order. For example, say 'order 1kg potatoes from Fresh Produce'.");
+            return;
+        }
+
+        const { product: foundProduct, variant } = await findProductAndVariant(product, quantity);
+        if (!foundProduct || !variant) {
+            speak(`Sorry, I could not find ${product}.`);
+            return;
+        }
+        
+        const spokenStoreName = storeName.toLowerCase();
+        const bestMatch = stores
+            .map(s => ({ ...s, similarity: calculateSimilarity(spokenStoreName, s.name.toLowerCase()) }))
+            .sort((a, b) => b.similarity - a.similarity)[0];
+
+        if (!bestMatch || bestMatch.similarity < 0.7) {
+            speak(`Sorry, I couldn't find a store named ${storeName}. Please try again.`);
+            return;
+        }
+
+        speak(`Okay, starting a quick order for ${quantity || ''} ${product} from ${bestMatch.name}.`);
+        
+        // Perform actions
+        clearCart();
+        addItemToCart(foundProduct, variant, 1);
+        setActiveStoreId(bestMatch.id);
+        
+        // Wait a moment for state to update, then navigate
+        setTimeout(() => {
+            router.push('/checkout');
+        }, 500);
       },
     };
     
