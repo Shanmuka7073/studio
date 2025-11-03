@@ -369,18 +369,22 @@ export function VoiceCommander({
             
             // --- Primary Command Matching Logic ---
             let bestMatch: { commandKey: string, fileCommand: any, similarity: number } | null = null;
+            const lowerCommandText = commandText.toLowerCase();
 
-            Object.entries(fileCommandsRef.current).forEach(([key, fileCommand]: [string, any]) => {
-                if (key === 'orderItem' || key === 'quickOrder') return; // Skip templates
-                fileCommand.aliases.forEach((alias: string) => {
-                    const similarity = calculateSimilarity(commandText, alias);
+            for (const key in fileCommandsRef.current) {
+                const fileCommand = fileCommandsRef.current[key];
+                // Skip template commands in this first pass
+                if (key === 'orderItem' || key === 'quickOrder') continue;
+
+                for (const alias of fileCommand.aliases) {
+                    const similarity = calculateSimilarity(lowerCommandText, alias);
                     if (!bestMatch || similarity > bestMatch.similarity) {
                         bestMatch = { commandKey: key, fileCommand, similarity };
                     }
-                });
-            });
+                }
+            }
 
-            // Consider a match if similarity is high enough
+            // If we found a strong match for a general command, execute it and stop.
             if (bestMatch && bestMatch.similarity > 0.85) {
                 const { commandKey, fileCommand } = bestMatch;
                 const action = commandActionsRef.current[commandKey];
@@ -388,9 +392,10 @@ export function VoiceCommander({
                     speak(fileCommand.reply);
                     action();
                     resetContext();
-                    return; // Command handled
+                    return; // Command handled, exit function.
                 }
             }
+
             
             // --- Template Command Matching (for ordering) ---
             const templates = [
