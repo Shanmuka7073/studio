@@ -84,7 +84,22 @@
       "go to basket",
       "open shopping cart",
       "my items",
-      "shopping"
+      "shopping",
+      "create a shopping list",
+      "make a list",
+      "new shopping list",
+      "start my list",
+      "prepare my list",
+      "record my order",
+      "start voice order",
+      "start list",
+      "i want to shop",
+      "take my order",
+      "let's shop",
+      "let's do shopping",
+      "shop now",
+      "add list",
+      "list items"
     ]
   },
   "orders": {
@@ -129,27 +144,6 @@
       "make a store",
       "open my shop",
       "go to seller page"
-    ]
-  },
-  "voiceOrder": {
-    "display": "Create a Shopping List",
-    "reply": "Okay, let's create a new shopping list.",
-    "aliases": [
-      "create a shopping list",
-      "make a list",
-      "new shopping list",
-      "start my list",
-      "prepare my list",
-      "record my order",
-      "start voice order",
-      "start list",
-      "i want to shop",
-      "take my order",
-      "let's shop",
-      "let's do shopping",
-      "shop now",
-      "add list",
-      "list items"
     ]
   },
   "checkout": {
