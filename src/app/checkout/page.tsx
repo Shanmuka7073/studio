@@ -180,7 +180,7 @@ export default function CheckoutPage() {
   const [structuredList, setStructuredList] = useState<StructuredListItem[]>([]);
   const [availableStores, setAvailableStores] = useState<Store[]>([]);
   
-  const speechRecognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   const [deliveryCoords, setDeliveryCoords] = useState<{lat: number, lng: number} | null>(null);
   const [images, setImages] = useState({});
@@ -211,8 +211,15 @@ export default function CheckoutPage() {
         }
     }, [toast]);
     
-   // This state now drives the voice prompt for location
   const shouldPromptForLocation = (hasItemsInCart || structuredList.length > 0) && !deliveryCoords;
+
+  useEffect(() => {
+    if (shouldPromptForLocation) {
+        // Auto-trigger location capture
+        const timeoutId = setTimeout(() => handleGetLocation(), 1000);
+        return () => clearTimeout(timeoutId);
+    }
+  }, [shouldPromptForLocation, handleGetLocation]);
 
   useEffect(() => {
     if (deliveryCoords) return;
@@ -326,15 +333,15 @@ export default function CheckoutPage() {
   }, [cartItems]);
 
   const handleToggleListening = useCallback(() => {
-    if (!speechRecognitionRef.current) return;
+    if (!recognitionRef.current) return;
     
     if (isListening) {
-        speechRecognitionRef.current.stop();
+        recognitionRef.current.stop();
     } else {
         setStructuredList([]);
         form.setValue('shoppingList', '');
         form.setValue('storeId', '');
-        speechRecognitionRef.current.start();
+        recognitionRef.current.start();
     }
   }, [isListening, form]);
   
@@ -378,8 +385,8 @@ export default function CheckoutPage() {
 
         return () => {
           clearTimeout(timeoutId);
-          if (speechRecognitionRef.current) {
-            speechRecognitionRef.current.abort();
+          if (recognitionRef.current) {
+            recognitionRef.current.abort();
           }
         }
     } else {
@@ -566,20 +573,7 @@ export default function CheckoutPage() {
                         />
                         <div className="space-y-2">
                             <FormLabel>Delivery Location</FormLabel>
-                             {shouldPromptForLocation ? (
-                                <Card className="bg-primary/5 p-4 text-center border-primary/20">
-                                    <div className="flex items-center justify-center gap-2 mb-2">
-                                         <HelpCircle className="h-5 w-5 text-primary" />
-                                        <p className="font-semibold text-primary">Confirm Your Delivery Location</p>
-                                    </div>
-                                    <p className="text-sm text-muted-foreground mb-4">For accurate delivery, please share your current location for this order. Say "Yes" if you've enabled voice commands.</p>
-                                    <div className="flex gap-4 justify-center">
-                                        <Button type="button" onClick={handleGetLocation}>
-                                           <MapPin className="mr-2 h-4 w-4" /> Yes, Use Current Location
-                                        </Button>
-                                    </div>
-                                </Card>
-                            ) : deliveryCoords ? (
+                             {deliveryCoords ? (
                                 <div className="flex items-center gap-4 pt-2">
                                      <div className="flex items-center text-green-600">
                                         <CheckCircle className="mr-2 h-5 w-5" />
@@ -590,9 +584,10 @@ export default function CheckoutPage() {
                                     </Button>
                                 </div>
                             ) : (
-                                <Button type="button" variant="outline" onClick={handleGetLocation} className="w-full">
-                                    <MapPin className="mr-2 h-4 w-4" /> Get Current Location
-                                </Button>
+                                <div className="flex items-center gap-2 text-muted-foreground p-3 bg-muted/50 rounded-md">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <span>Getting your current location...</span>
+                                </div>
                             )}
                         </div>
                         <FormField

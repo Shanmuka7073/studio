@@ -151,6 +151,13 @@ export function VoiceOrderDialog({ isOpen, onClose, orderInfo }: { isOpen: boole
   const voiceOrderSubtotal = structuredList.reduce((acc, item) => acc + ((item.price || 0) * item.quantity), 0);
   const finalTotal = voiceOrderSubtotal + DELIVERY_FEE;
 
+  useEffect(() => {
+    if (shouldPromptForLocation) {
+        // Auto-trigger location capture
+        const timeoutId = setTimeout(() => handleGetLocation(), 1000);
+        return () => clearTimeout(timeoutId);
+    }
+  }, [shouldPromptForLocation, handleGetLocation]);
 
   useEffect(() => {
     if (isOpen) {
@@ -393,62 +400,53 @@ export function VoiceOrderDialog({ isOpen, onClose, orderInfo }: { isOpen: boole
 
                 <ScrollArea className="md:pr-4">
                     <div className="space-y-6">
-                         {shouldPromptForLocation ? (
-                            <Card className="bg-primary/5 p-4 text-center border-primary/20">
-                                <div className="flex items-center justify-center gap-2 mb-2">
-                                     <HelpCircle className="h-5 w-5 text-primary" />
-                                    <p className="font-semibold text-primary">Confirm Your Delivery Location</p>
-                                </div>
-                                <p className="text-sm text-muted-foreground mb-4">For accurate delivery, please share your current location for this order. Say "Yes" if you've enabled voice commands.</p>
-                                <div className="flex gap-4 justify-center">
-                                    <Button type="button" onClick={handleGetLocation}>
-                                       <MapPin className="mr-2 h-4 w-4" /> Yes, Use Current Location
-                                    </Button>
-                                </div>
-                            </Card>
-                         ) : (
-                            <Card>
-                                <CardHeader><CardTitle>Delivery Details</CardTitle></CardHeader>
-                                <CardContent className="space-y-4">
-                                    <FormField
-                                        control={form.control}
-                                        name="name"
-                                        render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Full Name</FormLabel>
-                                            <FormControl><Input placeholder="John Doe" {...field} readOnly={!!userData?.firstName} /></FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                        )}
-                                    />
-                                    <FormField
-                                        control={form.control}
-                                        name="phone"
-                                        render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Phone Number</FormLabel>
-                                            <FormControl><Input placeholder="(555) 123-4567" {...field} readOnly={!!userData?.phoneNumber} /></FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                        )}
-                                    />
-                                    <div className="space-y-2">
-                                        <FormLabel>Delivery Location</FormLabel>
+                        <Card>
+                            <CardHeader><CardTitle>Delivery Details</CardTitle></CardHeader>
+                            <CardContent className="space-y-4">
+                                <FormField
+                                    control={form.control}
+                                    name="name"
+                                    render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Full Name</FormLabel>
+                                        <FormControl><Input placeholder="John Doe" {...field} readOnly={!!userData?.firstName} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="phone"
+                                    render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Phone Number</FormLabel>
+                                        <FormControl><Input placeholder="(555) 123-4567" {...field} readOnly={!!userData?.phoneNumber} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                    )}
+                                />
+                                <div className="space-y-2">
+                                    <FormLabel>Delivery Location</FormLabel>
+                                    {deliveryCoords ? (
                                         <div className="flex items-center gap-4 pt-1">
-                                             <Button type="button" variant="outline" onClick={handleGetLocation} className="flex-1">
-                                                <MapPin className="mr-2 h-4 w-4" /> {deliveryCoords ? 'Re-capture' : 'Get Current Location'}
+                                             <div className="flex items-center text-green-600">
+                                                <CheckCircle className="mr-2 h-5 w-5" />
+                                                <span>Location captured!</span>
+                                            </div>
+                                            <Button type="button" variant="outline" size="sm" onClick={handleGetLocation}>
+                                                <MapPin className="mr-2 h-4 w-4" /> Re-capture
                                             </Button>
-                                            {deliveryCoords && (
-                                                <div className="flex items-center text-green-600 text-sm">
-                                                    <CheckCircle className="mr-2 h-4 w-4" />
-                                                    <span>Captured!</span>
-                                                </div>
-                                            )}
                                         </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                         )}
+                                    ) : (
+                                        <div className="flex items-center gap-2 text-muted-foreground p-3 bg-muted/50 rounded-md">
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                            <span>Getting your current location...</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+                         
                         <Card>
                             <CardHeader><CardTitle>Order Summary</CardTitle></CardHeader>
                             <CardContent className="space-y-2">
