@@ -235,6 +235,16 @@ export function VoiceCommander({
         try {
             if (!firestore || !user) return;
 
+            // Priority 1: Check for a perfect match with simple action commands first.
+            const perfectMatch = commandsRef.current.find((c) => commandText === c.command);
+            if (perfectMatch) {
+                speak(perfectMatch.reply);
+                perfectMatch.action();
+                onSuggestions([]);
+                return;
+            }
+
+            // Handle multi-store clarification
             if (clarificationStores.length > 0) {
                 const chosenIndex = parseInt(commandText.replace(/[^0-9]/g, ''), 10) - 1;
                 let chosenStore: Store | undefined = clarificationStores[chosenIndex];
@@ -258,6 +268,7 @@ export function VoiceCommander({
                 return;
             }
 
+            // Handle store selection on checkout page
             if (isWaitingForStoreName) {
                 const spokenStoreName = commandText.toLowerCase();
                 const bestMatch = storesRef.current
@@ -277,6 +288,7 @@ export function VoiceCommander({
                 return;
             }
 
+            // Handle filling out the profile form
             if (formFieldToFillRef.current && profileForm) {
                 profileForm.setValue(formFieldToFillRef.current, commandText, { shouldValidate: true });
                 formFieldToFillRef.current = null;
@@ -284,16 +296,31 @@ export function VoiceCommander({
                 return;
             }
             
+            // Priority 2: Check if it's an "order item" command using the template.
             const orderItemTemplate = fileCommandsRef.current.orderItem;
             if (orderItemTemplate) {
                 for (const alias of orderItemTemplate.aliases) {
-                    const pattern = alias.replace('{quantity}', '(.+)').replace('{product}', '(.+)');
+                    // Improved regex to handle different sentence structures
+                    const pattern = alias
+                        .replace('{quantity}', '(.+?)') // Non-greedy quantity
+                        .replace('{product}', '(.+)');
                     const regex = new RegExp(`^${pattern}$`, 'i');
                     const match = commandText.match(regex);
                     
                     if (match) {
-                        const quantity = match[1]?.trim();
-                        const product = match[2]?.trim();
+                        // The regex will capture quantity and product.
+                        // Example: "add 1kg of potatoes" -> match[1]="1kg", match[2]="potatoes"
+                        // Example: "add potatoes" (if template is just "{product}") -> match[1]="potatoes"
+                        // We need to handle cases where quantity is optional in the template.
+                        let quantity: string | undefined = undefined;
+                        let product: string | undefined = undefined;
+
+                        if (alias.includes('{quantity}') && alias.includes('{product}')) {
+                            quantity = match[1]?.trim();
+                            product = match[2]?.trim();
+                        } else if (alias.includes('{product}')) {
+                            product = match[1]?.trim();
+                        }
 
                         if(product) {
                            commandActionsRef.current.orderItem({ product, quantity });
@@ -304,14 +331,7 @@ export function VoiceCommander({
                 }
             }
 
-            const perfectMatch = commandsRef.current.find((c) => commandText === c.command);
-            if (perfectMatch) {
-                speak(perfectMatch.reply);
-                perfectMatch.action();
-                onSuggestions([]);
-                return;
-            }
-            
+            // Priority 3: Fuzzy matching for suggestions if no direct match is found.
             const potentialMatches = commandsRef.current
               .map((c) => ({ ...c, similarity: calculateSimilarity(commandText, c.command) }))
               .filter((c) => c.similarity > 0.7)
@@ -480,5 +500,3 @@ export function VoiceCommander({
 
   return null;
 }
-
-    

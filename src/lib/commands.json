@@ -15,7 +15,10 @@
       "had {quantity} {product}",
       "add one {product}",
       "get one {product}",
-      "had one {product}"
+      "had one {product}",
+      "{quantity} {product}",
+      "oka product quantity",
+      "oka {product} {quantity}"
     ]
   },
   "orderChicken": {
@@ -27,7 +30,9 @@
       "i want chicken",
       "add chicken",
       "had one kg chicken",
-      "add 1 kg chicken"
+      "add 1 kg chicken",
+      "oka kg chicken",
+      "kg chicken"
     ]
   },
   "home": {
