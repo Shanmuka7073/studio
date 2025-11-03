@@ -5,7 +5,7 @@ import { useCart } from '@/lib/cart';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription as UiCardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -16,46 +16,26 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  FormDescription,
 } from '@/components/ui/form';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
-import { getProductImage, getStores, getStore } from '@/lib/data';
-import { useTransition, useState, useRef, useCallback, useEffect, useMemo, RefObject } from 'react';
+import { getProductImage, getStore } from '@/lib/data';
+import { useTransition, useState, useCallback, useEffect, useMemo, RefObject, useRef } from 'react';
 import { useFirebase, errorEmitter, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, addDoc, serverTimestamp, getDocs, doc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { Mic, StopCircle, CheckCircle, MapPin, Loader2, Bot, Store as StoreIcon, HelpCircle } from 'lucide-react';
+import { Mic, CheckCircle, MapPin, Loader2 } from 'lucide-react';
 import Link from 'next/link';
-import { Textarea } from '@/components/ui/textarea';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import type { ProductPrice, ProductVariant, Store, User as AppUser } from '@/lib/types';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { User as AppUser } from '@/lib/types';
 import { create } from 'zustand';
-import { translateProductNames } from '@/ai/flows/translation-flow';
 
 const checkoutSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   phone: z.string().min(10, 'Please enter a valid phone number'),
-  shoppingList: z.string().optional(),
-  storeId: z.string().optional(),
 });
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
-
-type StructuredListItem = {
-    productName: string;
-    quantity: number;
-    price: number | null;
-    variant: ProductVariant;
-};
-
-type ParsedOrderItem = {
-    quantity: number;
-    unit: string;
-    item: string;
-}
 
 const DELIVERY_FEE = 30;
 
@@ -76,67 +56,7 @@ function OrderSummaryItem({ item, image }) {
     );
 }
 
-
-// New, robust function based on user's working demo
-async function matchItemsToCatalog(text: string, db: any): Promise<StructuredListItem[]> {
-    if (!text || !db) return [];
-
-    // 1. Fetch the entire product price catalog
-    const productPricesRef = collection(db, 'productPrices');
-    const productSnapshot = await getDocs(productPricesRef);
-    const masterProductList = productSnapshot.docs.map(doc => doc.data() as ProductPrice);
-
-    if (masterProductList.length === 0) {
-        console.warn("Master product catalog is empty.");
-        return [];
-    }
-    
-    // Clean duplicates like "1 kg 1 kg chicken" -> "1 kg chicken"
-    let cleanedText = text.replace(/(\d+\s*kg\s*)\1+/gi, '$1');
-    cleanedText = cleanedText.replace(/(one\s*kg\s*)\1+/gi, '$1');
-    cleanedText = cleanedText.replace(/(one\s*kilo\s*)\1+/gi, '$1');
-
-
-    const matchedItems: StructuredListItem[] = [];
-    const pattern = /(one|\d+)\s*(kg|kilo|kilogram|grams|gm|g)?\s*([a-zA-Z\s]+)/gi;
-    let match;
-
-    while ((match = pattern.exec(cleanedText)) !== null) {
-        const quantityStr = match[1].toLowerCase();
-        const quantity = quantityStr === 'one' ? 1 : parseInt(quantityStr, 10);
-        let unit = (match[2] || 'kg').toLowerCase(); // Default to 'kg' if no unit
-        const itemName = match[3].trim().toLowerCase();
-
-        if (unit.startsWith('g')) unit = 'gm';
-        if (unit.startsWith('kilo')) unit = 'kg';
-
-        const targetWeight = `${quantity}${unit}`;
-        
-        // Find a product in the catalog where the name is included in the spoken item
-        const productMatch = masterProductList.find(p => 
-            itemName.includes(p.productName.toLowerCase())
-        );
-
-        if (productMatch) {
-            // Find the specific variant (e.g., "1kg") that matches the quantity
-            const variantMatch = productMatch.variants.find(v => 
-                v.weight.replace(/\s/g, '') === targetWeight
-            );
-            
-            if (variantMatch) {
-                matchedItems.push({
-                    productName: productMatch.productName,
-                    quantity: 1, // The quantity is part of the variant
-                    price: variantMatch.price,
-                    variant: variantMatch
-                });
-            }
-        }
-    }
-
-    return matchedItems;
-}
-
+// Minimal pass-through state needed by the voice commander.
 interface PassThroughState {
   placeOrderBtnRef: RefObject<HTMLButtonElement> | null;
   setPlaceOrderBtnRef: (ref: RefObject<HTMLButtonElement> | null) => void;
@@ -159,26 +79,13 @@ export const useCheckoutStore = create<PassThroughState>((set) => ({
   setHandleGetLocation: (handler) => set({ handleGetLocation: handler }),
 }));
 
-export const useCheckoutPassThrough = () => useCheckoutStore((state) => ({ 
-    placeOrderBtnRef: state.placeOrderBtnRef, 
-    getFinalTotal: state.getFinalTotal,
-    shouldPromptForLocation: state.shouldPromptForLocation,
-    handleGetLocation: state.handleGetLocation,
-}));
-
-
 export default function CheckoutPage() {
   const { cartItems, cartTotal, clearCart } = useCart();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [isPlacingOrder, startPlaceOrderTransition] = useTransition();
   const { firestore, user } = useFirebase();
 
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [structuredList, setStructuredList] = useState<StructuredListItem[]>([]);
-  const [availableStores, setAvailableStores] = useState<Store[]>([]);
-  
   const [deliveryCoords, setDeliveryCoords] = useState<{lat: number, lng: number} | null>(null);
   const [images, setImages] = useState({});
   const placeOrderBtnRef = useRef<HTMLButtonElement>(null);
@@ -186,8 +93,7 @@ export default function CheckoutPage() {
   const { setPlaceOrderBtnRef, setFinalTotalGetter, setShouldPromptForLocation, setHandleGetLocation } = useCheckoutStore();
 
   const hasItemsInCart = cartItems.length > 0;
-  const voiceOrderSubtotal = structuredList.reduce((acc, item) => acc + ((item.price || 0) * item.quantity), 0);
-  const finalTotal = hasItemsInCart ? cartTotal + DELIVERY_FEE : voiceOrderSubtotal + DELIVERY_FEE;
+  const finalTotal = hasItemsInCart ? cartTotal + DELIVERY_FEE : 0;
   
   const handleGetLocation = useCallback(() => {
         if (navigator.geolocation) {
@@ -209,21 +115,14 @@ export default function CheckoutPage() {
         }
     }, [toast]);
     
-  const shouldPromptForLocation = (hasItemsInCart || structuredList.length > 0) && !deliveryCoords;
+  const shouldPromptForLocation = hasItemsInCart && !deliveryCoords;
 
   useEffect(() => {
-    const autoStart = searchParams.get('action') === 'record';
-    if (autoStart) {
-        // This is a placeholder for where the global voice commander would trigger the logic
-        // For now, we'll just log it. A user would typically initiate this via voice.
-        console.log("Checkout opened with action=record. Voice command handler would take over.");
-    }
-
     if (shouldPromptForLocation) {
         const timeoutId = setTimeout(() => handleGetLocation(), 1000);
         return () => clearTimeout(timeoutId);
     }
-  }, [shouldPromptForLocation, handleGetLocation, searchParams]);
+  }, [shouldPromptForLocation, handleGetLocation]);
 
   useEffect(() => {
     if (deliveryCoords) return;
@@ -246,78 +145,22 @@ export default function CheckoutPage() {
     if (!firestore || !user) return null;
     return doc(firestore, 'users', user.uid);
   }, [firestore, user]);
-  const { data: userData, isLoading: isProfileLoading } = useDoc<AppUser>(userDocRef);
+  const { data: userData } = useDoc<AppUser>(userDocRef);
 
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
-    defaultValues: {
-      name: '',
-      phone: '',
-      shoppingList: '',
-      storeId: '',
-    },
+    defaultValues: { name: '', phone: '' },
   });
 
-  // Effect to pre-fill form with user data and decide on location prompt
+  // Effect to pre-fill form with user data
   useEffect(() => {
     if (userData) {
       form.reset({
         name: `${userData.firstName} ${userData.lastName}`,
         phone: userData.phoneNumber,
-        shoppingList: form.getValues('shoppingList'),
-        storeId: form.getValues('storeId'),
       });
     }
   }, [userData, form]);
-
-  const handleUnderstandList = useCallback(async (text: string) => {
-    if (!firestore) return;
-    const transcribedText = text || form.getValues('shoppingList');
-    if (!transcribedText) {
-        toast({ variant: 'destructive', title: 'No list to understand', description: 'Please record or type your shopping list first.' });
-        return;
-    }
-
-    setIsProcessing(true);
-    setStructuredList([]);
-    try {
-        const items = await matchItemsToCatalog(transcribedText, firestore);
-        
-        if (items.length > 0) {
-            setStructuredList(items);
-            toast({ title: "List Understood!", description: `Found ${items.length} item(s) from your list.` });
-        } else {
-            throw new Error("Could not find any matching products in the master catalog based on your list.");
-        }
-    } catch (error) {
-        console.error("List parsing error:", error);
-        toast({
-            variant: 'destructive',
-            title: 'Processing Failed',
-            description: (error as Error).message || 'Could not understand the items in your list.'
-        });
-    } finally {
-        setIsProcessing(false);
-    }
-  }, [firestore, form, toast]);
-
-  useEffect(() => {
-    async function fetchStores() {
-      if (!firestore) return;
-      try {
-        const stores = await getStores(firestore);
-        setAvailableStores(stores);
-      } catch (err) {
-        console.error(err);
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'Could not fetch available stores.',
-        });
-      }
-    }
-    fetchStores();
-  }, [firestore, toast]);
 
   useEffect(() => {
     const fetchImages = async () => {
@@ -336,77 +179,6 @@ export default function CheckoutPage() {
     }
   }, [cartItems]);
 
-    const handleConfirmVoiceOrder = async (data: CheckoutFormValues) => {
-        if (!firestore || !user) return;
-        
-        const storeId = data.storeId;
-        if (!storeId) {
-            toast({ variant: 'destructive', title: 'Store Required', description: 'Please select a store to fulfill your voice order.' });
-            return;
-        }
-
-        startPlaceOrderTransition(async () => {
-            const storeData = await getStore(firestore, storeId);
-            if (!storeData) {
-                toast({ variant: 'destructive', title: 'Error', description: 'Selected store could not be found.' });
-                return;
-            }
-            
-            const totalAmount = voiceOrderSubtotal + DELIVERY_FEE;
-
-            // Generate translated list
-            const productNames = structuredList.map(item => item.productName);
-            const translations = await translateProductNames(productNames);
-            const translatedListString = translations.map(t => `${t.englishName} (${t.teluguName})`).join(', ');
-            
-            let orderData: any = {
-                userId: user.uid,
-                storeId: storeId,
-                storeOwnerId: storeData.ownerId,
-                customerName: data.name,
-                deliveryAddress: 'Delivery via captured GPS coordinates',
-                deliveryLat: deliveryCoords!.lat,
-                deliveryLng: deliveryCoords!.lng,
-                phone: data.phone,
-                email: user.email,
-                orderDate: serverTimestamp(),
-                status: 'Pending' as 'Pending',
-                totalAmount,
-                translatedList: translatedListString,
-                items: structuredList.map(item => ({
-                    productName: item.productName,
-                    variantWeight: item.variant.weight,
-                    price: item.price || 0,
-                    productId: item.variant.sku,
-                    variantSku: item.variant.sku,
-                    quantity: item.quantity,
-                })),
-            };
-
-            const colRef = collection(firestore, 'orders');
-            addDoc(colRef, orderData).then(() => {
-                clearCart();
-                setStructuredList([]);
-                setDeliveryCoords(null);
-                form.reset();
-
-                toast({
-                    title: "Order Placed!",
-                    description: "Thank you for your purchase.",
-                });
-                router.push('/order-confirmation');
-            }).catch((e) => {
-                console.error('Error placing voice order:', e);
-                const permissionError = new FirestorePermissionError({
-                    path: colRef.path,
-                    operation: 'create',
-                    requestResourceData: orderData
-                });
-                errorEmitter.emit('permission-error', permissionError);
-            });
-        });
-    };
-
   const onSubmit = (data: CheckoutFormValues) => {
     if (!firestore || !user) {
         toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to place an order.' });
@@ -416,16 +188,9 @@ export default function CheckoutPage() {
         toast({ variant: 'destructive', title: 'Location Required', description: 'Please capture your current location for delivery.' });
         return;
     }
-
-    const isVoiceOrder = cartItems.length === 0 && structuredList.length > 0;
-    
-    if (isVoiceOrder) {
-        handleConfirmVoiceOrder(data);
-        return;
-    }
     
     if (cartItems.length === 0) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Your cart is empty. Please add items or create a shopping list.' });
+        toast({ variant: 'destructive', title: 'Error', description: 'Your cart is empty. Please add items before checking out.' });
         return;
     }
      const storeId = cartItems[0]?.product.storeId;
@@ -469,7 +234,6 @@ export default function CheckoutPage() {
         const colRef = collection(firestore, 'orders');
         addDoc(colRef, orderData).then(() => {
             clearCart();
-            setStructuredList([]);
             setDeliveryCoords(null);
             form.reset();
 
@@ -489,6 +253,22 @@ export default function CheckoutPage() {
         });
     });
   };
+
+  if (!hasItemsInCart) {
+      return (
+          <div className="container mx-auto py-24 text-center">
+              <h1 className="text-4xl font-bold mb-4 font-headline">
+                  Your Cart is Empty
+              </h1>
+              <p className="text-muted-foreground mb-8">
+                  Please add items to your cart before proceeding to checkout.
+              </p>
+              <Button asChild size="lg">
+                  <Link href="/stores">Browse Stores</Link>
+              </Button>
+          </div>
+      );
+  }
 
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
@@ -558,139 +338,18 @@ export default function CheckoutPage() {
                     <CardTitle>Order Summary</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        {hasItemsInCart ? (
-                            <>
-                                {cartItems.map((item) => {
-                                    const image = images[item.variant.sku] || { imageUrl: 'https://placehold.co/48x48/E2E8F0/64748B?text=...', imageHint: 'loading' };
-                                    return <OrderSummaryItem key={item.variant.sku} item={item} image={image} />
-                                })}
-                                <div className="flex justify-between items-center border-t pt-4">
-                                    <p className="font-medium">Subtotal</p>
-                                    <p>₹{cartTotal.toFixed(2)}</p>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <p className="font-medium">Delivery Fee</p>
-                                    <p>₹{DELIVERY_FEE.toFixed(2)}</p>
-                                </div>
-                            </>
-                        ) : (
-                            <div className="space-y-4">
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle>Create a Shopping List by Voice</CardTitle>
-                                        <UiCardDescription>No need to browse. Just tell us what you need, and a local shopkeeper will handle it.</UiCardDescription>
-                                    </CardHeader>
-                                    <CardContent className="flex flex-col items-center justify-center space-y-4">
-                                        <Button
-                                            type="button"
-                                            onClick={() => router.push('/checkout?action=record')}
-                                            variant={'default'}
-                                            size="lg"
-                                            className="w-48"
-                                        >
-                                            <Mic className="mr-2 h-5 w-5" />
-                                            Record List
-                                        </Button>
-                                        <p className="text-sm text-muted-foreground text-center">
-                                            Click to have the voice assistant record your list.
-                                        </p>
-                                    </CardContent>
-                                </Card>
-
-                                <FormField
-                                    control={form.control}
-                                    name="shoppingList"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                        <FormLabel>Your Transcribed List</FormLabel>
-                                        <FormControl>
-                                            <Textarea placeholder="Your transcribed list will appear here." {...field} rows={4} readOnly/>
-                                        </FormControl>
-                                        <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                                
-                                {isProcessing ? (
-                                    <div className="flex items-center justify-center text-muted-foreground">
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        <span>Understanding your list...</span>
-                                    </div>
-                                ) : structuredList.length > 0 ? (
-                                    <>
-                                    <FormField
-                                        control={form.control}
-                                        name="storeId"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                            <FormLabel>Choose a Store to Fulfill Your Order</FormLabel>
-                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                                <FormControl>
-                                                <SelectTrigger>
-                                                    <StoreIcon className="mr-2 h-4 w-4 text-muted-foreground" />
-                                                    <SelectValue placeholder="Select a store" />
-                                                </SelectTrigger>
-                                                </FormControl>
-                                                <SelectContent>
-                                                {availableStores.map(store => (
-                                                    <SelectItem key={store.id} value={store.id}>
-                                                    {store.name}
-                                                    </SelectItem>
-                                                ))}
-                                                </SelectContent>
-                                            </Select>
-                                            <FormMessage />
-                                            </FormItem>
-                                        )}
-                                        />
-                                    <Card className="bg-muted/50">
-                                        <CardHeader><CardTitle className="text-base">Understood Items</CardTitle></CardHeader>
-                                        <CardContent>
-                                            <Table>
-                                                <TableHeader>
-                                                    <TableRow>
-                                                        <TableHead>Item</TableHead>
-                                                        <TableHead>Quantity</TableHead>
-                                                        <TableHead className="text-right">Price</TableHead>
-                                                        <TableHead className="text-right">Subtotal</TableHead>
-                                                    </TableRow>
-                                                </TableHeader>
-                                                <TableBody>
-                                                    {structuredList.map((item, index) => (
-                                                        <TableRow key={index}>
-                                                            <TableCell className="capitalize">{item.productName}</TableCell>
-                                                            <TableCell>{item.variant.weight}</TableCell>
-                                                            <TableCell className="text-right">{item.price ? `₹${item.price.toFixed(2)}` : 'N/A'}</TableCell>
-                                                             <TableCell className="text-right font-medium">{item.price ? `₹${(item.price * item.quantity).toFixed(2)}` : 'N/A'}</TableCell>
-                                                        </TableRow>
-                                                    ))}
-                                                </TableBody>
-                                                <TableFooter>
-                                                    <TableRow>
-                                                        <TableCell colSpan={3} className="text-right font-bold">Subtotal</TableCell>
-                                                        <TableCell className="text-right font-bold">₹{voiceOrderSubtotal.toFixed(2)}</TableCell>
-                                                    </TableRow>
-                                                </TableFooter>
-                                            </Table>
-                                        </CardContent>
-                                    </Card>
-                                    </>
-                                ) : (
-                                     form.getValues('shoppingList') && !isProcessing && (
-                                        <Button type="button" onClick={() => handleUnderstandList(form.getValues('shoppingList'))} className="w-full">
-                                            <Bot className="mr-2 h-5 w-5" />
-                                            Understand My List
-                                        </Button>
-                                    )
-                                )}
-                                {structuredList.length > 0 && (
-                                    <div className="flex justify-between items-center border-t pt-4">
-                                        <p className="font-medium">Delivery Fee</p>
-                                        <p>₹{DELIVERY_FEE.toFixed(2)}</p>
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                        {cartItems.map((item) => {
+                            const image = images[item.variant.sku] || { imageUrl: 'https://placehold.co/48x48/E2E8F0/64748B?text=...', imageHint: 'loading' };
+                            return <OrderSummaryItem key={item.variant.sku} item={item} image={image} />
+                        })}
+                        <div className="flex justify-between items-center border-t pt-4">
+                            <p className="font-medium">Subtotal</p>
+                            <p>₹{cartTotal.toFixed(2)}</p>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <p className="font-medium">Delivery Fee</p>
+                            <p>₹{DELIVERY_FEE.toFixed(2)}</p>
+                        </div>
                     </CardContent>
                     <CardFooter className="flex justify-between font-bold text-lg border-t pt-4">
                         <span>Total</span>
@@ -703,7 +362,3 @@ export default function CheckoutPage() {
     </div>
   );
 }
-
-    
-
-    
