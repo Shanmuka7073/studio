@@ -88,7 +88,10 @@ export function VoiceCommander({
       if (onEndCallback) onEndCallback();
       return;
     }
-
+    
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel();
+    
     isSpeakingRef.current = true;
     recognition?.stop(); // Stop listening while speaking
 
@@ -103,6 +106,13 @@ export function VoiceCommander({
         onEndCallback();
       }
       // The main `onend` handler for recognition will restart it
+       if (isEnabledRef.current) {
+        try {
+          recognition?.start();
+        } catch(e) {
+          // ignore
+        }
+      }
     };
     
     utterance.onerror = (e) => {
@@ -148,8 +158,12 @@ export function VoiceCommander({
 
 
   const findProductAndVariant = useCallback(async (productName: string, desiredWeight?: string): Promise<{ product: Product | null, variant: ProductVariant | null, storeId: string | null }> => {
-    // We allow adding without an active store now
-    const storeIdForProduct = activeStoreId || 'any';
+    // If no store is active, we can't find a product. Guide the user.
+    if (!activeStoreId) {
+        speak("Please go to a specific store's page before adding items to your cart.");
+        router.push('/stores');
+        return { product: null, variant: null, storeId: null };
+    }
     
     const lowerProductName = productName.toLowerCase();
     const productMatch = masterProductsRef.current.find(p => p.name.toLowerCase() === lowerProductName);
@@ -170,22 +184,22 @@ export function VoiceCommander({
         if (desiredWeight) {
             const lowerDesiredWeight = desiredWeight.replace(/\s/g, '').toLowerCase();
             const variantMatch = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === lowerDesiredWeight);
-            if (variantMatch) return { product: finalProduct, variant: variantMatch, storeId: storeIdForProduct };
+            if (variantMatch) return { product: finalProduct, variant: variantMatch, storeId: activeStoreId };
         }
         
         if (!desiredWeight || desiredWeight === 'one') {
           const onePieceVariant = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === '1pc');
-          if (onePieceVariant) return { product: finalProduct, variant: onePieceVariant, storeId: storeIdForProduct };
+          if (onePieceVariant) return { product: finalProduct, variant: onePieceVariant, storeId: activeStoreId };
 
            const firstVariant = priceData.variants.sort((a,b) => a.price - b.price)[0];
-           if (firstVariant) return { product: finalProduct, variant: firstVariant, storeId: storeIdForProduct };
+           if (firstVariant) return { product: finalProduct, variant: firstVariant, storeId: activeStoreId };
         }
 
-        return { product: finalProduct, variant: priceData.variants[0], storeId: storeIdForProduct };
+        return { product: finalProduct, variant: priceData.variants[0], storeId: activeStoreId };
     }
     
     return { product: null, variant: null, storeId: null };
-  }, [activeStoreId, firestore, speak]);
+  }, [activeStoreId, firestore, speak, router]);
 
 
   const handleProfileFormInteraction = useCallback(() => {
@@ -346,13 +360,15 @@ export function VoiceCommander({
           speak(`Added ${variant.weight} of ${product} to your cart.`);
           onOpenCart();
         } else {
-          // The findProductAndVariant function will speak the error message
-          speak(`Sorry, I could not find ${product} in the store.`);
+          // The findProductAndVariant function will speak the error message if store is not selected
+          if (activeStoreId) {
+            speak(`Sorry, I could not find ${product} in the store.`);
+          }
         }
       },
     };
 
-    recognition.continuous = false; // Set to false to allow onend to fire reliably
+    recognition.continuous = false;
     recognition.interimResults = false;
     recognition.lang = 'en-IN';
 
@@ -373,8 +389,8 @@ export function VoiceCommander({
     };
     
     recognition.onend = () => {
-      // Ensure we only restart listening if the feature is still enabled by the user
-      // and we are not currently trying to speak.
+      // Robustly restart listening only if the feature is still enabled by the user
+      // and we are not currently speaking. This handles interruptions from speaking.
       if (isEnabledRef.current && !isSpeakingRef.current) {
         setTimeout(() => {
           try {
@@ -383,7 +399,7 @@ export function VoiceCommander({
             // This can happen if start() is called while it's already starting.
             // console.error('Could not restart recognition service: ', e);
           }
-        }, 250); // Add a short delay before restarting
+        }, 100); // A short delay can help prevent race conditions.
       }
     };
 
@@ -397,6 +413,7 @@ export function VoiceCommander({
           let builtCommands: Command[] = [];
 
           stores.forEach((store) => {
+            if (store.name === 'LocalBasket') return; // Exclude the master store from voice commands
             const coreName = store.name.toLowerCase().replace(/shop|store|kirana/g, '').trim();
             const variations = [...new Set([
               store.name.toLowerCase(), coreName, `go to ${store.name.toLowerCase()}`, `open ${store.name.toLowerCase()}`,
@@ -437,7 +454,7 @@ export function VoiceCommander({
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firestore, user, cartItems, profileForm, isWaitingForStoreName, activeStoreId, placeOrderBtnRef, enabled, pathname]);
+  }, [firestore, user, cartItems, profileForm, isWaitingForStoreName, activeStoreId, placeOrderBtnRef, enabled, pathname, findProductAndVariant, handleProfileFormInteraction, speak, toast, router, onSuggestions, onStatusUpdate, onCloseCart, onOpenCart, setActiveStoreId]);
 
   return null;
 }
