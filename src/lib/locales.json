@@ -127,7 +127,7 @@
   "chicken": { "en": ["Chicken"], "te": ["చికెన్", "కోడి"] },
   "whole-chicken-(with-skin)": { "en": ["Whole Chicken (With Skin)"], "te": ["పూర్తి చికెన్ (చర్మంతో)"] },
   "whole-chicken-(without-skin)": { "en": ["Whole Chicken (Without Skin)"], "te": ["పూర్తి చికెన్ (చర్మం లేకుండా)"] },
-  "country-chicken-(desi)": { "en": ["Country Chicken", "Desi Chicken"], "te": ["నాటు కోడి", "దేశీ కోడి"] },
+  "country-chicken-(desi)": { "en": ["Country Chicken", "Desi Chicken", "country hen"], "te": ["నాటు కోడి", "దేశీ కోడి", "country kodi"] },
   "chicken-breast-(boneless)": { "en": ["Chicken Breast (Boneless)", "Boneless Chicken Breast"], "te": ["చికెన్ బ్రెస్ట్ (ఎముకలు లేనిది)"] },
   "chicken-thigh-(boneless)": { "en": ["Chicken Thigh (Boneless)", "Boneless Chicken Thigh"], "te": ["చికెన్ తొడ (ఎముకలు లేనిది)"] },
   "chicken-leg-(drumstick)": { "en": ["Chicken Leg", "Chicken Drumstick"], "te": ["చికెన్ లెగ్", "చికెన్ డ్రమ్‌స్టిక్"] },
@@ -240,5 +240,6 @@
   "complete-your-profile-first": { "en": "Complete Your Profile First", "te": "ముందుగా మీ ప్రొఫైల్‌ను పూర్తి చేయండి" },
   "to-automatically-create-your-store": { "en": "To automatically create your store, we need your address from your user profile.", "te": "మీ స్టోర్‌ను స్వయంచాలకంగా సృష్టించడానికి, మాకు మీ వినియోగదారు ప్రొఫైల్ నుండి మీ చిరునామా అవసరం." },
   "go-to-my-profile": { "en": "Go to My Profile", "te": "నా ప్రొఫైల్‌కు వెళ్లండి" },
-  "delete": { "en": "Delete", "te": "తొలగించు" }
+  "delete": { "en": "Delete", "te": "తొలగించు" },
+  "milk": { "en": ["Milk", "Cow Milk"], "te": ["పాలు", "doodh", "paalu"] }
 }
