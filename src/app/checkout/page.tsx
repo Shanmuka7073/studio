@@ -89,13 +89,22 @@ export default function CheckoutPage() {
   const [images, setImages] = useState({});
   const placeOrderBtnRef = useRef<HTMLButtonElement>(null);
   
-  const allStores = useAppStore(state => state.stores);
+  const { allStores, fetchInitialData } = useAppStore((state) => ({
+    allStores: state.stores,
+    fetchInitialData: state.fetchInitialData,
+  }));
 
   const { setPlaceOrderBtnRef } = useCheckoutStore();
 
   const hasItemsInCart = cartItems.length > 0;
   const finalTotal = hasItemsInCart ? cartTotal + DELIVERY_FEE : 0;
   
+  useEffect(() => {
+    if (firestore) {
+      fetchInitialData(firestore);
+    }
+  }, [firestore, fetchInitialData]);
+
   const handleGetLocation = useCallback(() => {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
