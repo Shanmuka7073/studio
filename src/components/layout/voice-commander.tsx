@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -16,6 +15,7 @@ import { useCheckoutStore } from '@/app/checkout/page';
 import { getCommands } from '@/app/actions';
 import { t, getAllAliases } from '@/lib/locales';
 import { doc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { quickOrderFlow, QuickOrderFlowResponse } from '@/ai/flows/quick-order-flow';
 
 export interface Command {
   command: string;
@@ -368,43 +368,17 @@ export function VoiceCommander({
             
             // Priority 1.5: Check for quick order command
             const quickOrderTemplate = fileCommandsRef.current.quickOrder;
-            if(quickOrderTemplate && commandText.includes(' from ')) {
-                const commandParts = commandText.split(' from ');
-                const itemPart = commandParts[0].trim();
-                const storeName = commandParts[1].trim();
+            if(quickOrderTemplate) {
+                 const isQuickOrder = quickOrderTemplate.aliases.some(alias => {
+                    const simpleAlias = alias.replace(/\{.*\}/g, '').trim();
+                    return commandText.includes(simpleAlias);
+                 });
 
-                const triggerWords = ["order", "get", "buy", "add", "i want"];
-                let foundTrigger = false;
-                let processedItemPart = itemPart;
-
-                for(const word of triggerWords) {
-                    if(itemPart.startsWith(word + " ")) {
-                        processedItemPart = itemPart.substring(word.length + 1);
-                        foundTrigger = true;
-                        break;
-                    }
-                }
-                
-                if (foundTrigger && processedItemPart && storeName) {
-                    // More robust parsing for quantity + product
-                    const quantityRegex = /^(one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s*(kg|kgs|kilo|kilos|gram|grams|gm|gms|pc|pcs|piece|pieces)?/i;
-                    const quantityMatch = processedItemPart.match(quantityRegex);
-                    
-                    let quantity: string | undefined = "1"; // Default to 1 if not specified
-                    let product = processedItemPart;
-
-                    if (quantityMatch) {
-                        quantity = quantityMatch[0].trim();
-                        product = processedItemPart.substring(quantityMatch[0].length).trim();
-                    }
-                    
-                    // Check if there is a product name
-                    if (product) {
-                        await commandActionsRef.current.quickOrder({ product, quantity, storeName });
-                        resetContext();
-                        return;
-                    }
-                }
+                 if(isQuickOrder) {
+                    await commandActionsRef.current.quickOrder({ commandText });
+                    resetContext();
+                    return;
+                 }
             }
 
 
@@ -581,32 +555,29 @@ export function VoiceCommander({
           speak(`Sorry, I could not find ${product} in the store.`);
         }
       },
-      quickOrder: async ({ product, quantity, storeName }: { product: string, quantity: string, storeName: string }) => {
+      quickOrder: async ({ commandText }: { commandText: string }) => {
         if (!userProfileRef.current) {
             speak("I need your profile information before placing a quick order. Please complete your profile first.");
             router.push('/dashboard/customer/my-profile');
             return;
         }
 
-        const { product: foundProduct, variant } = await findProductAndVariant(product, quantity);
-        const foundStore = stores.find(s => s.name.toLowerCase() === storeName.toLowerCase());
+        const response: QuickOrderFlowResponse = await quickOrderFlow({ command: commandText });
 
-        if (!foundProduct || !variant) {
-            speak(`Sorry, I could not find ${quantity || ''} of ${product}.`);
-            return;
+        if ('error' in response) {
+            speak(response.error);
+        } else {
+            // Clear the cart and add just this one item.
+            clearCart();
+            addItemToCart(response.product, response.variant, 1);
+            setActiveStoreId(response.store.id);
+            
+            setIsWaitingForQuickOrderConfirmation(true);
+            router.push('/checkout');
+            
+            // The message is now spoken via useEffect on the checkout page
+            // speak(response.userFriendlyMessage);
         }
-        if (!foundStore) {
-            speak(`Sorry, I could not find the store named ${storeName}.`);
-            return;
-        }
-        
-        // Clear the cart and add just this one item.
-        clearCart();
-        addItemToCart(foundProduct, variant, 1);
-        setActiveStoreId(foundStore.id);
-        
-        setIsWaitingForQuickOrderConfirmation(true);
-        router.push('/checkout');
       },
     };
     
