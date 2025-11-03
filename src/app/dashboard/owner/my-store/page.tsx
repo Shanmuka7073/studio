@@ -69,8 +69,9 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { generateSingleImage } from '@/ai/flows/image-generator-flow';
 import Link from 'next/link';
-import { t } from '@/lib/locales';
+import { t, getAllAliases } from '@/lib/locales';
 import { useAppStore } from '@/lib/store';
+import { Badge } from '@/components/ui/badge';
 
 const ADMIN_EMAIL = 'admin@gmail.com';
 
@@ -1420,6 +1421,12 @@ function AdminProductRow({ product, storeId, onEdit, onDelete }: { product: Prod
     }, [firestore, product.name]);
 
     const { data: priceData, isLoading: pricesLoading } = useDoc<ProductPrice>(priceDocRef);
+    
+    const productAliases = useMemo(() => {
+        const aliases = getAllAliases(product.name.toLowerCase().replace(/ /g, '-'));
+        // Flatten the object of arrays into a single array
+        return Object.values(aliases).flat();
+    }, [product.name]);
 
     const variantsString = useMemo(() => {
         if (pricesLoading) return "Loading prices...";
@@ -1430,15 +1437,22 @@ function AdminProductRow({ product, storeId, onEdit, onDelete }: { product: Prod
     return (
         <TableRow>
             <TableCell>
-                 <div className="flex items-center gap-4">
+                 <div className="flex items-start gap-4">
                     <Image
                         src={product.imageUrl || 'https://placehold.co/40x40/E2E8F0/64748B?text=?'}
                         alt={product.name}
                         width={40}
                         height={40}
-                        className="rounded-sm object-cover"
+                        className="rounded-sm object-cover mt-1"
                     />
-                    <span>{getProductName(product)}</span>
+                    <div>
+                        <span className="font-semibold">{getProductName(product)}</span>
+                         <div className="flex flex-wrap gap-1 mt-1">
+                            {productAliases.map((alias, index) => (
+                                <Badge key={index} variant="secondary" className="font-normal">{alias}</Badge>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             </TableCell>
             <TableCell>{t(product.category.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-'))}</TableCell>
@@ -1960,5 +1974,7 @@ export default function MyStorePage() {
         </div>
     );
 }
+
+    
 
     
