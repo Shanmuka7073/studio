@@ -369,32 +369,29 @@ export function VoiceCommander({
             
             // --- Primary Command Matching Logic ---
             const lowerCommandText = commandText.toLowerCase();
+            let commandHandled = false;
 
-            // Pass 1: Check for a high-confidence match on a general command
-            let bestMatch: { commandKey: string, fileCommand: any, similarity: number } | null = null;
+            // Pass 1 & 2: Check for exact matches on general commands in BOTH English and Telugu
             for (const key in fileCommandsRef.current) {
-                const fileCommand = fileCommandsRef.current[key];
                 // Skip template commands in this pass
                 if (key === 'orderItem' || key === 'quickOrder') continue;
 
-                for (const alias of fileCommand.aliases) {
-                    const similarity = calculateSimilarity(lowerCommandText, alias);
-                    if (!bestMatch || similarity > bestMatch.similarity) {
-                        bestMatch = { commandKey: key, fileCommand, similarity };
+                const commandGroup = fileCommandsRef.current[key];
+                const allCommandAliases = commandGroup.aliases || [];
+
+                if (allCommandAliases.includes(lowerCommandText)) {
+                    const action = commandActionsRef.current[key];
+                    if (typeof action === 'function') {
+                        speak(commandGroup.reply || `Executing ${key}`);
+                        action();
+                        resetContext();
+                        commandHandled = true;
+                        break; 
                     }
                 }
             }
 
-            if (bestMatch && bestMatch.similarity > 0.85) {
-                const { commandKey, fileCommand } = bestMatch;
-                const action = commandActionsRef.current[commandKey];
-                if (typeof action === 'function') {
-                    speak(fileCommand.reply);
-                    action();
-                    resetContext();
-                    return; // Command handled, exit function.
-                }
-            }
+            if (commandHandled) return;
 
             
             // --- Template Command Matching (for ordering) ---
@@ -695,3 +692,5 @@ export function VoiceCommander({
 
   return null;
 }
+
+    
