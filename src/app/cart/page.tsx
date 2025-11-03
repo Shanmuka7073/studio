@@ -149,7 +149,7 @@ export default function CartPage() {
         </p>
         <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
           <Button asChild size="lg">
-            <Link href="/stores">Browse Items</Link>
+            <Link href="/stores">Browse Stores</Link>
           </Button>
         </div>
       </div>

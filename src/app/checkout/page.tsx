@@ -117,12 +117,13 @@ export default function CheckoutPage() {
     
   const shouldPromptForLocation = hasItemsInCart && !deliveryCoords;
 
+  // Automatically trigger location capture on page load if needed.
   useEffect(() => {
-    if (shouldPromptForLocation) {
-        const timeoutId = setTimeout(() => handleGetLocation(), 1000);
+    if (hasItemsInCart && !deliveryCoords) {
+        const timeoutId = setTimeout(() => handleGetLocation(), 1000); // 1-second delay
         return () => clearTimeout(timeoutId);
     }
-  }, [shouldPromptForLocation, handleGetLocation]);
+  }, [hasItemsInCart, deliveryCoords, handleGetLocation]);
 
   useEffect(() => {
     if (deliveryCoords) return;

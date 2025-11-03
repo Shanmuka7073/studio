@@ -50,7 +50,7 @@ export function VoiceCommander({
   const pathname = usePathname();
   const { toast } = useToast();
   const { firestore, user } = useFirebase();
-  const { addItem: addItemToCart, activeStoreId } = useCart();
+  const { cartItems, addItem: addItemToCart, activeStoreId } = useCart();
   const { form: profileForm } = useProfileFormStore();
   const { shouldPromptForLocation, handleGetLocation, getFinalTotal, placeOrderBtnRef } = useCheckoutStore();
 
@@ -317,23 +317,23 @@ export function VoiceCommander({
       orders: () => router.push('/dashboard/customer/my-orders'),
       deliveries: () => router.push('/dashboard/delivery/deliveries'),
       myStore: () => router.push('/dashboard/owner/my-store'),
-      voiceOrder: () => {
-        if (pathname !== '/checkout') {
-          router.push('/checkout?action=record');
-        } else {
-          const micButton = Array.from(document.querySelectorAll('button')).find(
-              btn => btn.textContent?.includes('Record List')
-          );
-          (micButton as HTMLButtonElement)?.click();
-        }
-      },
       checkout: () => {
         onCloseCart();
         router.push('/checkout');
       },
       placeOrder: () => {
-        if (placeOrderBtnRef?.current) placeOrderBtnRef.current.click();
-        else speak("You can only place an order from the checkout page.");
+        if (cartItems.length > 0) {
+            if (pathname !== '/checkout') {
+                speak("Okay, taking you to checkout.");
+                router.push('/checkout');
+            } else if (placeOrderBtnRef?.current) {
+                placeOrderBtnRef.current.click();
+            } else {
+                speak("I'm on the checkout page but can't find the place order button.");
+            }
+        } else {
+            speak("Your cart is empty. Please add some items first.");
+        }
       },
       saveChanges: () => {
         if (pathname === '/dashboard/customer/my-profile' && profileForm) {
