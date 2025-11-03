@@ -10,7 +10,6 @@ import { getStores, getMasterProducts, getProductPrice } from '@/lib/data';
 import type { Store, Product, ProductPrice, ProductVariant, CartItem } from '@/lib/types';
 import { calculateSimilarity } from '@/lib/calculate-similarity';
 import { useCart } from '@/lib/cart';
-import { getCommands } from '@/app/actions';
 import { useProfileFormStore } from '@/lib/store';
 import { ProfileFormValues } from '@/app/dashboard/customer/my-profile/page';
 import { useCheckoutStore } from '@/app/checkout/page';
@@ -128,9 +127,7 @@ export function VoiceCommander({
       const speakTimeout = setTimeout(() => {
         const actionAlert = document.getElementById('action-required-alert');
         if (actionAlert) {
-          const alertTitle = actionAlert.querySelector('h5')?.innerText || 'Action Required';
-          const alertDescription = actionAlert.querySelector('div[role="alert"] > div:last-child')?.innerText || 'Please check the screen.';
-          speak(`${alertTitle}. ${alertDescription}`);
+          speak(`Action required. Please select a store to continue, or tell me the store name.`);
           setIsWaitingForStoreName(true);
         } else {
           const totalAmountEl = document.getElementById('final-total-amount');
@@ -149,13 +146,18 @@ export function VoiceCommander({
 
 
   const findProductAndVariant = useCallback(async (productName: string, desiredWeight?: string): Promise<{ product: Product | null, variant: ProductVariant | null, storeId: string | null }> => {
-    // Logic no longer requires an active store ID to add to cart.
+    if (!activeStoreId) {
+        speak("Please go to a specific store's page before adding items to your cart.");
+        router.push('/stores');
+        return { product: null, variant: null, storeId: null };
+    }
+    
     const lowerProductName = productName.toLowerCase();
     const productMatch = masterProductsRef.current.find(p => p.name.toLowerCase() === lowerProductName);
 
     if (!productMatch) return { product: null, variant: null, storeId: null };
     
-    const finalProduct = { ...productMatch }; // Use master product as generic item
+    const finalProduct = { ...productMatch }; 
 
     let priceData = productPricesRef.current[lowerProductName];
     if (!priceData && firestore) {
@@ -184,7 +186,7 @@ export function VoiceCommander({
     }
     
     return { product: null, variant: null, storeId: null };
-  }, [activeStoreId, firestore]);
+  }, [activeStoreId, firestore, router, speak]);
 
 
   const handleProfileFormInteraction = useCallback(() => {
@@ -345,7 +347,7 @@ export function VoiceCommander({
           speak(`Added ${variant.weight} of ${product} to your cart.`);
           onOpenCart();
         } else {
-            speak(`Sorry, I could not find ${product} in the product catalog.`);
+            // The findProductAndVariant function will speak the error message
         }
       },
     };

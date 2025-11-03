@@ -69,7 +69,8 @@
       "my dashboard",
       "show my stats",
       "open my panel",
-      "go to control panel"
+      "go to control panel",
+      "dashboard"
     ]
   },
   "cart": {
@@ -129,7 +130,9 @@
       "check delivery status",
       "see my delivery list",
       "delivery updates",
-      "delivery dashboard"
+      "delivery dashboard",
+      "deliverys",
+      "delivery"
     ]
   },
   "myStore": {
