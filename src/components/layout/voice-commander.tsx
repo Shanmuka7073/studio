@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -571,10 +572,10 @@ export function VoiceCommander({
     
     recognition.continuous = false;
     recognition.interimResults = false;
-    recognition.lang = language; // Use dynamic language
+    recognition.lang = 'en-IN'; // Listen in English
 
     recognition.onstart = () => {
-      onStatusUpdate(`🎧 Listening in ${language}...`);
+      onStatusUpdate(`🎧 Listening...`);
     };
 
     recognition.onresult = (event) => {
