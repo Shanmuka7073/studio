@@ -224,16 +224,25 @@ export function VoiceCommander({
 
   const findProductAndVariant = useCallback(async (productName: string, desiredWeight?: string): Promise<{ product: Product | null, variant: ProductVariant | null }> => {
     const lowerProductName = productName.toLowerCase();
-
-    const productMatch = masterProducts.find(p => {
-        if (!p.name) return false;
-        // Use the new getAllAliases function
-        const allAliasValues = Object.values(getAllAliases(p.name.toLowerCase().replace(/ /g, '-'))).flat().map(name => name.toLowerCase());
-        return allAliasValues.includes(lowerProductName);
-    });
-
-    if (!productMatch) return { product: null, variant: null };
     
+    let bestMatch: { product: Product, alias: string } | null = null;
+
+    for (const p of masterProducts) {
+        if (!p.name) continue;
+        const allAliasValues = Object.values(getAllAliases(p.name.toLowerCase().replace(/ /g, '-'))).flat().map(name => name.toLowerCase());
+
+        for (const alias of allAliasValues) {
+            if (lowerProductName.includes(alias)) {
+                if (!bestMatch || alias.length > bestMatch.alias.length) {
+                    bestMatch = { product: p, alias: alias };
+                }
+            }
+        }
+    }
+
+    if (!bestMatch) return { product: null, variant: null };
+    
+    const productMatch = bestMatch.product;
     const finalProduct = { ...productMatch }; 
 
     let priceData = productPrices[productMatch.name.toLowerCase()];
@@ -668,4 +677,5 @@ export function VoiceCommander({
   return null;
 }
 
+    
     

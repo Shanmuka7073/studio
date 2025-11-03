@@ -1,250 +1,1352 @@
-
 {
-  "home": { "en": "Home", "te": "హోమ్" },
-  "stores": { "en": "Stores", "te": "స్టోర్స్" },
-  "dashboard": { "en": "Dashboard", "te": "డాష్‌బోర్డ్" },
-  "login": { "en": "Login", "te": "లాగిన్" },
-  "my-account": { "en": "My Account", "te": "నా ఖాతా" },
-  "my-profile": { "en": "My Profile", "te": "నా ప్రొఫైల్" },
-  "my-orders": { "en": "My Orders", "te": "నా ఆర్డర్లు" },
-  "my-store": { "en": "My Store", "te": "నా స్టోర్" },
-  "store-orders": { "en": "Store Orders", "te": "స్టోర్ ఆర్డర్లు" },
-  "deliveries": { "en": "Deliveries", "te": "డెలివరీలు" },
-  "roles": { "en": "Roles", "te": "పాత్రలు" },
-  "master-store": { "en": "Master Store", "te": "మాస్టర్ స్టోర్" },
-  "logout": { "en": "Logout", "te": "లాగ్ అవుట్" },
-  "start-shopping": { "en": "Start Shopping", "te": "షాపింగ్ ప్రారంభించండి" },
-  "browse-local-stores-and-find-fresh-groceries": { "en": "Browse local stores and find fresh groceries.", "te": "స్థానిక దుకాణాలను బ్రౌజ్ చేయండి మరియు తాజా కిరాణా సామాగ్రిని కనుగొనండి." },
-  "voice-order": { "en": "Voice Order", "te": "వాయిస్ ఆర్డర్" },
-  "record-your-shopping-list-and-have-a-local-shopkeeper-fulfill-it": { "en": "Record your shopping list and have a local shopkeeper fulfill it.", "te": "మీ షాపింగ్ జాబితాను రికార్డ్ చేయండి మరియు స్థానిక దుకాణదారుడు దానిని నెరవేర్చండి." },
-  "store-owner": { "en": "Store Owner", "te": "స్టోర్ యజమాని" },
-  "manage-your-store-products-and-incoming-orders": { "en": "Manage your store, products, and incoming orders.", "te": "మీ స్టోర్, ఉత్పత్తులు మరియు ఇన్‌కమింగ్ ఆర్డర్‌లను నిర్వహించండి." },
-  "delivery-partner": { "en": "Delivery Partner", "te": "డెలివరీ భాగస్వామి" },
-  "view-and-accept-available-delivery-jobs": { "en": "View and accept available delivery jobs.", "te": "అందుబాటులో ఉన్న డెలివరీ పనులను వీక్షించండి మరియు అంగీకరించండి." },
-  "your-dashboard": { "en": "Your Dashboard", "te": "మీ డాష్‌బోర్డ్" },
-  "select-your-role-to-access-your-tools": { "en": "Select your role to access your tools.", "te": "మీ సాధనాలను యాక్సెస్ చేయడానికి మీ పాత్రను ఎంచుకోండి." },
-  "go-to": { "en": "Go to", "te": "వెళ్ళండి" },
-  "shopping-cart": { "en": "Shopping Cart", "te": "షాపింగ్ కార్ట్" },
-  "total": { "en": "Total", "te": "మొత్తం" },
-  "proceed-to-checkout": { "en": "Proceed to Checkout", "te": "చెక్అవుట్‌కు వెళ్లండి" },
-  "your-cart-is-empty": { "en": "Your cart is empty.", "te": "మీ కార్ట్ ఖాళీగా ఉంది." },
-  "shop-fresh-shop-local-just-by-voice": { "en": "Shop Fresh, Shop Local, Just by Voice.", "te": "వాయిస్ ద్వారా తాజా, స్థానిక ఉత్పత్తులను కొనండి." },
-  "your-hands-free-shopping-assistant": { "en": "Your hands-free shopping assistant for local groceries.", "te": "స్థానిక కిరాణా సామాగ్రి కోసం మీ హ్యాండ్స్-ఫ్రీ షాపింగ్ సహాయకుడు." },
-  "browse-all-stores": { "en": "Browse All Stores", "te": "అన్ని దుకాణాలను బ్రౌజ్ చేయండి" },
-  "try-saying-find-bananas": { "en": "Try saying 'find bananas near me' with the voice assistant!", "te": "వాయిస్ అసిస్టెంట్‌తో 'నా దగ్గర అరటిపండ్లను కనుగొనండి' అని చెప్పడానికి ప్రయత్నించండి!" },
-  "or-browse-featured-stores": { "en": "Or, Browse Featured Stores", "te": "లేదా, ఫీచర్ చేయబడిన దుకాణాలను బ్రౌజ్ చేయండి" },
-  "explore-top-rated-local-stores-right-in-your-neighborhood": { "en": "Explore top-rated local stores right in your neighborhood.", "te": "మీ పరిసరాల్లోని అగ్రశ్రేణి స్థానిక దుకాణాలను అన్వేషించండి." },
-  "loading-stores": { "en": "Loading stores...", "te": "దుకాణాలు లోడ్ అవుతున్నాయి..." },
-  "no-stores-found": { "en": "No stores found.", "te": "దుకాణాలు కనుగొనబడలేదు." },
-  "looks-like-you-havent-added-anything": { "en": "Looks like you haven't added anything to your cart yet.", "te": "మీరు ఇంకా మీ కార్ట్‌లో ఏమీ జోడించనట్లు కనిపిస్తోంది." },
-  "browse-stores": { "en": "Browse Stores", "te": "దుకాణాలను బ్రౌజ్ చేయండి" },
-  "product": { "en": "Product", "te": "ఉత్పత్తి" },
-  "price": { "en": "Price", "te": "ధర" },
-  "quantity": { "en": "Quantity", "te": "పరిమాణం" },
-  "order-summary": { "en": "Order Summary", "te": "ఆర్డర్ సారాంశం" },
-  "subtotal": { "en": "Subtotal", "te": "ఉపమొత్తం" },
-  "delivery-fee": { "en": "Delivery Fee", "te": "డెలివరీ ఫీజు" },
-  "please-add-items-to-your-cart-before-proceeding": { "en": "Please add items to your cart before proceeding to checkout.", "te": "దయచేసి చెక్అవుట్‌కు వెళ్లే ముందు మీ కార్ట్‌కు వస్తువులను జోడించండి." },
-  "delivery-and-store-selection": { "en": "Delivery and Store Selection", "te": "డెలివరీ మరియు స్టోర్ ఎంపిక" },
-  "full-name": { "en": "Full Name", "te": "పూర్తి పేరు" },
-  "delivery-location": { "en": "Delivery Location", "te": "డెలివరీ స్థానం" },
-  "location-captured": { "en": "Location Captured", "te": "స్థానం సంగ్రహించబడింది" },
-  "re-capture": { "en": "Re-capture", "te": "తిరిగి సంగ్రహించండి" },
-  "getting-your-current-location": { "en": "Getting your current location...", "te": "మీ ప్రస్తుత స్థానం పొందుతోంది..." },
-  "phone-number": { "en": "Phone Number", "te": "ఫోను నంబరు" },
-  "fulfilling-store": { "en": "Fulfilling Store", "te": "నెరవేర్చే స్టోర్" },
-  "select-a-store-to-fulfill": { "en": "Select a store to fulfill your order", "te": "మీ ఆర్డర్‌ను నెరవేర్చడానికి ఒక దుకాణాన్ని ఎంచుకోండి" },
-  "action-required": { "en": "Action Required", "te": "చర్య అవసరం" },
-  "please-select-a-store-to-continue": { "en": "Please select a store to continue.", "te": "కొనసాగించడానికి దయచేసి ఒక దుకాణాన్ని ఎంచుకోండి." },
-  "placing-order": { "en": "Placing Order...", "te": "ఆర్డర్ చేస్తోంది..." },
-  "place-order": { "en": "Place Order", "te": "ఆర్డర్ చేయండి" },
-  "select-weight": { "en": "Select Weight", "te": "బరువును ఎంచుకోండి" },
-  "no-prices-set": { "en": "No prices set", "te": "ధరలు సెట్ చేయబడలేదు" },
-  "add-to-cart": { "en": "Add to Cart", "te": "కార్ట్‌లో చేర్చు" },
-  "total-customers": { "en": "Total Customers", "te": "మొత్తం వినియోగదారులు" },
-  "total-stores": { "en": "Total Stores", "te": "మొత్తం దుకాణాలు" },
-  "orders-delivered": { "en": "Orders Delivered", "te": "చేరవేసిన ఆర్డర్లు" },
-  "action-required-create-master-store": { "en": "Action Required: Create Master Store", "te": "చర్య అవసరం: మాస్టర్ స్టోర్‌ను సృష్టించండి" },
-  "the-master-store-for-setting-platform-wide": { "en": "The master store for setting platform-wide product prices has not been created.", "te": "ప్లాట్‌ఫారమ్-వ్యాప్తంగా ఉత్పత్తి ధరలను సెట్ చేయడానికి మాస్టర్ స్టోర్ సృష్టించబడలేదు." },
-  "create-master-store": { "en": "Create Master Store", "te": "మాస్టర్ స్టోర్‌ను సృష్టించండి" },
-  "admin-tools": { "en": "Admin Tools", "te": "అడ్మిన్ సాధనాలు" },
-  "manage-master-store-and-products": { "en": "Manage Master Store & Products", "te": "మాస్టర్ స్టోర్ & ఉత్పత్తులను నిర్వహించండి" },
-  "add-or-edit-products-in-the-master-catalog": { "en": "Add or edit products in the master catalog that all stores can sell.", "te": "అన్ని దుకాణాలు అమ్మగల మాస్టర్ కేటలాగ్‌లో ఉత్పత్తులను జోడించండి లేదా సవరించండి." },
-  "voice-commands-control": { "en": "Voice Commands Control", "te": "వాయిస్ ఆదేశాల నియంత్రణ" },
-  "view-and-manage-the-voice-commands-users-can-say": { "en": "View and manage the voice commands users can say.", "te": "వినియోగదారులు చెప్పగల వాయిస్ ఆదేశాలను వీక్షించండి మరియు నిర్వహించండి." },
-  "admin-dashboard": { "en": "Admin Dashboard", "te": "అడ్మిన్ డాష్‌బోర్డ్" },
-  "a-high-level-overview-of-your-application": { "en": "A high-level overview of your application's activity.", "te": "మీ అప్లికేషన్ యొక్క కార్యాచరణ యొక్క ఉన్నత-స్థాయి అవలోకనం." },
-  "potatoes": { "en": ["Potatoes", "Potato"], "te": ["బంగాళదుంపలు", "ఆలుగడ్డ", "ఆలు"] },
-  "onions": { "en": ["Onions", "Onion"], "te": ["ఉల్లిపాయలు", "ఉల్లిపాయ", "ఎర్రగడ్డ"] },
-  "tomatoes": { "en": ["Tomatoes", "Tomato"], "te": ["టమోటాలు", "టమోటా", "రామ ములగ"] },
-  "carrots": { "en": ["Carrots", "Carrot"], "te": ["క్యారెట్లు", "క్యారెట్"] },
-  "cabbage": { "en": ["Cabbage"], "te": ["క్యాబేజీ"] },
-  "cauliflower": { "en": ["Cauliflower"], "te": ["కాలీఫ్లవర్", "గోబి పువ్వు"] },
-  "capsicum-(bell-pepper)": { "en": ["Capsicum", "Bell Pepper"], "te": ["క్యాప్సికమ్", "బెంగళూరు మిరపకాయ"] },
-  "green-chilies": { "en": ["Green Chilies", "Green Chilli"], "te": ["పచ్చి మిరపకాయలు", "పచ్చి మిర్చి"] },
-  "ginger": { "en": ["Ginger"], "te": ["అల్లం"] },
-  "garlic": { "en": ["Garlic"], "te": ["వెల్లుల్లి", "ఎల్లిపాయ"] },
-  "beans": { "en": ["Beans"], "te": ["బీన్స్"] },
-  "peas": { "en": ["Peas", "Green Peas"], "te": ["బఠానీలు", "పచ్చి బఠానీలు"] },
-  "brinjal-(eggplant)": { "en": ["Brinjal", "Eggplant"], "te": ["వంకాయ", "వంగ"] },
-  "okra-(lady’s-finger)": { "en": ["Okra", "Lady's Finger"], "te": ["బెండకాయ"] },
-  "spinach": { "en": ["Spinach"], "te": ["పాలకూర"] },
-  "coriander-leaves": { "en": ["Coriander Leaves", "Coriander", "Cilantro"], "te": ["కొత్తిమీర"] },
-  "mint-leaves": { "en": ["Mint Leaves", "Mint"], "te": ["పుదీనా ఆకులు", "పుదీనా"] },
-  "drumstick": { "en": ["Drumstick"], "te": ["మునగకాయ"] },
-  "radish": { "en": ["Radish"], "te": ["ముల్లంగి"] },
-  "beetroot": { "en": ["Beetroot"], "te": ["బీట్‌రూట్"] },
-  "bottle-gourd": { "en": ["Bottle Gourd"], "te": ["సొరకాయ", "ఆనపకాయ"] },
-  "ridge-gourd": { "en": ["Ridge Gourd"], "te": ["బీరకాయ"] },
-  "bitter-gourd": { "en": ["Bitter Gourd"], "te": ["కాకరకాయ"] },
-  "pumpkin": { "en": ["Pumpkin"], "te": ["గుమ్మడికాయ"] },
-  "cucumber": { "en": ["Cucumber"], "te": ["కీర దోసకాయ", "దోసకాయ"] },
-  "raw-banana": { "en": ["Raw Banana"], "te": ["పచ్చి అరటికాయ", "అరటికాయ"] },
-  "yam": { "en": ["Yam"], "te": ["కంద గడ్డ", "కంద"] },
-  "sweet-potato": { "en": ["Sweet Potato", "Sweet Potatoes"], "te": ["చిలగడదుంప", "రత్నపురి గడ్డ"] },
-  "broccoli": { "en": ["Broccoli"], "te": ["బ్రోకలీ"] },
-  "zucchini": { "en": ["Zucchini"], "te": ["జుకినీ", "నల్ల దోసకాయ"] },
-  "apples": { "en": ["Apples", "Apple"], "te": ["యాపిల్స్", "యాపిల్ పండు", "సీమ రేగు"] },
-  "bananas": { "en": ["Bananas", "Banana"], "te": ["అరటిపండ్లు", "అరటిపండు"] },
-  "oranges": { "en": ["Oranges", "Orange"], "te": ["నారింజ", "కమలా పండు"] },
-  "grapes": { "en": ["Grapes"], "te": ["ద్రాక్ష", "ద్రాక్ష పండ్లు"] },
-  "mangoes": { "en": ["Mangoes", "Mango"], "te": ["మామిడిపండ్లు", "మామిడి పండు"] },
-  "papaya": { "en": ["Papaya"], "te": ["బొప్పాయి"] },
-  "pineapple": { "en": ["Pineapple"], "te": ["పైనాపిల్", "అనాస పండు"] },
-  "watermelon": { "en": ["Watermelon"], "te": ["పుచ్చకాయ"] },
-  "muskmelon": { "en": ["Muskmelon"], "te": ["కర్బూజ"] },
-  "guava": { "en": ["Guava"], "te": ["జామకాయ", "జామ పండు"] },
-  "pomegranate": { "en": ["Pomegranate"], "te": ["దానిమ్మ", "దానిమ్మ పండు"] },
-  "chikoo-(sapota)": { "en": ["Chikoo", "Sapota"], "te": ["సపోటా"] },
-  "strawberries": { "en": ["Strawberries", "Strawberry"], "te": ["స్ట్రాబెర్రీలు", "స్ట్రాబెర్రీ"] },
-  "kiwi": { "en": ["Kiwi"], "te": ["కివి"] },
-  "pears": { "en": ["Pears", "Pear"], "te": ["బేరిపండు"] },
-  "plums": { "en": ["Plums", "Plum"], "te": ["రేగు పండ్లు", "ఆల్బకరా"] },
-  "dates": { "en": ["Dates"], "te": ["ఖర్జూరం", "ఖర్జూర పండ్లు"] },
-  "dry-figs": { "en": ["Dry Figs", "Fig"], "te": ["ఎండు అత్తి పండ్లు", "అంజీర్"] },
-  "coconut": { "en": ["Coconut"], "te": ["కొబ్బరికాయ", "టెంకాయ"] },
-  "lemons": { "en": ["Lemons", "Lemon"], "te": ["నిమ్మకాయలు", "నిమ్మకాయ"] },
-  "chicken": { "en": ["Chicken"], "te": ["చికెన్", "కోడి మాంసం"] },
-  "whole-chicken-(with-skin)": { "en": ["Whole Chicken (With Skin)", "Whole chicken skin on"], "te": ["చర్మంతో ఉన్న పూర్తి చికెన్"] },
-  "whole-chicken-(without-skin)": { "en": ["Whole Chicken (Without Skin)", "Whole chicken skinless"], "te": ["చర్మం లేని పూర్తి చికెన్"] },
-  "country-chicken-(desi)": { "en": ["Country Chicken", "Desi Chicken", "country hen"], "te": ["నాటు కోడి", "దేశీ కోడి", "country kodi"] },
-  "chicken-breast-(boneless)": { "en": ["Chicken Breast (Boneless)", "Boneless Chicken Breast"], "te": ["చికెన్ బ్రెస్ట్ (ఎముకలు లేనిది)", "బోన్‌లెస్ చికెన్ బ్రెస్ట్"] },
-  "chicken-thigh-(boneless)": { "en": ["Chicken Thigh (Boneless)", "Boneless Chicken Thigh"], "te": ["చికెన్ తొడ (ఎముకలు లేనిది)", "బోన్‌లెస్ చికెన్ తొడ"] },
-  "chicken-leg-(drumstick)": { "en": ["Chicken Leg", "Chicken Drumstick"], "te": ["చికెన్ లెగ్", "చికెన్ డ్రమ్‌స్టిక్"] },
-  "chicken-wings": { "en": ["Chicken Wings"], "te": ["చికెన్ రెక్కలు"] },
-  "chicken-lollipop": { "en": ["Chicken Lollipop"], "te": ["చికెన్ లాలిపాప్"] },
-  "chicken-liver": { "en": ["Chicken Liver"], "te": ["చికెన్ లివర్", "చికెన్ కాలేయం"] },
-  "chicken-gizzard": { "en": ["Chicken Gizzard"], "te": ["చికెన్ గిజార్డ్"] },
-  "chicken-mince-(keema)": { "en": ["Chicken Mince", "Chicken Keema"], "te": ["చికెన్ కీమా"] },
-  "chicken-curry-cut": { "en": ["Chicken Curry Cut"], "te": ["చికెన్ కర్రీ కట్"] },
-  "masoor-dal-(red-lentil)": { "en": ["Masoor Dal", "Red Lentil"], "te": ["మసూర్ పప్పు", "ఎర్ర కంది పప్పు"] },
-  "fresh-cut": { "en": "Fresh Cut", "te": "తాజా కట్" },
-  "vegetables": { "en": "Vegetables", "te": "కూరగాయలు" },
-  "fruits": { "en": "Fruits", "te": "పండ్లు" },
-  "store-image": { "en": "Store Image", "te": "స్టోర్ చిత్రం" },
-  "take-or-upload-a-picture-of-your-storefront": { "en": "Take or upload a picture of your storefront.", "te": "మీ స్టోర్ ముందు భాగం యొక్క చిత్రాన్ని తీయండి లేదా అప్‌లోడ్ చేయండి." },
-  "no-image-set": { "en": "No image set", "te": "చిత్రం సెట్ చేయబడలేదు" },
-  "uploading": { "en": "Uploading", "te": "అప్‌లోడ్ చేస్తోంది" },
-  "close-camera": { "en": "Close Camera", "te": "కెమెరాను మూసివేయండి" },
-  "open-camera": { "en": "Open Camera", "te": "కెమెరాను తెరవండి" },
-  "capture": { "en": "Capture", "te": "చిత్రం తీయండి" },
-  "from-device": { "en": "From Device", "te": "పరికరం నుండి" },
-  "upload-and-save": { "en": "Upload and Save", "te": "అప్‌లోడ్ చేసి సేవ్ చేయండి" },
-  "edit-master-product": { "en": "Edit Master Product", "te": "మాస్టర్ ఉత్పత్తిని సవరించండి" },
-  "update-details-for": { "en": "Update details for", "te": "వివరాలను నవీకరించండి" },
-  "changes-will-affect-all-stores": { "en": "Changes will affect all stores.", "te": "మార్పులు అన్ని దుకాణాలపై ప్రభావం చూపుతాయి." },
-  "product-name": { "en": "Product Name", "te": "ఉత్పత్తి పేరు" },
-  "category": { "en": "Category", "te": "వర్గం" },
-  "select-a-category": { "en": "Select a category", "te": "ఒక వర్గాన్ని ఎంచుకోండి" },
-  "product-description-optional": { "en": "Product Description (Optional)", "te": "ఉత్పత్తి వివరణ (ఐచ్ఛికం)" },
-  "image-url": { "en": "Image URL", "te": "చిత్రం URL" },
-  "price-variants": { "en": "Price Variants", "te": "ధర వేరియంట్‌లు" },
-  "weight": { "en": "Weight", "te": "బరువు" },
-  "select-a-weight": { "en": "Select a weight", "te": "ఒక బరువును ఎంచుకోండి" },
-  "add-variant": { "en": "Add Variant", "te": "వేరియంట్‌ను జోడించండి" },
-  "cancel": { "en": "Cancel", "te": "రద్దు చేయండి" },
-  "saving": { "en": "Saving...", "te": "సేవ్ చేస్తోంది..." },
-  "save-changes": { "en": "Save Changes", "te": "మార్పులను ఊంచు" },
-  "manage-your-inventory": { "en": "Manage Your Inventory", "te": "మీ ఇన్వెంటరీని నిర్వహించండి" },
-  "select-the-products-you-want-to-sell": { "en": "Select the products you want to sell in your store.", "te": "మీరు మీ స్టోర్‌లో విక్రయించాలనుకుంటున్న ఉత్పత్తులను ఎంచుకోండి." },
-  "no-master-products-found": { "en": "No Master Products Found", "te": "మాస్టర్ ఉత్పత్తులు కనుగొనబడలేదు" },
-  "the-admin-has-not-added-any-products": { "en": "The admin has not added any products to the master catalog yet.", "te": "అడ్మిన్ ఇంకా మాస్టర్ కేటలాగ్‌కు ఏ ఉత్పత్తులను జోడించలేదు." },
-  "saving-changes": { "en": "Saving Changes...", "te": "మార్పులను సేవ్ చేస్తోంది..." },
-  "save-inventory-changes": { "en": "Save Inventory Changes", "te": "ఇన్వెంటరీ మార్పులను సేవ్ చేయండి" },
-  "add-a-master-product": { "en": "Add a Master Product", "te": "ఒక మాస్టర్ ఉత్పత్తిని జోడించండి" },
-  "add-a-new-product-to-the-platform": { "en": "Add a new product to the platform's master catalog.", "te": "ప్లాట్‌ఫారమ్ యొక్క మాస్టర్ కేటలాగ్‌కు ఒక కొత్త ఉత్పత్తిని జోడించండి." },
-  "product-template-optional": { "en": "Product Template (Optional)", "te": "ఉత్పత్తి టెంప్లేట్ (ఐచ్ఛికం)" },
-  "select-a-predefined-item": { "en": "Select a predefined item", "te": "ముందే నిర్వచించిన అంశాన్ని ఎంచుకోండి" },
-  "select-an-item-to-auto-fill": { "en": "Select an item to auto-fill the name and category.", "te": "పేరు మరియు వర్గాన్ని ఆటో-ఫిల్ చేయడానికి ఒక అంశాన్ని ఎంచుకోండి." },
-  "product-image-url-optional": { "en": "Product Image URL (Optional)", "te": "ఉత్పత్తి చిత్రం URL (ఐచ్ఛికం)" },
-  "generate-with-ai": { "en": "Generate with AI", "te": "AIతో రూపొందించండి" },
-  "paste-a-direct-image-link-or-generate-one": { "en": "Paste a direct image link or generate one with AI.", "te": "ఒక ప్రత్యక్ష చిత్ర లింక్‌ను అతికించండి లేదా AIతో ఒకదాన్ని రూపొందించండి." },
-  "describe-the-product": { "en": "Describe the product...", "te": "ఉత్పత్తిని వివరించండి..." },
-  "set-the-official-price-for-this-product": { "en": "Set the official price for this product across all stores.", "te": "అన్ని దుకాణాలలో ఈ ఉత్పత్తి కోసం అధికారిక ధరను సెట్ చేయండి." },
-  "adding-product": { "en": "Adding Product", "te": "ఉత్పత్తిని జోడిస్తోంది" },
-  "add-product": { "en": "Add Product", "te": "ఉత్పత్తిని జోడించండి" },
-  "promote-your-store": { "en": "Promote Your Store", "te": "మీ స్టోర్‌ను ప్రచారం చేయండి" },
-  "share-your-store-with-your-phone-contacts": { "en": "Share your store with your phone contacts via SMS.", "te": "మీ ఫోన్ పరిచయాలతో మీ స్టోర్‌ను SMS ద్వారా పంచుకోండి." },
-  "share-with-contacts": { "en": "Share with Contacts", "te": "పరిచయాలతో పంచుకోండి" },
-  "this-will-open-your-phones-contact-picker": { "en": "This will open your phone's contact picker.", "te": "ఇది మీ ఫోన్ యొక్క పరిచయ పికర్‌ను తెరుస్తుంది." },
-  "action-required-update-your-stores-location": { "en": "Action Required: Update Your Store's Location", "te": "చర్య అవసరం: మీ స్టోర్ యొక్క స్థానాన్ని నవీకరించండి" },
-  "your-store-is-missing-gps-coordinates": { "en": "Your store is missing GPS coordinates, which are needed for delivery calculations. Please set them below.", "te": "డెలివరీ గణనలకు అవసరమైన GPS కోఆర్డినేట్లు మీ స్టోర్‌లో లేవు. దయచేసి వాటిని క్రింద సెట్ చేయండి." },
-  "latitude": { "en": "Latitude", "te": "అక్షాంశం" },
-  "longitude": { "en": "Longitude", "te": "రేఖాంశం" },
-  "get-current-location": { "en": "Get Current Location", "te": "ప్రస్తుత స్థానం పొందండి" },
-  "save-location": { "en": "Save Location", "te": "స్థానాన్ని సేవ్ చేయండి" },
-  "danger-zone": { "en": "Danger Zone", "te": "ప్రమాదకర ప్రాంతం" },
-  "close-store": { "en": "Close Store", "te": "స్టోర్‌ను మూసివేయండి" },
-  "this-will-make-your-store-invisible": { "en": "This will make your store invisible to customers and prevent new orders.", "te": "ఇది మీ స్టోర్‌ను వినియోగదారులకు కనిపించకుండా చేస్తుంది మరియు కొత్త ఆర్డర్‌లను నివారిస్తుంది." },
-  "are-you-sure": { "en": "Are you sure?", "te": "మీరు ఖచ్చితంగా ఉన్నారా?" },
-  "your-store-and-all-its-products-will-no-longer-be-visible": { "en": "Your store and all its products will no longer be visible to customers. This action can be reversed.", "te": "మీ స్టోర్ మరియు దాని అన్ని ఉత్పత్తులు ఇకపై వినియోగదారులకు కనిపించవు. ఈ చర్యను రద్దు చేయవచ్చు." },
-  "yes-close-my-store": { "en": "Yes, Close My Store", "te": "అవును, నా స్టోర్‌ను మూసివేయండి" },
-  "closing": { "en": "Closing...", "te": "మూసివేస్తోంది..." },
-  "store-details": { "en": "Store Details", "te": "స్టోర్ వివరాలు" },
-  "edit": { "en": "Edit", "te": "సవరించు" },
-  "edit-store-details": { "en": "Edit Store Details", "te": "స్టోర్ వివరాలను సవరించండి" },
-  "update-your-stores-public-information": { "en": "Update your store's public information.", "te": "మీ స్టోర్ యొక్క పబ్లిక్ సమాచారాన్ని నవీకరించండి." },
-  "store-name": { "en": "Store Name", "te": "స్టోర్ పేరు" },
-  "description": { "en": "Description", "te": "వివరణ" },
-  "address": { "en": "Address", "te": "చిరునామా" },
-  "location": { "en": "Location", "te": "స్థానం" },
-  "variants": { "en": "Variants", "te": "వేరియంట్‌లు" },
-  "actions": { "en": "Actions", "te": "చర్యలు" },
-  "this-store-is-closed": { "en": "This Store is Closed", "te": "ఈ స్టోర్ మూసివేయబడింది" },
-  "your-store-is-currently-not-visible": { "en": "Your store is currently not visible to customers. Re-open it to start receiving orders again.", "te": "మీ స్టోర్ ప్రస్తుతం వినియోగదారులకు కనిపించడం లేదు. మళ్లీ ఆర్డర్‌లను స్వీకరించడం ప్రారంభించడానికి దాన్ని తిరిగి తెరవండి." },
-  "re-opening": { "en": "Re-opening...", "te": "తిరిగి తెరుస్తోంది..." },
-  "re-open-store": { "en": "Re-open Store", "te": "స్టోర్‌ను తిరిగి తెరవండి" },
-  "your-products": { "en": "Your Products", "te": "మీ ఉత్పత్తులు" },
-  "this-is-the-master-list-of-products": { "en": "This is the master list of products for the entire platform.", "te": "ఇది మొత్తం ప్లాట్‌ఫారమ్ కోసం ఉత్పత్తుల యొక్క మాస్టర్ జాబితా." },
-  "this-is-your-current-store-inventory": { "en": "This is your current store inventory, based on the master product list.", "te": "ఇది మీ ప్రస్తుత స్టోర్ ఇన్వెంటరీ, మాస్టర్ ఉత్పత్తి జాబితా ఆధారంగా." },
-  "loading-products": { "en": "Loading products...", "te": "ఉత్పత్తులు లోడ్ అవుతున్నాయి..." },
-  "you-havent-added-any-products-yet": { "en": "You haven't added any products yet.", "te": "మీరు ఇంకా ఏ ఉత్పత్తులను జోడించలేదు." },
-  "master-store-not-found": { "en": "Master Store Not Found", "te": "మాస్టర్ స్టోర్ కనుగొనబడలేదు" },
-  "the-admin-has-not-configured-the-master-product-store": { "en": "The admin has not configured the master product store. Inventory management is disabled.", "te": "అడ్మిన్ మాస్టర్ ఉత్పత్తి స్టోర్‌ను కాన్ఫిగర్ చేయలేదు. ఇన్వెంటరీ నిర్వహణ నిలిపివేయబడింది." },
-  "manage-inventory": { "en": "Manage Inventory", "te": "ఇన్వెంటరీని నిర్వహించండి" },
-  "confirm-store-location": { "en": "Confirm Store Location", "te": "స్టోర్ స్థానాన్ని నిర్ధారించండి" },
-  "weve-detected-your-location": { "en": "We've detected your location. Would you like to create your store here automatically?", "te": "మేము మీ స్థానాన్ని గుర్తించాము. మీరు మీ స్టోర్‌ను ఇక్కడ స్వయంచాలకంగా సృష్టించాలనుకుంటున్నారా?" },
-  "no-ill-do-it-later": { "en": "No, I'll do it later", "te": "వద్దు, నేను తర్వాత చేస్తాను" },
-  "yes-create-my-store-here": { "en": "Yes, create my store here", "te": "అవును, నా స్టోర్‌ను ఇక్కడ సృష్టించండి" },
-  "attempting-to-create-your-store-automatically": { "en": "Attempting to create your store automatically", "te": "మీ స్టోర్‌ను స్వయంచాలకంగా సృష్టించడానికి ప్రయత్నిస్తోంది" },
-  "if-this-fails-you-can-create-your-store-manually": { "en": "If this fails, you can create your store manually from your store location.", "te": "ఇది విఫలమైతే, మీరు మీ స్టోర్ స్థానం నుండి మీ స్టోర్‌ను మాన్యువల్‌గా సృష్టించవచ్చు." },
-  "create-your-store": { "en": "Create Your Store", "te": "మీ స్టోర్‌ను సృష్టించండి" },
-  "fill-out-the-details-to-get-your-shop-listed": { "en": "Fill out the details to get your shop listed on LocalBasket.", "te": "LocalBasketలో మీ దుకాణాన్ని జాబితా చేయడానికి వివరాలను పూరించండి." },
-  "store-description": { "en": "Store Description", "te": "స్టోర్ వివరణ" },
-  "describe-what-makes-your-store-special": { "en": "Describe what makes your store special...", "te": "మీ స్టోర్‌ను ప్రత్యేకంగా చేసేదాన్ని వివరించండి..." },
-  "full-store-address": { "en": "Full Store Address", "te": "పూర్తి స్టోర్ చిరునామా" },
-  "store-location-gps": { "en": "Store Location (GPS)", "te": "స్టోర్ స్థానం (GPS)" },
-  "creating": { "en": "Creating...", "te": "సృష్టిస్తోంది..." },
-  "create-store": { "en": "Create Store", "te": "స్టోర్‌ను సృష్టించండి" },
-  "loading-your-store": { "en": "Loading your store...", "te": "మీ స్టోర్ లోడ్ అవుతోంది..." },
-  "complete-your-profile-first": { "en": "Complete Your Profile First", "te": "ముందుగా మీ ప్రొఫైల్‌ను పూర్తి చేయండి" },
-  "to-automatically-create-your-store": { "en": "To automatically create your store, we need your address from your user profile.", "te": "మీ స్టోర్‌ను స్వయంచాలకంగా సృష్టించడానికి, మాకు మీ వినియోగదారు ప్రొఫైల్ నుండి మీ చిరునామా అవసరం." },
-  "go-to-my-profile": { "en": "Go to My Profile", "te": "నా ప్రొఫైల్‌కు వెళ్లండి" },
-  "delete": { "en": "Delete", "te": "తొలగించు" },
-  "dal": { "en": ["Dal", "Lentils"], "te": ["పప్పు", "పప్పులు", "dal"] },
-  "jaggery": { "en": ["Jaggery"], "te": ["బెల్లం", "bellam"], "hi": ["गुड़", "gud"] },
-  "rice": { "en": ["Rice"], "te": ["బియ్యం", "అన్నం", "biyyam"], "hi": ["चावल", "chawal"] },
-  "milk": { "en": ["Milk", "Cow Milk"], "te": ["పాలు", "doodh", "paalu"] }
+  "home": {
+    "en": "Home",
+    "te": "హోమ్"
+  },
+  "stores": {
+    "en": "Stores",
+    "te": "స్టోర్స్"
+  },
+  "dashboard": {
+    "en": "Dashboard",
+    "te": "డాష్‌బోర్డ్"
+  },
+  "login": {
+    "en": "Login",
+    "te": "లాగిన్"
+  },
+  "my-account": {
+    "en": "My Account",
+    "te": "నా ఖాతా"
+  },
+  "my-profile": {
+    "en": "My Profile",
+    "te": "నా ప్రొఫైల్"
+  },
+  "my-orders": {
+    "en": "My Orders",
+    "te": "నా ఆర్డర్లు"
+  },
+  "my-store": {
+    "en": "My Store",
+    "te": "నా స్టోర్"
+  },
+  "store-orders": {
+    "en": "Store Orders",
+    "te": "స్టోర్ ఆర్డర్లు"
+  },
+  "deliveries": {
+    "en": "Deliveries",
+    "te": "డెలివరీలు"
+  },
+  "roles": {
+    "en": "Roles",
+    "te": "పాత్రలు"
+  },
+  "master-store": {
+    "en": "Master Store",
+    "te": "మాస్టర్ స్టోర్"
+  },
+  "logout": {
+    "en": "Logout",
+    "te": "లాగ్ అవుట్"
+  },
+  "start-shopping": {
+    "en": "Start Shopping",
+    "te": "షాపింగ్ ప్రారంభించండి"
+  },
+  "browse-local-stores-and-find-fresh-groceries": {
+    "en": "Browse local stores and find fresh groceries.",
+    "te": "స్థానిక దుకాణాలను బ్రౌజ్ చేయండి మరియు తాజా కిరాణా సామాగ్రిని కనుగొనండి."
+  },
+  "voice-order": {
+    "en": "Voice Order",
+    "te": "వాయిస్ ఆర్డర్"
+  },
+  "record-your-shopping-list-and-have-a-local-shopkeeper-fulfill-it": {
+    "en": "Record your shopping list and have a local shopkeeper fulfill it.",
+    "te": "మీ షాపింగ్ జాబితాను రికార్డ్ చేయండి మరియు స్థానిక దుకాణదారుడు దానిని నెరవేర్చండి."
+  },
+  "store-owner": {
+    "en": "Store Owner",
+    "te": "స్టోర్ యజమాని"
+  },
+  "manage-your-store-products-and-incoming-orders": {
+    "en": "Manage your store, products, and incoming orders.",
+    "te": "మీ స్టోర్, ఉత్పత్తులు మరియు ఇన్‌కమింగ్ ఆర్డర్‌లను నిర్వహించండి."
+  },
+  "delivery-partner": {
+    "en": "Delivery Partner",
+    "te": "డెలివరీ భాగస్వామి"
+  },
+  "view-and-accept-available-delivery-jobs": {
+    "en": "View and accept available delivery jobs.",
+    "te": "అందుబాటులో ఉన్న డెలివరీ పనులను వీక్షించండి మరియు అంగీకరించండి."
+  },
+  "your-dashboard": {
+    "en": "Your Dashboard",
+    "te": "మీ డాష్‌బోర్డ్"
+  },
+  "select-your-role-to-access-your-tools": {
+    "en": "Select your role to access your tools.",
+    "te": "మీ సాధనాలను యాక్సెస్ చేయడానికి మీ పాత్రను ఎంచుకోండి."
+  },
+  "go-to": {
+    "en": "Go to",
+    "te": "వెళ్ళండి"
+  },
+  "shopping-cart": {
+    "en": "Shopping Cart",
+    "te": "షాపింగ్ కార్ట్"
+  },
+  "total": {
+    "en": "Total",
+    "te": "మొత్తం"
+  },
+  "proceed-to-checkout": {
+    "en": "Proceed to Checkout",
+    "te": "చెక్అవుట్‌కు వెళ్లండి"
+  },
+  "your-cart-is-empty": {
+    "en": "Your cart is empty.",
+    "te": "మీ కార్ట్ ఖాళీగా ఉంది."
+  },
+  "shop-fresh-shop-local-just-by-voice": {
+    "en": "Shop Fresh, Shop Local, Just by Voice.",
+    "te": "వాయిస్ ద్వారా తాజా, స్థానిక ఉత్పత్తులను కొనండి."
+  },
+  "your-hands-free-shopping-assistant": {
+    "en": "Your hands-free shopping assistant for local groceries.",
+    "te": "స్థానిక కిరాణా సామాగ్రి కోసం మీ హ్యాండ్స్-ఫ్రీ షాపింగ్ సహాయకుడు."
+  },
+  "browse-all-stores": {
+    "en": "Browse All Stores",
+    "te": "అన్ని దుకాణాలను బ్రౌజ్ చేయండి"
+  },
+  "try-saying-find-bananas": {
+    "en": "Try saying 'find bananas near me' with the voice assistant!",
+    "te": "వాయిస్ అసిస్టెంట్‌తో 'నా దగ్గర అరటిపండ్లను కనుగొనండి' అని చెప్పడానికి ప్రయత్నించండి!"
+  },
+  "or-browse-featured-stores": {
+    "en": "Or, Browse Featured Stores",
+    "te": "లేదా, ఫీచర్ చేయబడిన దుకాణాలను బ్రౌజ్ చేయండి"
+  },
+  "explore-top-rated-local-stores-right-in-your-neighborhood": {
+    "en": "Explore top-rated local stores right in your neighborhood.",
+    "te": "మీ పరిసరాల్లోని అగ్రశ్రేణి స్థానిక దుకాణాలను అన్వేషించండి."
+  },
+  "loading-stores": {
+    "en": "Loading stores...",
+    "te": "దుకాణాలు లోడ్ అవుతున్నాయి..."
+  },
+  "no-stores-found": {
+    "en": "No stores found.",
+    "te": "దుకాణాలు కనుగొనబడలేదు."
+  },
+  "looks-like-you-havent-added-anything": {
+    "en": "Looks like you haven't added anything to your cart yet.",
+    "te": "మీరు ఇంకా మీ కార్ట్‌లో ఏమీ జోడించనట్లు కనిపిస్తోంది."
+  },
+  "browse-stores": {
+    "en": "Browse Stores",
+    "te": "దుకాణాలను బ్రౌజ్ చేయండి"
+  },
+  "product": {
+    "en": "Product",
+    "te": "ఉత్పత్తి"
+  },
+  "price": {
+    "en": "Price",
+    "te": "ధర"
+  },
+  "quantity": {
+    "en": "Quantity",
+    "te": "పరిమాణం"
+  },
+  "order-summary": {
+    "en": "Order Summary",
+    "te": "ఆర్డర్ సారాంశం"
+  },
+  "subtotal": {
+    "en": "Subtotal",
+    "te": "ఉపమొత్తం"
+  },
+  "delivery-fee": {
+    "en": "Delivery Fee",
+    "te": "డెలివరీ ఫీజు"
+  },
+  "please-add-items-to-your-cart-before-proceeding": {
+    "en": "Please add items to your cart before proceeding to checkout.",
+    "te": "దయచేసి చెక్అవుట్‌కు వెళ్లే ముందు మీ కార్ట్‌కు వస్తువులను జోడించండి."
+  },
+  "delivery-and-store-selection": {
+    "en": "Delivery and Store Selection",
+    "te": "డెలివరీ మరియు స్టోర్ ఎంపిక"
+  },
+  "full-name": {
+    "en": "Full Name",
+    "te": "పూర్తి పేరు"
+  },
+  "delivery-location": {
+    "en": "Delivery Location",
+    "te": "డెలివరీ స్థానం"
+  },
+  "location-captured": {
+    "en": "Location Captured",
+    "te": "స్థానం సంగ్రహించబడింది"
+  },
+  "re-capture": {
+    "en": "Re-capture",
+    "te": "తిరిగి సంగ్రహించండి"
+  },
+  "getting-your-current-location": {
+    "en": "Getting your current location...",
+    "te": "మీ ప్రస్తుత స్థానం పొందుతోంది..."
+  },
+  "phone-number": {
+    "en": "Phone Number",
+    "te": "ఫోను నంబరు"
+  },
+  "fulfilling-store": {
+    "en": "Fulfilling Store",
+    "te": "నెరవేర్చే స్టోర్"
+  },
+  "select-a-store-to-fulfill": {
+    "en": "Select a store to fulfill your order",
+    "te": "మీ ఆర్డర్‌ను నెరవేర్చడానికి ఒక దుకాణాన్ని ఎంచుకోండి"
+  },
+  "action-required": {
+    "en": "Action Required",
+    "te": "చర్య అవసరం"
+  },
+  "please-select-a-store-to-continue": {
+    "en": "Please select a store to continue.",
+    "te": "కొనసాగించడానికి దయచేసి ఒక దుకాణాన్ని ఎంచుకోండి."
+  },
+  "placing-order": {
+    "en": "Placing Order...",
+    "te": "ఆర్డర్ చేస్తోంది..."
+  },
+  "place-order": {
+    "en": "Place Order",
+    "te": "ఆర్డర్ చేయండి"
+  },
+  "select-weight": {
+    "en": "Select Weight",
+    "te": "బరువును ఎంచుకోండి"
+  },
+  "no-prices-set": {
+    "en": "No prices set",
+    "te": "ధరలు సెట్ చేయబడలేదు"
+  },
+  "add-to-cart": {
+    "en": "Add to Cart",
+    "te": "కార్ట్‌లో చేర్చు"
+  },
+  "total-customers": {
+    "en": "Total Customers",
+    "te": "మొత్తం వినియోగదారులు"
+  },
+  "total-stores": {
+    "en": "Total Stores",
+    "te": "మొత్తం దుకాణాలు"
+  },
+  "orders-delivered": {
+    "en": "Orders Delivered",
+    "te": "చేరవేసిన ఆర్డర్లు"
+  },
+  "action-required-create-master-store": {
+    "en": "Action Required: Create Master Store",
+    "te": "చర్య అవసరం: మాస్టర్ స్టోర్‌ను సృష్టించండి"
+  },
+  "the-master-store-for-setting-platform-wide": {
+    "en": "The master store for setting platform-wide product prices has not been created.",
+    "te": "ప్లాట్‌ఫారమ్-వ్యాప్తంగా ఉత్పత్తి ధరలను సెట్ చేయడానికి మాస్టర్ స్టోర్ సృష్టించబడలేదు."
+  },
+  "create-master-store": {
+    "en": "Create Master Store",
+    "te": "మాస్టర్ స్టోర్‌ను సృష్టించండి"
+  },
+  "admin-tools": {
+    "en": "Admin Tools",
+    "te": "అడ్మిన్ సాధనాలు"
+  },
+  "manage-master-store-and-products": {
+    "en": "Manage Master Store & Products",
+    "te": "మాస్టర్ స్టోర్ & ఉత్పత్తులను నిర్వహించండి"
+  },
+  "add-or-edit-products-in-the-master-catalog": {
+    "en": "Add or edit products in the master catalog that all stores can sell.",
+    "te": "అన్ని దుకాణాలు అమ్మగల మాస్టర్ కేటలాగ్‌లో ఉత్పత్తులను జోడించండి లేదా సవరించండి."
+  },
+  "voice-commands-control": {
+    "en": "Voice Commands Control",
+    "te": "వాయిస్ ఆదేశాల నియంత్రణ"
+  },
+  "view-and-manage-the-voice-commands-users-can-say": {
+    "en": "View and manage the voice commands users can say.",
+    "te": "వినియోగదారులు చెప్పగల వాయిస్ ఆదేశాలను వీక్షించండి మరియు నిర్వహించండి."
+  },
+  "admin-dashboard": {
+    "en": "Admin Dashboard",
+    "te": "అడ్మిన్ డాష్‌బోర్డ్"
+  },
+  "a-high-level-overview-of-your-application": {
+    "en": "A high-level overview of your application's activity.",
+    "te": "మీ అప్లికేషన్ యొక్క కార్యాచరణ యొక్క ఉన్నత-స్థాయి అవలోకనం."
+  },
+  "potatoes": {
+    "en": [
+      "Potatoes",
+      "Potato"
+    ],
+    "te": [
+      "బంగాళదుంపలు",
+      "ఆలుగడ్డ",
+      "ఆలు"
+    ]
+  },
+  "onions": {
+    "en": [
+      "Onions",
+      "Onion"
+    ],
+    "te": [
+      "ఉల్లిపాయలు",
+      "ఉల్లిపాయ",
+      "ఎర్రగడ్డ"
+    ]
+  },
+  "tomatoes": {
+    "en": [
+      "Tomatoes",
+      "Tomato"
+    ],
+    "te": [
+      "టమోటాలు",
+      "టమోటా",
+      "రామ ములగ"
+    ]
+  },
+  "carrots": {
+    "en": [
+      "Carrots",
+      "Carrot"
+    ],
+    "te": [
+      "క్యారెట్లు",
+      "క్యారెట్"
+    ]
+  },
+  "cabbage": {
+    "en": [
+      "Cabbage"
+    ],
+    "te": [
+      "క్యాబేజీ"
+    ]
+  },
+  "cauliflower": {
+    "en": [
+      "Cauliflower"
+    ],
+    "te": [
+      "కాలీఫ్లవర్",
+      "గోబి పువ్వు"
+    ]
+  },
+  "capsicum-(bell-pepper)": {
+    "en": [
+      "Capsicum",
+      "Bell Pepper"
+    ],
+    "te": [
+      "క్యాప్సికమ్",
+      "బెంగళూరు మిరపకాయ"
+    ]
+  },
+  "green-chilies": {
+    "en": [
+      "Green Chilies",
+      "Green Chilli"
+    ],
+    "te": [
+      "పచ్చి మిరపకాయలు",
+      "పచ్చి మిర్చి"
+    ]
+  },
+  "ginger": {
+    "en": [
+      "Ginger"
+    ],
+    "te": [
+      "అల్లం"
+    ]
+  },
+  "garlic": {
+    "en": [
+      "Garlic"
+    ],
+    "te": [
+      "వెల్లుల్లి",
+      "ఎల్లిపాయ"
+    ]
+  },
+  "beans": {
+    "en": [
+      "Beans"
+    ],
+    "te": [
+      "బీన్స్"
+    ]
+  },
+  "peas": {
+    "en": [
+      "Peas",
+      "Green Peas"
+    ],
+    "te": [
+      "బఠానీలు",
+      "పచ్చి బఠానీలు"
+    ]
+  },
+  "brinjal-(eggplant)": {
+    "en": [
+      "Brinjal",
+      "Eggplant"
+    ],
+    "te": [
+      "వంకాయ",
+      "వంగ"
+    ]
+  },
+  "okra-(lady’s-finger)": {
+    "en": [
+      "Okra",
+      "Lady's Finger"
+    ],
+    "te": [
+      "బెండకాయ"
+    ]
+  },
+  "spinach": {
+    "en": [
+      "Spinach"
+    ],
+    "te": [
+      "పాలకూర"
+    ]
+  },
+  "coriander-leaves": {
+    "en": [
+      "Coriander Leaves",
+      "Coriander",
+      "Cilantro"
+    ],
+    "te": [
+      "కొత్తిమీర"
+    ]
+  },
+  "mint-leaves": {
+    "en": [
+      "Mint Leaves",
+      "Mint"
+    ],
+    "te": [
+      "పుదీనా ఆకులు",
+      "పుదీనా"
+    ]
+  },
+  "drumstick": {
+    "en": [
+      "Drumstick"
+    ],
+    "te": [
+      "మునగకాయ"
+    ]
+  },
+  "radish": {
+    "en": [
+      "Radish"
+    ],
+    "te": [
+      "ముల్లంగి"
+    ]
+  },
+  "beetroot": {
+    "en": [
+      "Beetroot"
+    ],
+    "te": [
+      "బీట్‌రూట్"
+    ]
+  },
+  "bottle-gourd": {
+    "en": [
+      "Bottle Gourd"
+    ],
+    "te": [
+      "సొరకాయ",
+      "ఆనపకాయ"
+    ]
+  },
+  "ridge-gourd": {
+    "en": [
+      "Ridge Gourd"
+    ],
+    "te": [
+      "బీరకాయ"
+    ]
+  },
+  "bitter-gourd": {
+    "en": [
+      "Bitter Gourd"
+    ],
+    "te": [
+      "కాకరకాయ"
+    ]
+  },
+  "pumpkin": {
+    "en": [
+      "Pumpkin"
+    ],
+    "te": [
+      "గుమ్మడికాయ"
+    ]
+  },
+  "cucumber": {
+    "en": [
+      "Cucumber"
+    ],
+    "te": [
+      "కీర దోసకాయ",
+      "దోసకాయ"
+    ]
+  },
+  "raw-banana": {
+    "en": [
+      "Raw Banana"
+    ],
+    "te": [
+      "పచ్చి అరటికాయ",
+      "అరటికాయ"
+    ]
+  },
+  "yam": {
+    "en": [
+      "Yam"
+    ],
+    "te": [
+      "కంద గడ్డ",
+      "కంద"
+    ]
+  },
+  "sweet-potato": {
+    "en": [
+      "Sweet Potato",
+      "Sweet Potatoes"
+    ],
+    "te": [
+      "చిలగడదుంప",
+      "రత్నపురి గడ్డ"
+    ]
+  },
+  "broccoli": {
+    "en": [
+      "Broccoli"
+    ],
+    "te": [
+      "బ్రోకలీ"
+    ]
+  },
+  "zucchini": {
+    "en": [
+      "Zucchini"
+    ],
+    "te": [
+      "జుకినీ",
+      "నల్ల దోసకాయ"
+    ]
+  },
+  "apples": {
+    "en": [
+      "Apples",
+      "Apple"
+    ],
+    "te": [
+      "యాపిల్స్",
+      "యాపిల్ పండు",
+      "సీమ రేగు"
+    ]
+  },
+  "bananas": {
+    "en": [
+      "Bananas",
+      "Banana"
+    ],
+    "te": [
+      "అరటిపండ్లు",
+      "అరటిపండు"
+    ]
+  },
+  "oranges": {
+    "en": [
+      "Oranges",
+      "Orange"
+    ],
+    "te": [
+      "నారింజ",
+      "కమలా పండు"
+    ]
+  },
+  "grapes": {
+    "en": [
+      "Grapes"
+    ],
+    "te": [
+      "ద్రాక్ష",
+      "ద్రాక్ష పండ్లు"
+    ]
+  },
+  "mangoes": {
+    "en": [
+      "Mangoes",
+      "Mango"
+    ],
+    "te": [
+      "మామిడిపండ్లు",
+      "మామిడి పండు"
+    ]
+  },
+  "papaya": {
+    "en": [
+      "Papaya"
+    ],
+    "te": [
+      "బొప్పాయి"
+    ]
+  },
+  "pineapple": {
+    "en": [
+      "Pineapple"
+    ],
+    "te": [
+      "పైనాపిల్",
+      "అనాస పండు"
+    ]
+  },
+  "watermelon": {
+    "en": [
+      "Watermelon"
+    ],
+    "te": [
+      "పుచ్చకాయ"
+    ]
+  },
+  "muskmelon": {
+    "en": [
+      "Muskmelon"
+    ],
+    "te": [
+      "కర్బూజ"
+    ]
+  },
+  "guava": {
+    "en": [
+      "Guava"
+    ],
+    "te": [
+      "జామకాయ",
+      "జామ పండు"
+    ]
+  },
+  "pomegranate": {
+    "en": [
+      "Pomegranate"
+    ],
+    "te": [
+      "దానిమ్మ",
+      "దానిమ్మ పండు"
+    ]
+  },
+  "chikoo-(sapota)": {
+    "en": [
+      "Chikoo",
+      "Sapota"
+    ],
+    "te": [
+      "సపోటా"
+    ]
+  },
+  "strawberries": {
+    "en": [
+      "Strawberries",
+      "Strawberry"
+    ],
+    "te": [
+      "స్ట్రాబెర్రీలు",
+      "స్ట్రాబెర్రీ"
+    ]
+  },
+  "kiwi": {
+    "en": [
+      "Kiwi"
+    ],
+    "te": [
+      "కివి"
+    ]
+  },
+  "pears": {
+    "en": [
+      "Pears",
+      "Pear"
+    ],
+    "te": [
+      "బేరిపండు"
+    ]
+  },
+  "plums": {
+    "en": [
+      "Plums",
+      "Plum"
+    ],
+    "te": [
+      "రేగు పండ్లు",
+      "ఆల్బకరా"
+    ]
+  },
+  "dates": {
+    "en": [
+      "Dates"
+    ],
+    "te": [
+      "ఖర్జూరం",
+      "ఖర్జూర పండ్లు"
+    ]
+  },
+  "dry-figs": {
+    "en": [
+      "Dry Figs",
+      "Fig"
+    ],
+    "te": [
+      "ఎండు అత్తి పండ్లు",
+      "అంజీర్"
+    ]
+  },
+  "coconut": {
+    "en": [
+      "Coconut"
+    ],
+    "te": [
+      "కొబ్బరికాయ",
+      "టెంకాయ"
+    ]
+  },
+  "lemons": {
+    "en": [
+      "Lemons",
+      "Lemon"
+    ],
+    "te": [
+      "నిమ్మకాయలు",
+      "నిమ్మకాయ"
+    ]
+  },
+  "chicken": {
+    "en": [
+      "Chicken"
+    ],
+    "te": [
+      "చికెన్",
+      "కోడి మాంసం"
+    ]
+  },
+  "whole-chicken-(with-skin)": {
+    "en": [
+      "Whole Chicken (With Skin)",
+      "Whole chicken skin on"
+    ],
+    "te": [
+      "చర్మంతో ఉన్న పూర్తి చికెన్"
+    ]
+  },
+  "whole-chicken-(without-skin)": {
+    "en": [
+      "Whole Chicken (Without Skin)",
+      "Whole chicken skinless"
+    ],
+    "te": [
+      "చర్మం లేని పూర్తి చికెన్"
+    ]
+  },
+  "country-chicken-(desi)": {
+    "en": [
+      "Country Chicken",
+      "Desi Chicken",
+      "country hen"
+    ],
+    "te": [
+      "నాటు కోడి",
+      "దేశీ కోడి",
+      "country kodi"
+    ]
+  },
+  "chicken-breast-(boneless)": {
+    "en": [
+      "Chicken Breast (Boneless)",
+      "Boneless Chicken Breast"
+    ],
+    "te": [
+      "చికెన్ బ్రెస్ట్ (ఎముకలు లేనిది)",
+      "బోన్‌లెస్ చికెన్ బ్రెస్ట్"
+    ]
+  },
+  "chicken-thigh-(boneless)": {
+    "en": [
+      "Chicken Thigh (Boneless)",
+      "Boneless Chicken Thigh"
+    ],
+    "te": [
+      "చికెన్ తొడ (ఎముకలు లేనిది)",
+      "బోన్‌లెస్ చికెన్ తొడ"
+    ]
+  },
+  "chicken-leg-(drumstick)": {
+    "en": [
+      "Chicken Leg",
+      "Chicken Drumstick"
+    ],
+    "te": [
+      "చికెన్ లెగ్",
+      "చికెన్ డ్రమ్‌స్టిక్"
+    ]
+  },
+  "chicken-wings": {
+    "en": [
+      "Chicken Wings"
+    ],
+    "te": [
+      "చికెన్ రెక్కలు"
+    ]
+  },
+  "chicken-lollipop": {
+    "en": [
+      "Chicken Lollipop"
+    ],
+    "te": [
+      "చికెన్ లాలిపాప్"
+    ]
+  },
+  "chicken-liver": {
+    "en": [
+      "Chicken Liver"
+    ],
+    "te": [
+      "చికెన్ లివర్",
+      "చికెన్ కాలేయం"
+    ]
+  },
+  "chicken-gizzard": {
+    "en": [
+      "Chicken Gizzard"
+    ],
+    "te": [
+      "చికెన్ గిజార్డ్"
+    ]
+  },
+  "chicken-mince-(keema)": {
+    "en": [
+      "Chicken Mince",
+      "Chicken Keema"
+    ],
+    "te": [
+      "చికెన్ కీమా"
+    ]
+  },
+  "chicken-curry-cut": {
+    "en": [
+      "Chicken Curry Cut"
+    ],
+    "te": [
+      "చికెన్ కర్రీ కట్"
+    ]
+  },
+  "masoor-dal-(red-lentil)": {
+    "en": [
+      "Masoor Dal",
+      "Red Lentil"
+    ],
+    "te": [
+      "మసూర్ పప్పు",
+      "ఎర్ర కంది పప్పు"
+    ]
+  },
+  "fresh-cut": {
+    "en": "Fresh Cut",
+    "te": "తాజా కట్"
+  },
+  "vegetables": {
+    "en": "Vegetables",
+    "te": "కూరగాయలు"
+  },
+  "fruits": {
+    "en": "Fruits",
+    "te": "పండ్లు"
+  },
+  "store-image": {
+    "en": "Store Image",
+    "te": "స్టోర్ చిత్రం"
+  },
+  "take-or-upload-a-picture-of-your-storefront": {
+    "en": "Take or upload a picture of your storefront.",
+    "te": "మీ స్టోర్ ముందు భాగం యొక్క చిత్రాన్ని తీయండి లేదా అప్‌లోడ్ చేయండి."
+  },
+  "no-image-set": {
+    "en": "No image set",
+    "te": "చిత్రం సెట్ చేయబడలేదు"
+  },
+  "uploading": {
+    "en": "Uploading",
+    "te": "అప్‌లోడ్ చేస్తోంది"
+  },
+  "close-camera": {
+    "en": "Close Camera",
+    "te": "కెమెరాను మూసివేయండి"
+  },
+  "open-camera": {
+    "en": "Open Camera",
+    "te": "కెమెరాను తెరవండి"
+  },
+  "capture": {
+    "en": "Capture",
+    "te": "చిత్రం తీయండి"
+  },
+  "from-device": {
+    "en": "From Device",
+    "te": "పరికరం నుండి"
+  },
+  "upload-and-save": {
+    "en": "Upload and Save",
+    "te": "అప్‌లోడ్ చేసి సేవ్ చేయండి"
+  },
+  "edit-master-product": {
+    "en": "Edit Master Product",
+    "te": "మాస్టర్ ఉత్పత్తిని సవరించండి"
+  },
+  "update-details-for": {
+    "en": "Update details for",
+    "te": "వివరాలను నవీకరించండి"
+  },
+  "changes-will-affect-all-stores": {
+    "en": "Changes will affect all stores.",
+    "te": "మార్పులు అన్ని దుకాణాలపై ప్రభావం చూపుతాయి."
+  },
+  "product-name": {
+    "en": "Product Name",
+    "te": "ఉత్పత్తి పేరు"
+  },
+  "category": {
+    "en": "Category",
+    "te": "వర్గం"
+  },
+  "select-a-category": {
+    "en": "Select a category",
+    "te": "ఒక వర్గాన్ని ఎంచుకోండి"
+  },
+  "product-description-optional": {
+    "en": "Product Description (Optional)",
+    "te": "ఉత్పత్తి వివరణ (ఐచ్ఛికం)"
+  },
+  "image-url": {
+    "en": "Image URL",
+    "te": "చిత్రం URL"
+  },
+  "price-variants": {
+    "en": "Price Variants",
+    "te": "ధర వేరియంట్‌లు"
+  },
+  "weight": {
+    "en": "Weight",
+    "te": "బరువు"
+  },
+  "select-a-weight": {
+    "en": "Select a weight",
+    "te": "ఒక బరువును ఎంచుకోండి"
+  },
+  "add-variant": {
+    "en": "Add Variant",
+    "te": "వేరియంట్‌ను జోడించండి"
+  },
+  "cancel": {
+    "en": "Cancel",
+    "te": "రద్దు చేయండి"
+  },
+  "saving": {
+    "en": "Saving...",
+    "te": "సేవ్ చేస్తోంది..."
+  },
+  "save-changes": {
+    "en": "Save Changes",
+    "te": "మార్పులను ఊంచు"
+  },
+  "manage-your-inventory": {
+    "en": "Manage Your Inventory",
+    "te": "మీ ఇన్వెంటరీని నిర్వహించండి"
+  },
+  "select-the-products-you-want-to-sell": {
+    "en": "Select the products you want to sell in your store.",
+    "te": "మీరు మీ స్టోర్‌లో విక్రయించాలనుకుంటున్న ఉత్పత్తులను ఎంచుకోండి."
+  },
+  "no-master-products-found": {
+    "en": "No Master Products Found",
+    "te": "మాస్టర్ ఉత్పత్తులు కనుగొనబడలేదు"
+  },
+  "the-admin-has-not-added-any-products": {
+    "en": "The admin has not added any products to the master catalog yet.",
+    "te": "అడ్మిన్ ఇంకా మాస్టర్ కేటలాగ్‌కు ఏ ఉత్పత్తులను జోడించలేదు."
+  },
+  "saving-changes": {
+    "en": "Saving Changes...",
+    "te": "మార్పులను సేవ్ చేస్తోంది..."
+  },
+  "save-inventory-changes": {
+    "en": "Save Inventory Changes",
+    "te": "ఇన్వెంటరీ మార్పులను సేవ్ చేయండి"
+  },
+  "add-a-master-product": {
+    "en": "Add a Master Product",
+    "te": "ఒక మాస్టర్ ఉత్పత్తిని జోడించండి"
+  },
+  "add-a-new-product-to-the-platform": {
+    "en": "Add a new product to the platform's master catalog.",
+    "te": "ప్లాట్‌ఫారమ్ యొక్క మాస్టర్ కేటలాగ్‌కు ఒక కొత్త ఉత్పత్తిని జోడించండి."
+  },
+  "product-template-optional": {
+    "en": "Product Template (Optional)",
+    "te": "ఉత్పత్తి టెంప్లేట్ (ఐచ్ఛికం)"
+  },
+  "select-a-predefined-item": {
+    "en": "Select a predefined item",
+    "te": "ముందే నిర్వచించిన అంశాన్ని ఎంచుకోండి"
+  },
+  "select-an-item-to-auto-fill": {
+    "en": "Select an item to auto-fill the name and category.",
+    "te": "పేరు మరియు వర్గాన్ని ఆటో-ఫిల్ చేయడానికి ఒక అంశాన్ని ఎంచుకోండి."
+  },
+  "product-image-url-optional": {
+    "en": "Product Image URL (Optional)",
+    "te": "ఉత్పత్తి చిత్రం URL (ఐచ్ఛికం)"
+  },
+  "generate-with-ai": {
+    "en": "Generate with AI",
+    "te": "AIతో రూపొందించండి"
+  },
+  "paste-a-direct-image-link-or-generate-one": {
+    "en": "Paste a direct image link or generate one with AI.",
+    "te": "ఒక ప్రత్యక్ష చిత్ర లింక్‌ను అతికించండి లేదా AIతో ఒకదాన్ని రూపొందించండి."
+  },
+  "describe-the-product": {
+    "en": "Describe the product...",
+    "te": "ఉత్పత్తిని వివరించండి..."
+  },
+  "set-the-official-price-for-this-product": {
+    "en": "Set the official price for this product across all stores.",
+    "te": "అన్ని దుకాణాలలో ఈ ఉత్పత్తి కోసం అధికారిక ధరను సెట్ చేయండి."
+  },
+  "adding-product": {
+    "en": "Adding Product",
+    "te": "ఉత్పత్తిని జోడిస్తోంది"
+  },
+  "add-product": {
+    "en": "Add Product",
+    "te": "ఉత్పత్తిని జోడించండి"
+  },
+  "promote-your-store": {
+    "en": "Promote Your Store",
+    "te": "మీ స్టోర్‌ను ప్రచారం చేయండి"
+  },
+  "share-your-store-with-your-phone-contacts": {
+    "en": "Share your store with your phone contacts via SMS.",
+    "te": "మీ ఫోన్ పరిచయాలతో మీ స్టోర్‌ను SMS ద్వారా పంచుకోండి."
+  },
+  "share-with-contacts": {
+    "en": "Share with Contacts",
+    "te": "పరిచయాలతో పంచుకోండి"
+  },
+  "this-will-open-your-phones-contact-picker": {
+    "en": "This will open your phone's contact picker.",
+    "te": "ఇది మీ ఫోన్ యొక్క పరిచయ పికర్‌ను తెరుస్తుంది."
+  },
+  "action-required-update-your-stores-location": {
+    "en": "Action Required: Update Your Store's Location",
+    "te": "చర్య అవసరం: మీ స్టోర్ యొక్క స్థానాన్ని నవీకరించండి"
+  },
+  "your-store-is-missing-gps-coordinates": {
+    "en": "Your store is missing GPS coordinates, which are needed for delivery calculations. Please set them below.",
+    "te": "డెలివరీ గణనలకు అవసరమైన GPS కోఆర్డినేట్లు మీ స్టోర్‌లో లేవు. దయచేసి వాటిని క్రింద సెట్ చేయండి."
+  },
+  "latitude": {
+    "en": "Latitude",
+    "te": "అక్షాంశం"
+  },
+  "longitude": {
+    "en": "Longitude",
+    "te": "రేఖాంశం"
+  },
+  "get-current-location": {
+    "en": "Get Current Location",
+    "te": "ప్రస్తుత స్థానం పొందండి"
+  },
+  "save-location": {
+    "en": "Save Location",
+    "te": "స్థానాన్ని సేవ్ చేయండి"
+  },
+  "danger-zone": {
+    "en": "Danger Zone",
+    "te": "ప్రమాదకర ప్రాంతం"
+  },
+  "close-store": {
+    "en": "Close Store",
+    "te": "స్టోర్‌ను మూసివేయండి"
+  },
+  "this-will-make-your-store-invisible": {
+    "en": "This will make your store invisible to customers and prevent new orders.",
+    "te": "ఇది మీ స్టోర్‌ను వినియోగదారులకు కనిపించకుండా చేస్తుంది మరియు కొత్త ఆర్డర్‌లను నివారిస్తుంది."
+  },
+  "are-you-sure": {
+    "en": "Are you sure?",
+    "te": "మీరు ఖచ్చితంగా ఉన్నారా?"
+  },
+  "your-store-and-all-its-products-will-no-longer-be-visible": {
+    "en": "Your store and all its products will no longer be visible to customers. This action can be reversed.",
+    "te": "మీ స్టోర్ మరియు దాని అన్ని ఉత్పత్తులు ఇకపై వినియోగదారులకు కనిపించవు. ఈ చర్యను రద్దు చేయవచ్చు."
+  },
+  "yes-close-my-store": {
+    "en": "Yes, Close My Store",
+    "te": "అవును, నా స్టోర్‌ను మూసివేయండి"
+  },
+  "closing": {
+    "en": "Closing...",
+    "te": "మూసివేస్తోంది..."
+  },
+  "store-details": {
+    "en": "Store Details",
+    "te": "స్టోర్ వివరాలు"
+  },
+  "edit": {
+    "en": "Edit",
+    "te": "సవరించు"
+  },
+  "edit-store-details": {
+    "en": "Edit Store Details",
+    "te": "స్టోర్ వివరాలను సవరించండి"
+  },
+  "update-your-stores-public-information": {
+    "en": "Update your store's public information.",
+    "te": "మీ స్టోర్ యొక్క పబ్లిక్ సమాచారాన్ని నవీకరించండి."
+  },
+  "store-name": {
+    "en": "Store Name",
+    "te": "స్టోర్ పేరు"
+  },
+  "description": {
+    "en": "Description",
+    "te": "వివరణ"
+  },
+  "address": {
+    "en": "Address",
+    "te": "చిరునామా"
+  },
+  "location": {
+    "en": "Location",
+    "te": "స్థానం"
+  },
+  "variants": {
+    "en": "Variants",
+    "te": "వేరియంట్‌లు"
+  },
+  "actions": {
+    "en": "Actions",
+    "te": "చర్యలు"
+  },
+  "this-store-is-closed": {
+    "en": "This Store is Closed",
+    "te": "ఈ స్టోర్ మూసివేయబడింది"
+  },
+  "your-store-is-currently-not-visible": {
+    "en": "Your store is currently not visible to customers. Re-open it to start receiving orders again.",
+    "te": "మీ స్టోర్ ప్రస్తుతం వినియోగదారులకు కనిపించడం లేదు. మళ్లీ ఆర్డర్‌లను స్వీకరించడం ప్రారంభించడానికి దాన్ని తిరిగి తెరవండి."
+  },
+  "re-opening": {
+    "en": "Re-opening...",
+    "te": "తిరిగి తెరుస్తోంది..."
+  },
+  "re-open-store": {
+    "en": "Re-open Store",
+    "te": "స్టోర్‌ను తిరిగి తెరవండి"
+  },
+  "your-products": {
+    "en": "Your Products",
+    "te": "మీ ఉత్పత్తులు"
+  },
+  "this-is-the-master-list-of-products": {
+    "en": "This is the master list of products for the entire platform.",
+    "te": "ఇది మొత్తం ప్లాట్‌ఫారమ్ కోసం ఉత్పత్తుల యొక్క మాస్టర్ జాబితా."
+  },
+  "this-is-your-current-store-inventory": {
+    "en": "This is your current store inventory, based on the master product list.",
+    "te": "ఇది మీ ప్రస్తుత స్టోర్ ఇన్వెంటరీ, మాస్టర్ ఉత్పత్తి జాబితా ఆధారంగా."
+  },
+  "loading-products": {
+    "en": "Loading products...",
+    "te": "ఉత్పత్తులు లోడ్ అవుతున్నాయి..."
+  },
+  "you-havent-added-any-products-yet": {
+    "en": "You haven't added any products yet.",
+    "te": "మీరు ఇంకా ఏ ఉత్పత్తులను జోడించలేదు."
+  },
+  "master-store-not-found": {
+    "en": "Master Store Not Found",
+    "te": "మాస్టర్ స్టోర్ కనుగొనబడలేదు"
+  },
+  "the-admin-has-not-configured-the-master-product-store": {
+    "en": "The admin has not configured the master product store. Inventory management is disabled.",
+    "te": "అడ్మిన్ మాస్టర్ ఉత్పత్తి స్టోర్‌ను కాన్ఫిగర్ చేయలేదు. ఇన్వెంటరీ నిర్వహణ నిలిపివేయబడింది."
+  },
+  "manage-inventory": {
+    "en": "Manage Inventory",
+    "te": "ఇన్వెంటరీని నిర్వహించండి"
+  },
+  "confirm-store-location": {
+    "en": "Confirm Store Location",
+    "te": "స్టోర్ స్థానాన్ని నిర్ధారించండి"
+  },
+  "weve-detected-your-location": {
+    "en": "We've detected your location. Would you like to create your store here automatically?",
+    "te": "మేము మీ స్థానాన్ని గుర్తించాము. మీరు మీ స్టోర్‌ను ఇక్కడ స్వయంచాలకంగా సృష్టించాలనుకుంటున్నారా?"
+  },
+  "no-ill-do-it-later": {
+    "en": "No, I'll do it later",
+    "te": "వద్దు, నేను తర్వాత చేస్తాను"
+  },
+  "yes-create-my-store-here": {
+    "en": "Yes, create my store here",
+    "te": "అవును, నా స్టోర్‌ను ఇక్కడ సృష్టించండి"
+  },
+  "attempting-to-create-your-store-automatically": {
+    "en": "Attempting to create your store automatically",
+    "te": "మీ స్టోర్‌ను స్వయంచాలకంగా సృష్టించడానికి ప్రయత్నిస్తోంది"
+  },
+  "if-this-fails-you-can-create-your-store-manually": {
+    "en": "If this fails, you can create your store manually from your store location.",
+    "te": "ఇది విఫలమైతే, మీరు మీ స్టోర్ స్థానం నుండి మీ స్టోర్‌ను మాన్యువల్‌గా సృష్టించవచ్చు."
+  },
+  "create-your-store": {
+    "en": "Create Your Store",
+    "te": "మీ స్టోర్‌ను సృష్టించండి"
+  },
+  "fill-out-the-details-to-get-your-shop-listed": {
+    "en": "Fill out the details to get your shop listed on LocalBasket.",
+    "te": "LocalBasketలో మీ దుకాణాన్ని జాబితా చేయడానికి వివరాలను పూరించండి."
+  },
+  "store-description": {
+    "en": "Store Description",
+    "te": "స్టోర్ వివరణ"
+  },
+  "describe-what-makes-your-store-special": {
+    "en": "Describe what makes your store special...",
+    "te": "మీ స్టోర్‌ను ప్రత్యేకంగా చేసేదాన్ని వివరించండి..."
+  },
+  "full-store-address": {
+    "en": "Full Store Address",
+    "te": "పూర్తి స్టోర్ చిరునామా"
+  },
+  "store-location-gps": {
+    "en": "Store Location (GPS)",
+    "te": "స్టోర్ స్థానం (GPS)"
+  },
+  "creating": {
+    "en": "Creating...",
+    "te": "సృష్టిస్తోంది..."
+  },
+  "create-store": {
+    "en": "Create Store",
+    "te": "స్టోర్‌ను సృష్టించండి"
+  },
+  "loading-your-store": {
+    "en": "Loading your store...",
+    "te": "మీ స్టోర్ లోడ్ అవుతోంది..."
+  },
+  "complete-your-profile-first": {
+    "en": "Complete Your Profile First",
+    "te": "ముందుగా మీ ప్రొఫైల్‌ను పూర్తి చేయండి"
+  },
+  "to-automatically-create-your-store": {
+    "en": "To automatically create your store, we need your address from your user profile.",
+    "te": "మీ స్టోర్‌ను స్వయంచాలకంగా సృష్టించడానికి, మాకు మీ వినియోగదారు ప్రొఫైల్ నుండి మీ చిరునామా అవసరం."
+  },
+  "go-to-my-profile": {
+    "en": "Go to My Profile",
+    "te": "నా ప్రొఫైల్‌కు వెళ్లండి"
+  },
+  "delete": {
+    "en": "Delete",
+    "te": "తొలగించు"
+  },
+  "dal": {
+    "en": [
+      "Dal",
+      "Lentils"
+    ],
+    "te": [
+      "పప్పు",
+      "పప్పులు",
+      "dal"
+    ]
+  },
+  "jaggery": {
+    "en": [
+      "Jaggery"
+    ],
+    "te": [
+      "బెల్లం",
+      "bellam"
+    ],
+    "hi": [
+      "गुड़",
+      "gud"
+    ]
+  },
+  "rice": {
+    "en": [
+      "Rice"
+    ],
+    "te": [
+      "బియ్యం",
+      "అన్నం",
+      "biyyam"
+    ],
+    "hi": [
+      "चावल",
+      "chawal"
+    ]
+  },
+  "milk": {
+    "en": [
+      "Milk",
+      "Cow Milk"
+    ],
+    "te": [
+      "పాలు",
+      "doodh",
+      "paalu"
+    ]
+  },
+  "chicken-skin-less": {
+    "en": [
+      "chicken skinless"
+    ]
+  }
 }
-
     
