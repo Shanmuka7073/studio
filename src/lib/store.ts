@@ -91,7 +91,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   getProductName: (product: Product) => {
-    if (!product) return '';
+    if (!product || !product.name) return '';
     const lang = get().language;
     return translate(product.name.toLowerCase().replace(/ /g, '-'), lang);
   },
