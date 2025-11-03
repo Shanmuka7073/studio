@@ -1424,7 +1424,7 @@ function AdminProductRow({ product, storeId, onEdit, onDelete }: { product: Prod
     
     const productAliases = useMemo(() => {
         const aliases = getAllAliases(product.name.toLowerCase().replace(/ /g, '-'));
-        // Flatten the object of arrays into a single array
+        // Flatten the object of arrays into a single array, but only get the first one for display
         return Object.values(aliases).flat();
     }, [product.name]);
 
