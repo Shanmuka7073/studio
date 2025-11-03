@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -52,7 +51,7 @@ export function VoiceCommander({
   const pathname = usePathname();
   const { toast } = useToast();
   const { firestore, user } = useFirebase();
-  const { addItem: addItemToCart, activeStoreId, setActiveStoreId } = useCart();
+  const { addItem: addItemToCart, updateQuantity, activeStoreId, setActiveStoreId } = useCart();
   const { form: profileForm } = useProfileFormStore();
   const { placeOrderBtnRef } = useCheckoutStore();
 
@@ -69,6 +68,10 @@ export function VoiceCommander({
   const [isWaitingForStoreName, setIsWaitingForStoreName] = useState(false);
   const [clarificationStores, setClarificationStores] = useState<Store[]>([]);
   const hasSpokenCheckoutPrompt = useRef(false);
+
+  const [isWaitingForQuantity, setIsWaitingForQuantity] = useState(false);
+  const itemToUpdateSkuRef = useRef<string | null>(null);
+
 
   const [hasMounted, setHasMounted] = useState(false);
 
@@ -244,6 +247,28 @@ export function VoiceCommander({
         try {
             if (!firestore || !user) return;
 
+             // Priority 0: Handle quantity clarification
+            if (isWaitingForQuantity && itemToUpdateSkuRef.current) {
+                const quantityRegex = /^(\d+|one|two|three|four|five|six|seven|eight|nine|ten)/i;
+                const match = commandText.match(quantityRegex);
+                if (match) {
+                    let quantity = 1;
+                    const numStr = match[1].toLowerCase();
+                    const wordToNum = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+                    quantity = wordToNum[numStr] || parseInt(numStr, 10);
+                    
+                    updateQuantity(itemToUpdateSkuRef.current, quantity);
+                    speak(`Okay, updated to ${quantity}.`);
+                } else {
+                    speak("Sorry, I didn't catch a valid quantity. Please state a number.");
+                }
+                setIsWaitingForQuantity(false);
+                itemToUpdateSkuRef.current = null;
+                onSuggestions([]);
+                return;
+            }
+
+
             // Priority 1: Check for a perfect match with simple action commands first.
             const perfectMatch = commandsRef.current.find((c) => commandText === c.command);
             if (perfectMatch) {
@@ -257,47 +282,30 @@ export function VoiceCommander({
             const orderItemTemplate = fileCommandsRef.current.orderItem;
             if (orderItemTemplate) {
               for (const alias of orderItemTemplate.aliases) {
-                const isTemplate = /\{product\}/.test(alias);
-                let product, quantity;
+                  // Find the longest alias that is a prefix of the command
+                  if (commandText.startsWith(alias)) {
+                      const remainingText = commandText.substring(alias.length).trim();
+                      // This alias could be a full product name itself (e.g. "add chicken")
+                      // Or it could be a prefix to a product name (e.g. "add" for "add apples")
+                      const product = remainingText || alias.replace(/add|get|buy|i want/g, '').trim();
 
-                if (isTemplate) {
-                    // It's a template like "add {quantity} of {product}"
-                    const actionPart = alias.replace(/\{quantity\}/g, '').replace(/\{product\}/g, '').trim();
-                    if (commandText.startsWith(actionPart) && actionPart !== '') {
-                        const restOfString = commandText.substring(actionPart.length).trim();
-                        
+                      if (product) {
+                        // A simplified quantity check
                         const quantityRegex = /^(one|two|three|four|five|six|seven|eight|nine|ten|[\d\.]+)\s*(kg|kilo|kilos|gram|grams|gm|g)?/i;
-                        const quantityMatch = restOfString.match(quantityRegex);
+                        const quantityMatch = product.match(quantityRegex);
+                        let finalProduct = product;
+                        let quantity;
 
                         if (quantityMatch) {
-                            quantity = quantityMatch[0].trim();
-                            product = restOfString.substring(quantity.length).trim();
-                        } else {
-                            product = restOfString; // No quantity, just product
+                           quantity = quantityMatch[0].trim();
+                           finalProduct = product.substring(quantity.length).trim();
                         }
-                    } else if (actionPart === '') { // Handles cases like "{quantity} {product}"
-                        const quantityRegex = /^(one|two|three|four|five|six|seven|eight|nine|ten|[\d\.]+)\s*(kg|kilo|kilos|gram|grams|gm|g)?/i;
-                        const quantityMatch = commandText.match(quantityRegex);
-                         if (quantityMatch) {
-                            quantity = quantityMatch[0].trim();
-                            product = commandText.substring(quantity.length).trim();
-                        }
-                    }
-                } else {
-                    // It's a simple alias like "add chicken"
-                    if (commandText.startsWith(alias)) {
-                         product = commandText.substring(alias.length).trim() || alias;
-                    } else if (commandText.endsWith(alias)) {
-                         product = alias;
-                         quantity = commandText.replace(alias, '').trim();
-                    }
-                }
 
-                if (product) {
-                    await commandActionsRef.current.orderItem({ product, quantity });
-                    onSuggestions([]);
-                    return; 
-                }
+                        await commandActionsRef.current.orderItem({ product: finalProduct, quantity });
+                        onSuggestions([]);
+                        return;
+                      }
+                  }
               }
             }
 
@@ -420,9 +428,18 @@ export function VoiceCommander({
       orderItem: async ({ product, quantity }: { product: string, quantity?: string }) => {
         const { product: foundProduct, variant } = await findProductAndVariant(product, quantity);
         if (foundProduct && variant) {
-          addItemToCart(foundProduct, variant, 1);
-          speak(`Added ${variant.weight} of ${t(foundProduct.name.toLowerCase().replace(/ /g, '-')).split(' / ')[0]} to your cart.`);
+          addItemToCart(foundProduct, variant, 1); // Always add 1 initially
           onOpenCart();
+          
+          if (!quantity) {
+             // If no quantity was spoken, ask for it.
+             itemToUpdateSkuRef.current = variant.sku;
+             setIsWaitingForQuantity(true);
+             speak(`Added. What quantity would you like?`);
+          } else {
+             // If quantity was spoken, just confirm.
+             speak(`Added ${variant.weight} of ${t(foundProduct.name.toLowerCase().replace(/ /g, '-')).split(' / ')[0]} to your cart.`);
+          }
         } else {
           speak(`Sorry, I could not find ${product} in the store.`);
         }
@@ -498,7 +515,8 @@ export function VoiceCommander({
           });
 
           Object.entries(fileCommands).forEach(([key, { display, aliases, reply }]: [string, any]) => {
-            if (key !== 'orderItem') { // Exclude template item orders
+             // Exclude template item orders as they are handled differently
+            if (key !== 'orderItem') {
               const action = commandActionsRef.current[key];
               if (action) {
                 aliases.forEach((alias: string) => {
@@ -519,7 +537,9 @@ export function VoiceCommander({
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firestore, user, cartItems, profileForm, isWaitingForStoreName, activeStoreId, placeOrderBtnRef, enabled, pathname, findProductAndVariant, handleProfileFormInteraction, speak, toast, router, onSuggestions, onStatusUpdate, onCloseCart, onOpenCart, setActiveStoreId, clarificationStores]);
+  }, [firestore, user, cartItems, profileForm, isWaitingForStoreName, activeStoreId, placeOrderBtnRef, enabled, pathname, findProductAndVariant, handleProfileFormInteraction, speak, toast, router, onSuggestions, onStatusUpdate, onCloseCart, onOpenCart, setActiveStoreId, clarificationStores, isWaitingForQuantity, updateQuantity]);
 
   return null;
 }
+
+    
