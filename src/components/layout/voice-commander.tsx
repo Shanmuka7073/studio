@@ -367,54 +367,40 @@ export function VoiceCommander({
                 return;
             }
             
-            // --- Primary Command Matching Logic ---
             const lowerCommandText = commandText.toLowerCase();
-            let commandHandled = false;
-
-            // Pass 1 & 2: Check for exact matches on general commands in BOTH English and Telugu
+            
+            // --- PASS 1: Exact match on general commands ---
             for (const key in fileCommandsRef.current) {
-                // Skip template commands in this pass
-                if (key === 'orderItem' || key === 'quickOrder') continue;
-
                 const commandGroup = fileCommandsRef.current[key];
-                const allCommandAliases = commandGroup.aliases || [];
-
+                if (key === 'orderItem' || key === 'quickOrder') continue; // Skip templates
+                
+                const allCommandAliases: string[] = commandGroup.aliases || [];
+                
                 if (allCommandAliases.includes(lowerCommandText)) {
                     const action = commandActionsRef.current[key];
                     if (typeof action === 'function') {
                         speak(commandGroup.reply || `Executing ${key}`);
                         action();
                         resetContext();
-                        commandHandled = true;
-                        break; 
+                        return; // Command handled
                     }
                 }
             }
-
-            if (commandHandled) return;
-
             
-            // --- Template Command Matching (for ordering) ---
+            // --- PASS 2: Template-based commands ---
             const templates = [
               { key: 'quickOrder', template: fileCommandsRef.current.quickOrder },
               { key: 'orderItem', template: fileCommandsRef.current.orderItem },
             ];
-
             for (const { key, template } of templates) {
                 if (template) {
                     for (const alias of template.aliases) {
                         const aliasParts = alias.split(/(\{product\}|\{quantity\}|\{store\})/g).filter(Boolean);
                         const isTemplate = aliasParts.some(p => p.startsWith('{') && p.endsWith('}'));
-                        
                         if (isTemplate) {
-                            const regexString = alias
-                                .replace(/\{quantity\}/g, '(.*?)')
-                                .replace(/\{product\}/g, '(.*?)')
-                                .replace(/\{store\}/g, '(.*)'); // Store name is greedy at the end
-                            
+                            const regexString = alias.replace(/\{quantity\}/g, '(.*?)').replace(/\{product\}/g, '(.*?)').replace(/\{store\}/g, '(.*)');
                             const regex = new RegExp(`^${regexString}$`, 'i');
                             const match = commandText.match(regex);
-
                             if (match) {
                                 const extracted: Record<string, string | undefined> = {};
                                 let matchIndex = 1;
@@ -423,7 +409,6 @@ export function VoiceCommander({
                                     else if (part === '{product}') extracted.product = match[matchIndex++]?.trim();
                                     else if (part === '{store}') extracted.store = match[matchIndex++]?.trim();
                                 }
-                                
                                 if (extracted.product) {
                                     await commandActionsRef.current[key](extracted);
                                     resetContext();
@@ -435,8 +420,7 @@ export function VoiceCommander({
                 }
             }
 
-
-            // --- Final Fallback: Assume the command is a product to be added ---
+            // --- PASS 3 (Fallback): Assume the whole command is a product ---
             const productAsCommandMatch = await findProductAndVariant(commandText);
             if (productAsCommandMatch.product && productAsCommandMatch.variant) {
                 await commandActionsRef.current.orderItem({ product: commandText });
@@ -445,12 +429,7 @@ export function VoiceCommander({
             }
             
             // If we're here, no match was found.
-            speak(`Sorry, I don't recognize the command "${commandText}".`);
-            toast({
-                variant: 'destructive',
-                title: 'Command Not Recognized',
-                description: `I heard "${commandText}", but I don't know what to do.`,
-            });
+            speak(`Sorry, I could not find ${commandText} in the store.`);
             onSuggestions([]);
 
       } catch(e) {
