@@ -149,12 +149,7 @@ export function VoiceCommander({
 
 
   const findProductAndVariant = useCallback(async (productName: string, desiredWeight?: string): Promise<{ product: Product | null, variant: ProductVariant | null, storeId: string | null }> => {
-    if (!activeStoreId) {
-        speak("Please go to a specific store's page before adding items to your cart.");
-        router.push('/stores');
-        return { product: null, variant: null, storeId: null };
-    }
-    
+    // Logic no longer requires an active store ID to add to cart.
     const lowerProductName = productName.toLowerCase();
     const productMatch = masterProductsRef.current.find(p => p.name.toLowerCase() === lowerProductName);
 
@@ -189,7 +184,7 @@ export function VoiceCommander({
     }
     
     return { product: null, variant: null, storeId: null };
-  }, [activeStoreId, firestore, speak, router]);
+  }, [activeStoreId, firestore]);
 
 
   const handleProfileFormInteraction = useCallback(() => {
@@ -350,7 +345,7 @@ export function VoiceCommander({
           speak(`Added ${variant.weight} of ${product} to your cart.`);
           onOpenCart();
         } else {
-            speak(`Sorry, I could not find ${product} in the store's product catalog.`);
+            speak(`Sorry, I could not find ${product} in the product catalog.`);
         }
       },
     };
