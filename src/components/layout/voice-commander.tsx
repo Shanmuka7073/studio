@@ -14,7 +14,7 @@ import { useAppStore, useProfileFormStore } from '@/lib/store';
 import { ProfileFormValues } from '@/app/dashboard/customer/my-profile/page';
 import { useCheckoutStore } from '@/app/checkout/page';
 import { getCommands } from '@/app/actions';
-import { t } from '@/lib/locales';
+import { t, getAllAliases } from '@/lib/locales';
 import { doc, getDoc, serverTimestamp } from 'firebase/firestore';
 
 export interface Command {
@@ -227,15 +227,9 @@ export function VoiceCommander({
 
     const productMatch = masterProducts.find(p => {
         if (!p.name) return false;
-        const translation = t(p.name.toLowerCase().replace(/ /g, '-'));
-        const parts = translation.split(' / ');
-        const englishName = parts[0]?.trim().toLowerCase();
-        const teluguName = parts[1]?.trim();
-
-        if (englishName === lowerProductName) return true;
-        if (teluguName && teluguName === lowerProductName) return true;
-        
-        return false;
+        const aliases = getAllAliases(p.name.toLowerCase().replace(/ /g, '-'));
+        const allNames = [...aliases.en, ...aliases.te].map(name => name.toLowerCase());
+        return allNames.includes(lowerProductName);
     });
 
     if (!productMatch) return { product: null, variant: null };
@@ -378,6 +372,7 @@ export function VoiceCommander({
                 const commandParts = commandText.split(' from ');
                 const itemPart = commandParts[0].trim();
                 const storeName = commandParts[1].trim();
+
                 const triggerWords = ["order", "get", "buy", "add", "i want"];
                 let foundTrigger = false;
                 let processedItemPart = itemPart;
@@ -389,11 +384,13 @@ export function VoiceCommander({
                         break;
                     }
                 }
-
+                
                 if (foundTrigger && processedItemPart && storeName) {
+                    // More robust parsing for quantity + product
                     const quantityRegex = /^(one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s*(kg|kgs|kilo|kilos|gram|grams|gm|gms|pc|pcs|piece|pieces)?/i;
                     const quantityMatch = processedItemPart.match(quantityRegex);
-                    let quantity: string | undefined = "1";
+                    
+                    let quantity: string | undefined = "1"; // Default to 1 if not specified
                     let product = processedItemPart;
 
                     if (quantityMatch) {
@@ -401,9 +398,12 @@ export function VoiceCommander({
                         product = processedItemPart.substring(quantityMatch[0].length).trim();
                     }
                     
-                    await commandActionsRef.current.quickOrder({ product, quantity, storeName });
-                    resetContext();
-                    return;
+                    // Check if there is a product name
+                    if (product) {
+                        await commandActionsRef.current.quickOrder({ product, quantity, storeName });
+                        resetContext();
+                        return;
+                    }
                 }
             }
 
@@ -574,7 +574,8 @@ export function VoiceCommander({
              speak(`Added. What quantity would you like?`);
           } else {
              // If quantity was spoken, just confirm.
-             speak(`Added ${variant.weight} of ${t(foundProduct.name.toLowerCase().replace(/ /g, '-')).split(' / ')[0]} to your cart.`);
+             const productName = t(foundProduct.name.toLowerCase().replace(/ /g, '-')).split(' / ')[0];
+             speak(`Added ${variant.weight} of ${productName} to your cart.`);
           }
         } else {
           speak(`Sorry, I could not find ${product} in the store.`);
