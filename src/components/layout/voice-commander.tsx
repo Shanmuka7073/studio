@@ -5,9 +5,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { useFirebase } from '@/firebase';
+import { useFirebase, errorEmitter } from '@/firebase';
 import { getStores, getMasterProducts, getProductPrice } from '@/lib/data';
-import type { Store, Product, ProductPrice, ProductVariant, CartItem } from '@/lib/types';
+import type { Store, Product, ProductPrice, ProductVariant, CartItem, User } from '@/lib/types';
 import { calculateSimilarity } from '@/lib/calculate-similarity';
 import { useCart } from '@/lib/cart';
 import { useProfileFormStore } from '@/lib/store';
@@ -15,6 +15,8 @@ import { ProfileFormValues } from '@/app/dashboard/customer/my-profile/page';
 import { useCheckoutStore } from '@/app/checkout/page';
 import { getCommands } from '@/app/actions';
 import { t } from '@/lib/locales';
+import { addDoc, collection, doc, serverTimestamp } from 'firebase/firestore';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 export interface Command {
   command: string;
@@ -33,11 +35,20 @@ interface VoiceCommanderProps {
   cartItems: CartItem[]; // Receive cart items as a prop
 }
 
+interface QuickOrderState {
+    product: Product;
+    variant: ProductVariant;
+    store: Store;
+    userProfile: User;
+}
+
 let recognition: SpeechRecognition | null = null;
 if (typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     recognition = new SpeechRecognition();
 }
+
+const DELIVERY_FEE = 30;
 
 export function VoiceCommander({
   enabled,
@@ -74,6 +85,9 @@ export function VoiceCommander({
   const [isWaitingForQuantity, setIsWaitingForQuantity] = useState(false);
   const itemToUpdateSkuRef = useRef<string | null>(null);
 
+  const [isWaitingForQuickOrderConfirmation, setIsWaitingForQuickOrderConfirmation] = useState(false);
+  const quickOrderDetailsRef = useRef<QuickOrderState | null>(null);
+  const userProfileRef = useRef<User | null>(null);
 
   const [hasMounted, setHasMounted] = useState(false);
 
@@ -267,6 +281,67 @@ export function VoiceCommander({
         onStatusUpdate(`Processing: "${commandText}"`);
         try {
             if (!firestore || !user) return;
+            
+            const resetContext = () => {
+                setIsWaitingForQuantity(false);
+                itemToUpdateSkuRef.current = null;
+                setIsWaitingForStoreName(false);
+                setClarificationStores([]);
+                onSuggestions([]);
+                setIsWaitingForQuickOrderConfirmation(false);
+                quickOrderDetailsRef.current = null;
+            };
+
+            // Priority -1: Handle direct confirmation for quick order
+            if (isWaitingForQuickOrderConfirmation && quickOrderDetailsRef.current) {
+                if (commandText.toLowerCase() === 'confirm order' || commandText.toLowerCase() === 'confirm') {
+                    const { product, variant, store, userProfile } = quickOrderDetailsRef.current;
+                    const totalAmount = variant.price + DELIVERY_FEE;
+                    
+                    const orderData = {
+                        userId: user.uid,
+                        storeId: store.id,
+                        storeOwnerId: store.ownerId,
+                        customerName: `${userProfile.firstName} ${userProfile.lastName}`,
+                        deliveryAddress: userProfile.address,
+                        deliveryLat: 0, // Placeholder, requires location capture
+                        deliveryLng: 0, // Placeholder, requires location capture
+                        phone: userProfile.phoneNumber,
+                        email: user.email,
+                        orderDate: serverTimestamp(),
+                        status: 'Pending' as 'Pending',
+                        totalAmount: totalAmount,
+                        items: [{
+                            productId: product.id,
+                            productName: product.name,
+                            variantSku: variant.sku,
+                            variantWeight: variant.weight,
+                            quantity: 1, // Assuming 1 for quick order for now
+                            price: variant.price,
+                        }],
+                    };
+
+                    speak("Placing your order now.");
+                    const colRef = collection(firestore, 'orders');
+                    addDoc(colRef, orderData).then(() => {
+                       toast({
+                           title: "Quick Order Placed!",
+                           description: `Your order from ${store.name} is confirmed.`
+                       });
+                       router.push('/order-confirmation');
+                    }).catch((e) => {
+                        const permissionError = new FirestorePermissionError({ path: colRef.path, operation: 'create', requestResourceData: orderData });
+                        errorEmitter.emit('permission-error', permissionError);
+                        speak("Sorry, I couldn't place the order due to a permissions issue.");
+                    });
+
+                } else {
+                    speak("Okay, cancelling the order.");
+                }
+                resetContext();
+                return;
+            }
+
 
              // Priority 0: Handle contextual responses (quantity, store name)
             if (isWaitingForQuantity && itemToUpdateSkuRef.current) {
@@ -291,9 +366,7 @@ export function VoiceCommander({
                     speak("Sorry, I didn't catch a valid quantity. Please state a number.");
                 }
                 
-                setIsWaitingForQuantity(false);
-                itemToUpdateSkuRef.current = null;
-                onSuggestions([]);
+                resetContext();
                 return;
             }
 
@@ -314,6 +387,7 @@ export function VoiceCommander({
                 } else {
                     speak(`Sorry, I couldn't find a store named ${commandText}. Please try again.`);
                 }
+                resetContext();
                 return;
             }
 
@@ -330,69 +404,93 @@ export function VoiceCommander({
             if (perfectMatch) {
                 speak(perfectMatch.reply);
                 perfectMatch.action();
-                onSuggestions([]);
+                resetContext();
                 return;
             }
+            
+            // Priority 1.5: Check for quick order command
+            const quickOrderTemplate = fileCommandsRef.current.quickOrder;
+            if(quickOrderTemplate) {
+                for (const alias of quickOrderTemplate.aliases) {
+                    const fromSplit = alias.split(' from ');
+                    const mainPart = fromSplit[0];
 
-            // Priority 2: Check if it's an "order item" command using templates.
-            const orderItemTemplate = fileCommandsRef.current.orderItem;
-            if (orderItemTemplate) {
-                 for (const alias of orderItemTemplate.aliases) {
-                    const aliasParts = alias.split(/(\{product\}|\{quantity\})/g).filter(Boolean);
-                    const isTemplate = aliasParts.some(p => p === '{product}' || p === '{quantity}');
-                    
-                    if (isTemplate) {
-                        let quantity: string | undefined = undefined;
-                        let product: string | undefined = undefined;
+                    if(commandText.includes(' from ')) {
+                        const commandParts = commandText.split(' from ');
+                        const commandActionPart = commandParts[0];
+                        const storeName = commandParts[1].trim();
 
-                        // This is a simplified parser based on the alias structure
-                        if (alias.startsWith('{quantity}')) { // e.g., {quantity} {product}
-                             const match = commandText.match(/([\d\w\s]+?)\s(.+)/);
-                             if (match) {
-                                quantity = match[1];
-                                product = match[2];
-                             }
-                        } else if (alias.includes('{quantity}')) { // e.g., add {quantity} of {product}
-                            const prefix = alias.substring(0, alias.indexOf('{'));
-                            if (commandText.startsWith(prefix)) {
-                                const rest = commandText.substring(prefix.length).trim();
-                                const parts = rest.split(' of ');
-                                if(parts.length > 1) {
-                                    quantity = parts[0].trim();
-                                    product = parts[1].trim();
-                                } else {
-                                     // Handle "{quantity} {product}" case
-                                    const spaceIndex = rest.indexOf(' ');
-                                    if(spaceIndex > -1) {
-                                        quantity = rest.substring(0, spaceIndex);
-                                        product = rest.substring(spaceIndex + 1);
-                                    }
-                                }
-                            }
-                        } else if (alias.includes('{product}')) { // e.g., "add one {product}" or just "{product}"
-                             const prefix = alias.substring(0, alias.indexOf('{'));
-                             if (commandText.startsWith(prefix)) {
-                                product = commandText.substring(prefix.length).trim();
-                                if (alias.includes('one')) quantity = '1';
-                             }
-                        }
-
-                        if (product) {
-                            await commandActionsRef.current.orderItem({ product, quantity });
-                            onSuggestions([]);
-                            return; 
-                        }
-
-                    } else { // It's a simple, non-template alias like "chicken kavali"
-                         if (commandText === alias) {
-                            // Extract product from alias if possible
-                            const productFromAlias = alias.replace(/add|i want|get|buy/i, '').trim();
-                            await commandActionsRef.current.orderItem({ product: productFromAlias });
-                            onSuggestions([]);
+                        const productAlias = mainPart.replace('{quantity}', '(\\S+)').replace('{product}', '(.+)');
+                        const regex = new RegExp(`^${productAlias}$`);
+                        const match = commandActionPart.match(regex);
+                        
+                        if(match) {
+                            const quantity = match[1];
+                            const product = match[2];
+                            await commandActionsRef.current.quickOrder({ product, quantity, storeName });
+                            resetContext();
                             return;
                         }
                     }
                 }
+            }
+
+
+            // Priority 2: Check if it's an "order item" command using templates.
+            const orderItemTemplate = fileCommandsRef.current.orderItem;
+            if (orderItemTemplate) {
+                let parsed = false;
+                 for (const alias of orderItemTemplate.aliases) {
+                    if(parsed) break;
+
+                    const aliasParts = alias.split(/(\{product\}|\{quantity\})/g).filter(Boolean);
+                    const isTemplate = aliasParts.some(p => p === '{product}' || p === '{quantity}');
+                    
+                    if (isTemplate) {
+                        const regexString = alias
+                            .replace(/\{quantity\}/g, '([\\w\\s\\d]+?)')
+                            .replace(/\{product\}/g, '([\\w\\s]+)');
+                        
+                        const regex = new RegExp(`^${regexString}$`, 'i');
+                        const match = commandText.match(regex);
+
+                        if (match) {
+                            let quantity: string | undefined = undefined;
+                            let product: string | undefined = undefined;
+                            let quantityIndex = alias.indexOf('{quantity}');
+                            let productIndex = alias.indexOf('{product}');
+
+                            let matchIndex = 1;
+                            if (quantityIndex !== -1 && productIndex !== -1) {
+                                if(quantityIndex < productIndex) {
+                                    quantity = match[matchIndex++];
+                                    product = match[matchIndex];
+                                } else {
+                                    product = match[matchIndex++];
+                                    quantity = match[matchIndex];
+                                }
+                            } else if (quantityIndex !== -1) {
+                                quantity = match[matchIndex];
+                            } else if (productIndex !== -1) {
+                                product = match[matchIndex];
+                            }
+
+                            if (product) {
+                                await commandActionsRef.current.orderItem({ product: product.trim(), quantity: quantity?.trim() });
+                                resetContext();
+                                parsed = true;
+                            }
+                        }
+                    } else { // It's a simple, non-template alias
+                         if (commandText === alias) {
+                            const productFromAlias = alias.replace(/add|i want|get|buy|oka|naaku/i, '').replace(/kavali/i, '').trim();
+                            await commandActionsRef.current.orderItem({ product: productFromAlias });
+                            resetContext();
+                            parsed = true;
+                        }
+                    }
+                }
+                if(parsed) return;
             }
 
 
@@ -416,7 +514,7 @@ export function VoiceCommander({
                 } else {
                     speak(`Sorry, I didn't understand that. Please say the address or number of the store you want.`);
                 }
-                setClarificationStores([]);
+                resetContext();
                 return;
             }
             
@@ -424,7 +522,7 @@ export function VoiceCommander({
             const productAsCommandMatch = await findProductAndVariant(commandText);
             if (productAsCommandMatch.product && productAsCommandMatch.variant) {
                 await commandActionsRef.current.orderItem({ product: commandText });
-                onSuggestions([]);
+                resetContext();
                 return;
             }
             
@@ -510,6 +608,35 @@ export function VoiceCommander({
           speak(`Sorry, I could not find ${product} in the store.`);
         }
       },
+      quickOrder: async ({ product, quantity, storeName }: { product: string, quantity: string, storeName: string }) => {
+        if (!userProfileRef.current) {
+            speak("I need your profile information before placing a quick order. Please complete your profile first.");
+            router.push('/dashboard/customer/my-profile');
+            return;
+        }
+
+        const { product: foundProduct, variant } = await findProductAndVariant(product, quantity);
+        const foundStore = storesRef.current.find(s => s.name.toLowerCase() === storeName.toLowerCase());
+
+        if (!foundProduct || !variant) {
+            speak(`Sorry, I could not find ${quantity || ''} of ${product}.`);
+            return;
+        }
+        if (!foundStore) {
+            speak(`Sorry, I could not find the store named ${storeName}.`);
+            return;
+        }
+        
+        const total = variant.price + DELIVERY_FEE;
+        quickOrderDetailsRef.current = {
+            product: foundProduct,
+            variant: variant,
+            store: foundStore,
+            userProfile: userProfileRef.current,
+        };
+        setIsWaitingForQuickOrderConfirmation(true);
+        speak(`The total for ${variant.weight} of ${t(foundProduct.name.toLowerCase().replace(/ /g, '-')).split(' / ')[0]} from ${foundStore.name} is ₹${total}. Say 'confirm order' to place it now.`);
+      },
     };
     
     recognition.continuous = false;
@@ -543,6 +670,14 @@ export function VoiceCommander({
     };
 
     if (firestore && user) {
+      // Fetch user profile once and store it
+      const userDocRef = doc(firestore, 'users', user.uid);
+      getDoc(userDocRef).then(docSnap => {
+          if (docSnap.exists()) {
+              userProfileRef.current = docSnap.data() as User;
+          }
+      });
+
       Promise.all([ getStores(firestore), getMasterProducts(firestore), getCommands() ])
         .then(([stores, masterProducts, fileCommands]) => {
           storesRef.current = stores;
@@ -592,7 +727,7 @@ export function VoiceCommander({
           });
 
           Object.entries(fileCommands).forEach(([key, { display, aliases, reply }]: [string, any]) => {
-            if (key !== 'orderItem') { // The orderItem is handled separately as a template
+            if (key !== 'orderItem' && key !== 'quickOrder') { // The orderItem is handled separately as a template
                 const action = commandActionsRef.current[key];
                 if (action) {
                     aliases.forEach((alias: string) => {
@@ -613,7 +748,7 @@ export function VoiceCommander({
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firestore, user, cartItems, profileForm, isWaitingForStoreName, activeStoreId, placeOrderBtnRef, enabled, pathname, findProductAndVariant, handleProfileFormInteraction, speak, toast, router, onSuggestions, onStatusUpdate, onCloseCart, onOpenCart, setActiveStoreId, clarificationStores, isWaitingForQuantity, updateQuantity]);
+  }, [firestore, user, cartItems, profileForm, isWaitingForStoreName, activeStoreId, placeOrderBtnRef, enabled, pathname, findProductAndVariant, handleProfileFormInteraction, speak, toast, router, onSuggestions, onStatusUpdate, onCloseCart, onOpenCart, setActiveStoreId, clarificationStores, isWaitingForQuantity, updateQuantity, isWaitingForQuickOrderConfirmation]);
 
   return null;
 }
