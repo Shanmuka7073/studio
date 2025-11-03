@@ -26,25 +26,24 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { getAuth, signOut } from 'firebase/auth';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useState, useEffect, RefObject } from 'react';
+import { useState, useEffect } from 'react';
 import { Command } from './voice-commander';
 import { useToast } from '@/hooks/use-toast';
-import { useCheckoutStore } from '@/app/checkout/page';
-
+import { t } from '@/lib/locales';
 
 const ADMIN_EMAIL = 'admin@gmail.com';
 
 const navLinks = [
-  { href: '/', label: 'Home' },
-  { href: '/stores', label: 'Stores' },
+  { href: '/', label: 'home' },
+  { href: '/stores', label: 'stores' },
 ];
 
 const dashboardLinks = [
-    { href: '/dashboard/customer/my-profile', label: 'My Profile', icon: UserCircle },
-    { href: '/dashboard/customer/my-orders', label: 'My Orders', icon: ShoppingBag},
-    { href: '/dashboard/owner/my-store', label: 'My Store', icon: Store },
-    { href: '/dashboard/owner/orders', label: 'Store Orders', icon: ShoppingBag },
-    { href: '/dashboard/delivery/deliveries', label: 'Deliveries', icon: Truck },
+    { href: '/dashboard/customer/my-profile', label: 'my-profile', icon: UserCircle },
+    { href: '/dashboard/customer/my-orders', label: 'my-orders', icon: ShoppingBag},
+    { href: '/dashboard/owner/my-store', label: 'my-store', icon: Store },
+    { href: '/dashboard/owner/orders', label: 'store-orders', icon: ShoppingBag },
+    { href: '/dashboard/delivery/deliveries', label: 'deliveries', icon: Truck },
 ]
 
 function UserMenu() {
@@ -64,7 +63,7 @@ function UserMenu() {
   if (!user) {
     return (
       <Button asChild variant="outline">
-        <Link href="/login">Login</Link>
+        <Link href="/login">{t('login')}</Link>
       </Button>
     );
   }
@@ -78,24 +77,24 @@ function UserMenu() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuLabel>My Account</DropdownMenuLabel>
+        <DropdownMenuLabel>{t('my-account')}</DropdownMenuLabel>
         <DropdownMenuItem disabled>{user.email}</DropdownMenuItem>
         <DropdownMenuSeparator />
         <Link href={dashboardHref} passHref>
           <DropdownMenuItem>
               <LayoutDashboard className="mr-2 h-4 w-4" />
-              <span>Dashboard</span>
+              <span>{t('dashboard')}</span>
           </DropdownMenuItem>
         </Link>
         {!isAdmin && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel>Roles</DropdownMenuLabel>
+            <DropdownMenuLabel>{t('roles')}</DropdownMenuLabel>
             {dashboardLinks.map(({ href, label, icon: Icon }) => (
                 <Link key={href} href={href} passHref>
                     <DropdownMenuItem>
                         <Icon className="mr-2 h-4 w-4" />
-                        <span>{label}</span>
+                        <span>{t(label)}</span>
                     </DropdownMenuItem>
                 </Link>
             ))}
@@ -108,13 +107,13 @@ function UserMenu() {
                 <Link href="/dashboard/owner/my-store" passHref>
                     <DropdownMenuItem>
                         <Store className="mr-2 h-4 w-4" />
-                        <span>Master Store</span>
+                        <span>{t('master-store')}</span>
                     </DropdownMenuItem>
                 </Link>
             </>
         )}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
+        <DropdownMenuItem onClick={handleLogout}>{t('logout')}</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -134,12 +133,7 @@ export function Header({ voiceEnabled, onToggleVoice, voiceStatus, suggestedComm
   const { user } = useFirebase();
   const isAdmin = user && user.email === ADMIN_EMAIL;
   const dashboardHref = isAdmin ? '/dashboard/admin' : '/dashboard';
-  const [hasMounted, setHasMounted] = useState(false);
   const { toast } = useToast();
-
-  useEffect(() => {
-    setHasMounted(true);
-  }, []);
 
   const handleToggleVoiceWithCheck = () => {
     if (!user) {
@@ -155,7 +149,6 @@ export function Header({ voiceEnabled, onToggleVoice, voiceStatus, suggestedComm
   
   const handleSuggestionClick = (command: Command) => {
     command.action();
-    // This state is managed in the RootLayout now
   }
 
   return (
@@ -177,7 +170,7 @@ export function Header({ voiceEnabled, onToggleVoice, voiceStatus, suggestedComm
               pathname === href ? 'text-foreground' : 'text-muted-foreground'
             )}
           >
-            {label}
+            {t(label)}
           </Link>
         ))}
          <Link
@@ -187,7 +180,7 @@ export function Header({ voiceEnabled, onToggleVoice, voiceStatus, suggestedComm
               pathname.startsWith('/dashboard') ? 'text-foreground' : 'text-muted-foreground'
             )}
           >
-            Dashboard
+            {t('dashboard')}
           </Link>
       </nav>
       <Sheet>
@@ -220,13 +213,13 @@ export function Header({ voiceEnabled, onToggleVoice, voiceStatus, suggestedComm
                         pathname === href && 'text-primary'
                         )}
                     >
-                        {label}
+                        {t(label)}
                     </Link>
                 </SheetClose>
                 ))}
             </nav>
             <div className="mt-6 border-t pt-4">
-                <p className="px-3 text-sm font-medium text-muted-foreground mb-2">Dashboard</p>
+                <p className="px-3 text-sm font-medium text-muted-foreground mb-2">{t('dashboard')}</p>
                 <div className="grid gap-2">
                     <SheetClose asChild>
                         <Link
@@ -234,7 +227,7 @@ export function Header({ voiceEnabled, onToggleVoice, voiceStatus, suggestedComm
                             className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
                         >
                             <LayoutDashboard className="h-4 w-4" />
-                            Dashboard
+                            {t('dashboard')}
                         </Link>
                     </SheetClose>
                     {!isAdmin && dashboardLinks.map(({ href, label, icon: Icon }) => (
@@ -244,7 +237,7 @@ export function Header({ voiceEnabled, onToggleVoice, voiceStatus, suggestedComm
                             className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
                         >
                             <Icon className="h-4 w-4" />
-                            {label}
+                            {t(label)}
                         </Link>
                     </SheetClose>
                     ))}
@@ -256,7 +249,7 @@ export function Header({ voiceEnabled, onToggleVoice, voiceStatus, suggestedComm
                                     className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
                                 >
                                     <Store className="h-4 w-4" />
-                                    Master Store
+                                    {t('master-store')}
                                 </Link>
                             </SheetClose>
                         </>
@@ -268,24 +261,15 @@ export function Header({ voiceEnabled, onToggleVoice, voiceStatus, suggestedComm
       </Sheet>
       
       <div className="flex w-full items-center justify-end gap-4 md:ml-auto md:gap-2 lg:gap-4">
-        {hasMounted ? (
-          <>
-            <Button variant={voiceEnabled ? 'secondary' : 'outline'} size="icon" onClick={handleToggleVoiceWithCheck} className="relative">
-              {voiceEnabled ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-              {voiceEnabled && <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-red-500 animate-pulse"></span>}
-              <span className="sr-only">{voiceEnabled ? 'Stop voice commands' : 'Start voice commands'}</span>
-            </Button>
-            <CartIcon open={isCartOpen} onOpenChange={onCartOpenChange} />
-            <UserMenu />
-          </>
-        ) : (
-          <>
-            <Skeleton className="h-10 w-10 rounded-md" />
-            <Skeleton className="h-10 w-10 rounded-full" />
-          </>
-        )}
+        <Button variant={voiceEnabled ? 'secondary' : 'outline'} size="icon" onClick={handleToggleVoiceWithCheck} className="relative">
+          {voiceEnabled ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+          {voiceEnabled && <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-red-500 animate-pulse"></span>}
+          <span className="sr-only">{voiceEnabled ? 'Stop voice commands' : 'Start voice commands'}</span>
+        </Button>
+        <CartIcon open={isCartOpen} onOpenChange={onCartOpenChange} />
+        <UserMenu />
       </div>
-       {hasMounted && voiceEnabled && (
+       {voiceEnabled && (
         <div className="absolute top-16 left-0 w-full bg-secondary text-secondary-foreground text-center py-1 text-sm font-mono z-40">
             {voiceStatus}
         </div>

@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useTransition, useEffect, useMemo, useRef } from 'react';
@@ -68,7 +69,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { generateSingleImage } from '@/ai/flows/image-generator-flow';
 import Link from 'next/link';
-
+import { t } from '@/lib/locales';
+import { useAppStore } from '@/lib/store';
 
 const ADMIN_EMAIL = 'admin@gmail.com';
 
@@ -253,8 +255,8 @@ function StoreImageUploader({ store }: { store: Store }) {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Store Image</CardTitle>
-                <CardDescription>Take or upload a picture of your storefront.</CardDescription>
+                <CardTitle>{t('store-image')}</CardTitle>
+                <CardDescription>{t('take-or-upload-a-picture-of-your-storefront')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                  <div className="w-full aspect-video relative rounded-md overflow-hidden border bg-muted">
@@ -267,7 +269,7 @@ function StoreImageUploader({ store }: { store: Store }) {
                     ) : (
                         <div className="flex flex-col items-center justify-center h-full bg-muted/50 text-muted-foreground">
                             <ImageIcon className="h-10 w-10 mb-2" />
-                            <p className="text-sm">No image set</p>
+                            <p className="text-sm">{t('no-image-set')}</p>
                         </div>
                     )}
                 </div>
@@ -279,30 +281,30 @@ function StoreImageUploader({ store }: { store: Store }) {
                 {uploading ? (
                     <div className="space-y-2">
                         <Progress value={progress} />
-                        <p className="text-xs text-center text-muted-foreground">Uploading... {Math.round(progress)}%</p>
+                        <p className="text-xs text-center text-muted-foreground">{t('uploading')}... {Math.round(progress)}%</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-2 gap-4">
                         <Button variant="outline" onClick={handleToggleCamera}>
                             {isCameraOn ? <CameraOff className="mr-2 h-4 w-4" /> : <Camera className="mr-2 h-4 w-4" />}
-                            {isCameraOn ? 'Close Camera' : 'Open Camera'}
+                            {isCameraOn ? t('close-camera') : t('open-camera')}
                         </Button>
                         
                         {isCameraOn && !capturedImage && (
-                            <Button onClick={handleCapture}>Capture</Button>
+                            <Button onClick={handleCapture}>{t('capture')}</Button>
                         )}
                         
                         {!isCameraOn && !capturedImage && (
                             <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
                                 <Upload className="mr-2 h-4 w-4" />
-                                From Device
+                                {t('from-device')}
                             </Button>
                         )}
 
                         {capturedImage && (
                              <Button onClick={handleUpload}>
                                 <Upload className="mr-2 h-4 w-4" />
-                                Upload & Save
+                                {t('upload-and-save')}
                             </Button>
                         )}
                     </div>
@@ -403,8 +405,8 @@ function EditProductDialog({ storeId, product, isOpen, onOpenChange }: { storeId
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>Edit Master Product</DialogTitle>
-                    <DialogDescription>Update details for {product.name}. Changes will affect all stores.</DialogDescription>
+                    <DialogTitle>{t('edit-master-product')}</DialogTitle>
+                    <DialogDescription>{t('update-details-for')} {product.name}. {t('changes-will-affect-all-stores')}</DialogDescription>
                 </DialogHeader>
                 {pricesLoading ? <p>Loading prices...</p> : (
                     <Form {...form}>
@@ -414,7 +416,7 @@ function EditProductDialog({ storeId, product, isOpen, onOpenChange }: { storeId
                                 name="name"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Product Name</FormLabel>
+                                        <FormLabel>{t('product-name')}</FormLabel>
                                         <FormControl><Input {...field} /></FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -425,9 +427,9 @@ function EditProductDialog({ storeId, product, isOpen, onOpenChange }: { storeId
                                 name="category"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Category</FormLabel>
+                                        <FormLabel>{t('category')}</FormLabel>
                                         <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                            <FormControl><SelectTrigger><SelectValue placeholder="Select a category" /></SelectTrigger></FormControl>
+                                            <FormControl><SelectTrigger><SelectValue placeholder={t('select-a-category')} /></SelectTrigger></FormControl>
                                             <SelectContent>
                                                 {groceryData.categories.map(cat => (
                                                     <SelectItem key={cat.categoryName} value={cat.categoryName}>{cat.categoryName}</SelectItem>
@@ -443,7 +445,7 @@ function EditProductDialog({ storeId, product, isOpen, onOpenChange }: { storeId
                                 name="description"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Product Description (Optional)</FormLabel>
+                                        <FormLabel>{t('product-description-optional')}</FormLabel>
                                         <FormControl><Textarea {...field} /></FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -454,7 +456,7 @@ function EditProductDialog({ storeId, product, isOpen, onOpenChange }: { storeId
                                 name="imageUrl"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Image URL</FormLabel>
+                                        <FormLabel>{t('image-url')}</FormLabel>
                                         <FormControl><Input placeholder="https://example.com/image.webp" {...field} /></FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -463,7 +465,7 @@ function EditProductDialog({ storeId, product, isOpen, onOpenChange }: { storeId
 
                             <Card className="bg-muted/50 p-4">
                                 <CardHeader className="p-2">
-                                    <CardTitle className="text-lg">Price Variants</CardTitle>
+                                    <CardTitle className="text-lg">{t('price-variants')}</CardTitle>
                                 </CardHeader>
                                 <CardContent className="p-2 space-y-4">
                                     {fields.map((field, index) => (
@@ -473,11 +475,11 @@ function EditProductDialog({ storeId, product, isOpen, onOpenChange }: { storeId
                                                 name={`variants.${index}.weight`}
                                                 render={({ field }) => (
                                                     <FormItem className="flex-1">
-                                                        <FormLabel>Weight</FormLabel>
+                                                        <FormLabel>{t('weight')}</FormLabel>
                                                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                                                             <FormControl>
                                                                 <SelectTrigger>
-                                                                    <SelectValue placeholder="Select a weight" />
+                                                                    <SelectValue placeholder={t('select-a-weight')} />
                                                                 </SelectTrigger>
                                                             </FormControl>
                                                             <SelectContent>
@@ -493,7 +495,7 @@ function EditProductDialog({ storeId, product, isOpen, onOpenChange }: { storeId
                                                 name={`variants.${index}.price`}
                                                 render={({ field }) => (
                                                     <FormItem className="flex-1">
-                                                        <FormLabel>Price (₹)</FormLabel>
+                                                        <FormLabel>{t('price')} (₹)</FormLabel>
                                                         <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
                                                         <FormMessage />
                                                     </FormItem>
@@ -505,14 +507,14 @@ function EditProductDialog({ storeId, product, isOpen, onOpenChange }: { storeId
                                         </div>
                                     ))}
                                     <Button type="button" variant="outline" size="sm" onClick={() => append({ weight: '', price: 0, sku: `new-${fields.length}` })}>
-                                        <PlusCircle className="mr-2 h-4 w-4" /> Add Variant
+                                        <PlusCircle className="mr-2 h-4 w-4" /> {t('add-variant')}
                                     </Button>
                                 </CardContent>
                             </Card>
                             <DialogFooter className="sticky bottom-0 bg-background pt-4">
-                                <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>Cancel</Button>
+                                <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>{t('cancel')}</Button>
                                 <Button type="submit" disabled={isPending}>
-                                    {isPending ? "Saving..." : "Save Changes"}
+                                    {isPending ? t('saving') : t('save-changes')}
                                 </Button>
                             </DialogFooter>
                         </form>
@@ -617,8 +619,8 @@ function ProductChecklist({ storeId, adminStoreId }: { storeId: string; adminSto
       return (
           <Alert>
             <AlertCircle className="h-4 w-4" />
-            <AlertTitle>No Master Products Found</AlertTitle>
-            <AlertDescription>The admin has not added any products to the master catalog yet. Please check back later.</AlertDescription>
+            <AlertTitle>{t('no-master-products-found')}</AlertTitle>
+            <AlertDescription>{t('the-admin-has-not-added-any-products')}</AlertDescription>
           </Alert>
       )
   }
@@ -636,14 +638,14 @@ function ProductChecklist({ storeId, adminStoreId }: { storeId: string; adminSto
   return (
       <Card>
           <CardHeader>
-              <CardTitle>Manage Your Inventory</CardTitle>
-              <CardDescription>Select the products you want to sell in your store. Prices are managed by the platform admin.</CardDescription>
+              <CardTitle>{t('manage-your-inventory')}</CardTitle>
+              <CardDescription>{t('select-the-products-you-want-to-sell')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
               <Accordion type="multiple" className="w-full">
                   {Object.entries(productsByCategory).map(([category, products]: [string, Product[]]) => (
                        <AccordionItem value={category} key={category}>
-                          <AccordionTrigger>{category}</AccordionTrigger>
+                          <AccordionTrigger>{t(category.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-'))}</AccordionTrigger>
                           <AccordionContent>
                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4 p-4">
                                   {(products as Product[]).map((product) => (
@@ -654,7 +656,7 @@ function ProductChecklist({ storeId, adminStoreId }: { storeId: string; adminSto
                                               onCheckedChange={(checked) => handleCheckChange(product.name, !!checked)}
                                           />
                                           <label htmlFor={product.id} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                              {product.name}
+                                              {t(product.name.toLowerCase().replace(/ /g, '-'))}
                                           </label>
                                       </div>
                                   ))}
@@ -664,7 +666,7 @@ function ProductChecklist({ storeId, adminStoreId }: { storeId: string; adminSto
                   ))}
               </Accordion>
                <Button onClick={handleSaveChanges} disabled={isSaving} className="w-full">
-                  {isSaving ? 'Saving Changes...' : 'Save Inventory Changes'}
+                  {isSaving ? t('saving-changes') : t('save-inventory-changes')}
               </Button>
           </CardContent>
       </Card>
@@ -786,18 +788,18 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Add a Master Product</CardTitle>
-        <CardDescription>Add a new product to the platform's master catalog. You can generate an image with AI or add a URL manually.</CardDescription>
+        <CardTitle>{t('add-a-master-product')}</CardTitle>
+        <CardDescription>{t('add-a-new-product-to-the-platform')}</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
              <FormItem>
-                <FormLabel>Product Template (Optional)</FormLabel>
+                <FormLabel>{t('product-template-optional')}</FormLabel>
                 <Select onValueChange={handleTemplateSelect}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select a predefined item..." />
+                        <SelectValue placeholder={t('select-a-predefined-item')} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -811,7 +813,7 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
                     </SelectContent>
                 </Select>
                 <FormDescription>
-                    Select an item to auto-fill the name and category.
+                    {t('select-an-item-to-auto-fill')}
                 </FormDescription>
             </FormItem>
 
@@ -820,7 +822,7 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Product Name</FormLabel>
+                  <FormLabel>{t('product-name')}</FormLabel>
                   <FormControl>
                     <Input placeholder="e.g., Organic Apples" {...field} />
                   </FormControl>
@@ -833,7 +835,7 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
               name="imageUrl"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Product Image URL (Optional)</FormLabel>
+                  <FormLabel>{t('product-image-url-optional')}</FormLabel>
                   <div className="flex items-center gap-2">
                     <div className="relative flex-grow">
                         <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"/>
@@ -841,11 +843,11 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
                     </div>
                     <Button type="button" variant="outline" onClick={handleGenerateImage} disabled={isGeneratingImage}>
                         {isGeneratingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                        <span className="ml-2 hidden sm:inline">Generate with AI</span>
+                        <span className="ml-2 hidden sm:inline">{t('generate-with-ai')}</span>
                     </Button>
                   </div>
                    <FormDescription>
-                    Paste a direct image link or generate one with AI based on the product name.
+                    {t('paste-a-direct-image-link-or-generate-one')}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -856,16 +858,16 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
               name="category"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Category</FormLabel>
+                  <FormLabel>{t('category')}</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select a category" />
+                        <SelectValue placeholder={t('select-a-category')} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       {groceryData.categories.map(cat => (
-                        <SelectItem key={cat.categoryName} value={cat.categoryName}>{cat.categoryName}</SelectItem>
+                        <SelectItem key={cat.categoryName} value={cat.categoryName}>{t(cat.categoryName.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-'))}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -878,9 +880,9 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Product Description (Optional)</FormLabel>
+                  <FormLabel>{t('product-description-optional')}</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Describe the product" {...field} />
+                    <Textarea placeholder={t('describe-the-product')} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -889,9 +891,9 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
 
             <Card className="bg-muted/50 p-4">
                 <CardHeader className="p-2">
-                    <CardTitle className="text-lg">Price Variants</CardTitle>
+                    <CardTitle className="text-lg">{t('price-variants')}</CardTitle>
                     <CardDescription className="text-xs">
-                        Set the official price for this product for all stores.
+                        {t('set-the-official-price-for-this-product')}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="p-2 space-y-4">
@@ -902,11 +904,11 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
                                 name={`variants.${index}.weight`}
                                 render={({ field }) => (
                                     <FormItem className="flex-1">
-                                        <FormLabel>Weight</FormLabel>
+                                        <FormLabel>{t('weight')}</FormLabel>
                                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                                             <FormControl>
                                                 <SelectTrigger>
-                                                    <SelectValue placeholder="Select a weight" />
+                                                    <SelectValue placeholder={t('select-a-weight')} />
                                                 </SelectTrigger>
                                             </FormControl>
                                             <SelectContent>
@@ -922,7 +924,7 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
                                 name={`variants.${index}.price`}
                                 render={({ field }) => (
                                     <FormItem className="flex-1">
-                                        <FormLabel>Price (₹)</FormLabel>
+                                        <FormLabel>{t('price')} (₹)</FormLabel>
                                         <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -935,7 +937,7 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
                     ))}
                     <Button type="button" variant="outline" onClick={() => append({ weight: '', price: 0, sku: `new-${fields.length}` })}>
                         <PlusCircle className="mr-2 h-4 w-4" />
-                        Add Variant
+                        {t('add-variant')}
                     </Button>
                 </CardContent>
             </Card>
@@ -945,10 +947,10 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
                 {isPending ? (
                     <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Adding Product...
+                        {t('adding-product')}...
                     </>
                 ) : (
-                    "Add Product"
+                    t('add-product')
                 )}
             </Button>
           </form>
@@ -1011,18 +1013,18 @@ function PromoteStore({ store }: { store: Store }) {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Promote Your Store</CardTitle>
+                <CardTitle>{t('promote-your-store')}</CardTitle>
                 <CardDescription>
-                    Share your store with your phone contacts to bring in more customers.
+                    {t('share-your-store-with-your-phone-contacts')}
                 </CardDescription>
             </CardHeader>
             <CardContent>
                 <Button onClick={handleShare} className="w-full">
                     <Share2 className="mr-2 h-4 w-4" />
-                    Share with Contacts
+                    {t('share-with-contacts')}
                 </Button>
                 <p className="text-xs text-muted-foreground mt-2 text-center">
-                    This will open your phone's contact picker. We never see your full contact list.
+                    {t('this-will-open-your-phones-contact-picker')}
                 </p>
             </CardContent>
         </Card>
@@ -1080,9 +1082,9 @@ function UpdateLocationForm({ store, onUpdate }: { store: Store, onUpdate: () =>
 
     return (
         <Alert variant="destructive">
-            <AlertTitle>Action Required: Update Your Store's Location</AlertTitle>
+            <AlertTitle>{t('action-required-update-your-stores-location')}</AlertTitle>
             <AlertDescription>
-                Your store is missing GPS coordinates. This is required for customers to find you and for delivery services to work. Please update it below.
+                {t('your-store-is-missing-gps-coordinates')}
             </AlertDescription>
             <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
@@ -1090,25 +1092,25 @@ function UpdateLocationForm({ store, onUpdate }: { store: Store, onUpdate: () =>
                         <div className="grid grid-cols-2 gap-4 flex-1">
                             <FormField control={form.control} name="latitude" render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Latitude</FormLabel>
+                                    <FormLabel>{t('latitude')}</FormLabel>
                                     <FormControl><Input type="number" {...field} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )} />
                             <FormField control={form.control} name="longitude" render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Longitude</FormLabel>
+                                    <FormLabel>{t('longitude')}</FormLabel>
                                     <FormControl><Input type="number" {...field} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )} />
                         </div>
                          <Button type="button" variant="outline" onClick={handleGetLocation}>
-                            <MapPin className="mr-2 h-4 w-4" /> Get Current Location
+                            <MapPin className="mr-2 h-4 w-4" /> {t('get-current-location')}
                         </Button>
                     </div>
                      <Button type="submit" disabled={isPending}>
-                        {isPending ? "Saving..." : "Save Location"}
+                        {isPending ? t('saving') : t('save-location')}
                     </Button>
                 </form>
             </Form>
@@ -1147,31 +1149,31 @@ function DangerZone({ store }: { store: Store }) {
     return (
         <Card className="border-destructive">
             <CardHeader>
-                <CardTitle className="text-destructive">Danger Zone</CardTitle>
+                <CardTitle className="text-destructive">{t('danger-zone')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
                 <div className="flex justify-between items-center">
                     <div>
-                        <p className="font-medium">Close Store</p>
+                        <p className="font-medium">{t('close-store')}</p>
                         <p className="text-sm text-muted-foreground">
-                            This will make your store invisible to customers. You can re-open it later.
+                            {t('this-will-make-your-store-invisible')}
                         </p>
                     </div>
                     <AlertDialog>
                         <AlertDialogTrigger asChild>
-                            <Button variant="destructive">Close Store</Button>
+                            <Button variant="destructive">{t('close-store')}</Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                             <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogTitle>{t('are-you-sure')}</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    Your store and all its products will no longer be visible to any users. You will not be able to accept any new orders. You can re-open it from this page.
+                                    {t('your-store-and-all-its-products-will-no-longer-be-visible')}
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
                                 <AlertDialogAction onClick={handleCloseStore} disabled={isClosing}>
-                                    {isClosing ? "Closing..." : "Yes, Close My Store"}
+                                    {isClosing ? t('closing') : t('yes-close-my-store')}
                                 </AlertDialogAction>
                             </AlertDialogFooter>
                         </AlertDialogContent>
@@ -1222,17 +1224,17 @@ function StoreDetails({ store, onUpdate }: { store: Store, onUpdate: () => void 
         <Card>
             <CardHeader>
                 <div className="flex justify-between items-center">
-                    <CardTitle>Store Details</CardTitle>
+                    <CardTitle>{t('store-details')}</CardTitle>
                     <Dialog open={isOpen} onOpenChange={setIsOpen}>
                         <DialogTrigger asChild>
                             <Button variant="outline" size="sm">
-                                <Edit className="mr-2 h-4 w-4" /> Edit
+                                <Edit className="mr-2 h-4 w-4" /> {t('edit')}
                             </Button>
                         </DialogTrigger>
                         <DialogContent>
                             <DialogHeader>
-                                <DialogTitle>Edit Store Details</DialogTitle>
-                                <DialogDescription>Update your store's public information.</DialogDescription>
+                                <DialogTitle>{t('edit-store-details')}</DialogTitle>
+                                <DialogDescription>{t('update-your-stores-public-information')}</DialogDescription>
                             </DialogHeader>
                             <Form {...form}>
                                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -1241,7 +1243,7 @@ function StoreDetails({ store, onUpdate }: { store: Store, onUpdate: () => void 
                                         name="name"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel>Store Name</FormLabel>
+                                                <FormLabel>{t('store-name')}</FormLabel>
                                                 <FormControl>
                                                     <Input {...field} disabled={store.name === 'LocalBasket'} />
                                                 </FormControl>
@@ -1254,7 +1256,7 @@ function StoreDetails({ store, onUpdate }: { store: Store, onUpdate: () => void 
                                         name="description"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel>Description</FormLabel>
+                                                <FormLabel>{t('description')}</FormLabel>
                                                 <FormControl><Textarea {...field} /></FormControl>
                                                 <FormMessage />
                                             </FormItem>
@@ -1265,15 +1267,15 @@ function StoreDetails({ store, onUpdate }: { store: Store, onUpdate: () => void 
                                         name="address"
                                         render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel>Address</FormLabel>
+                                                <FormLabel>{t('address')}</FormLabel>
                                                 <FormControl><Input {...field} /></FormControl>
                                                 <FormMessage />
                                             </FormItem>
                                         )}
                                     />
                                     <DialogFooter>
-                                        <Button type="button" variant="secondary" onClick={() => setIsOpen(false)}>Cancel</Button>
-                                        <Button type="submit" disabled={isPending}>{isPending ? "Saving..." : "Save Changes"}</Button>
+                                        <Button type="button" variant="secondary" onClick={() => setIsOpen(false)}>{t('cancel')}</Button>
+                                        <Button type="submit" disabled={isPending}>{isPending ? t('saving') : t('save-changes')}</Button>
                                     </DialogFooter>
                                 </form>
                             </Form>
@@ -1282,9 +1284,9 @@ function StoreDetails({ store, onUpdate }: { store: Store, onUpdate: () => void 
                 </div>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
-                <p><strong>Description:</strong> {store.description}</p>
-                <p><strong>Address:</strong> {store.address}</p>
-                <p><strong>Location:</strong> {store.latitude}, {store.longitude}</p>
+                <p><strong>{t('description')}:</strong> {store.description}</p>
+                <p><strong>{t('address')}:</strong> {store.address}</p>
+                <p><strong>{t('location')}:</strong> {store.latitude}, {store.longitude}</p>
             </CardContent>
         </Card>
     );
@@ -1293,6 +1295,7 @@ function StoreDetails({ store, onUpdate }: { store: Store, onUpdate: () => void 
 // New component to fetch and display variants for a single product row in the admin table
 function AdminProductRow({ product, storeId, onEdit, onDelete }: { product: Product; storeId: string; onEdit: () => void; onDelete: () => void; }) {
     const { firestore } = useFirebase();
+    const getProductName = useAppStore(state => state.getProductName);
 
     const priceDocRef = useMemoFirebase(() => {
         if (!firestore || !product.name) return null;
@@ -1318,10 +1321,10 @@ function AdminProductRow({ product, storeId, onEdit, onDelete }: { product: Prod
                         height={40}
                         className="rounded-sm object-cover"
                     />
-                    <span>{product.name}</span>
+                    <span>{getProductName(product)}</span>
                 </div>
             </TableCell>
-            <TableCell>{product.category}</TableCell>
+            <TableCell>{t(product.category.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-'))}</TableCell>
             <TableCell>{variantsString}</TableCell>
             <TableCell className="text-right">
                 <Button variant="ghost" size="icon" onClick={onEdit}>
@@ -1337,14 +1340,14 @@ function AdminProductRow({ product, storeId, onEdit, onDelete }: { product: Prod
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                      <AlertDialogTitle>{t('are-you-sure')}</AlertDialogTitle>
                       <AlertDialogDescription>
                         This will permanently delete the master product "{product.name}" and its pricing from the entire platform. This cannot be undone.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={onDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                      <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+                      <AlertDialogAction onClick={onDelete} className="bg-destructive hover:bg-destructive/90">{t('delete')}</AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
@@ -1360,6 +1363,7 @@ function ManageStoreView({ store, isAdmin, adminStoreId }: { store: Store; isAdm
     const [isDeleting, startDeleteTransition] = useTransition();
     const [isOpening, startOpenTransition] = useTransition();
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+    const getProductName = useAppStore(state => state.getProductName);
 
     const productsQuery = useMemoFirebase(() => {
         if (!firestore) return null;
@@ -1396,12 +1400,12 @@ function ManageStoreView({ store, isAdmin, adminStoreId }: { store: Store; isAdm
         return (
             <Alert variant="destructive">
                  <AlertCircle className="h-4 w-4" />
-                <AlertTitle>This Store Is Closed</AlertTitle>
+                <AlertTitle>{t('this-store-is-closed')}</AlertTitle>
                 <AlertDescription>
-                    Your store is currently not visible to customers. You can re-open it at any time.
+                    {t('your-store-is-currently-not-visible')}
                 </AlertDescription>
                 <Button onClick={handleOpenStore} disabled={isOpening} className="mt-4">
-                    {isOpening ? "Re-opening..." : "Re-open Store"}
+                    {isOpening ? t('re-opening') : t('re-open-store')}
                 </Button>
             </Alert>
         )
@@ -1465,12 +1469,12 @@ function ManageStoreView({ store, isAdmin, adminStoreId }: { store: Store; isAdm
                     <ProductChecklist storeId={store.id} adminStoreId={adminStoreId} />
                 ) : (
                     <Card>
-                        <CardHeader><CardTitle>Manage Inventory</CardTitle></CardHeader>
+                        <CardHeader><CardTitle>{t('manage-inventory')}</CardTitle></CardHeader>
                         <CardContent>
                             <Alert>
                                 <AlertCircle className="h-4 w-4" />
-                                <AlertTitle>Master Store Not Found</AlertTitle>
-                                <AlertDescription>The admin has not configured the master product store yet. Inventory management is temporarily unavailable.</AlertDescription>
+                                <AlertTitle>{t('master-store-not-found')}</AlertTitle>
+                                <AlertDescription>{t('the-admin-has-not-configured-the-master-product-store')}</AlertDescription>
                             </Alert>
                         </CardContent>
                     </Card>
@@ -1484,22 +1488,22 @@ function ManageStoreView({ store, isAdmin, adminStoreId }: { store: Store; isAdm
 
         <Card>
             <CardHeader>
-                <CardTitle>Your Products</CardTitle>
+                <CardTitle>{t('your-products')}</CardTitle>
                  <CardDescription>
-                    {isAdmin ? "This is the master list of products for the entire platform." : "This is your current store inventory."}
+                    {isAdmin ? t('this-is-the-master-list-of-products') : t('this-is-your-current-store-inventory')}
                 </CardDescription>
             </CardHeader>
             <CardContent>
                 {isLoading ? (
-                    <p>Loading products...</p>
+                    <p>{t('loading-products')}...</p>
                 ) : products && products.length > 0 ? (
                     <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Product</TableHead>
-                            <TableHead>Category</TableHead>
-                            {isAdmin && <TableHead>Variants</TableHead>}
-                            {isAdmin && <TableHead className="text-right">Actions</TableHead>}
+                            <TableHead>{t('product')}</TableHead>
+                            <TableHead>{t('category')}</TableHead>
+                            {isAdmin && <TableHead>{t('variants')}</TableHead>}
+                            {isAdmin && <TableHead className="text-right">{t('actions')}</TableHead>}
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1523,17 +1527,17 @@ function ManageStoreView({ store, isAdmin, adminStoreId }: { store: Store; isAdm
                                                 height={40}
                                                 className="rounded-sm object-cover"
                                             />
-                                            <span>{product.name}</span>
+                                            <span>{getProductName(product)}</span>
                                         </div>
                                     </TableCell>
-                                    <TableCell>{product.category}</TableCell>
+                                    <TableCell>{t(product.category.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-'))}</TableCell>
                                 </TableRow>
                             )
                         )}
                     </TableBody>
                     </Table>
                 ) : (
-                <p className="text-muted-foreground">You haven't added any products yet.</p>
+                <p className="text-muted-foreground">{t('you-havent-added-any-products-yet')}</p>
                 )}
             </CardContent>
         </Card>
@@ -1632,20 +1636,20 @@ function CreateStoreForm({ user, isAdmin, profile, onAutoCreate }: { user: any; 
                  <AlertDialog open={isLocationConfirmOpen} onOpenChange={setIsLocationConfirmOpen}>
                     <AlertDialogContent>
                         <AlertDialogHeader>
-                            <AlertDialogTitle>Confirm Store Location</AlertDialogTitle>
+                            <AlertDialogTitle>{t('confirm-store-location')}</AlertDialogTitle>
                             <AlertDialogDescription>
-                                We've detected your location. Is this the physical location of your store? This is required for deliveries.
+                                {t('weve-detected-your-location')}
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                            <AlertDialogCancel onClick={() => handleConfirmLocation(false)}>No, I'll do it later</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleConfirmLocation(true)}>Yes, Create My Store Here</AlertDialogAction>
+                            <AlertDialogCancel onClick={() => handleConfirmLocation(false)}>{t('no-ill-do-it-later')}</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleConfirmLocation(true)}>{t('yes-create-my-store-here')}</AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
-                <p className="text-lg">Attempting to create your store automatically...</p>
+                <p className="text-lg">{t('attempting-to-create-your-store-automatically')}...</p>
                 <Loader2 className="mx-auto mt-4 h-8 w-8 animate-spin" />
-                 <p className="text-sm text-muted-foreground mt-4">If this fails, you can create your store manually.</p>
+                 <p className="text-sm text-muted-foreground mt-4">{t('if-this-fails-you-can-create-your-store-manually')}</p>
             </div>
         );
     }
@@ -1653,9 +1657,9 @@ function CreateStoreForm({ user, isAdmin, profile, onAutoCreate }: { user: any; 
     return (
         <Card className="max-w-3xl mx-auto">
             <CardHeader>
-                <CardTitle className="text-3xl font-headline">{isAdmin ? 'Create Master Store' : 'Create Your Store'}</CardTitle>
+                <CardTitle className="text-3xl font-headline">{isAdmin ? t('create-master-store') : t('create-your-store')}</CardTitle>
                 <CardDescription>
-                    {isAdmin ? "This is the master store for the platform." : "Fill out the details to get your shop listed."}
+                    {isAdmin ? t('this-is-the-master-store-for-the-platform') : t('fill-out-the-details-to-get-your-shop-listed')}
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -1667,7 +1671,7 @@ function CreateStoreForm({ user, isAdmin, profile, onAutoCreate }: { user: any; 
                             name="name"
                             render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Store Name</FormLabel>
+                                <FormLabel>{t('store-name')}</FormLabel>
                                 <FormControl>
                                 <Input placeholder="e.g., Patel Kirana Store" {...field} disabled={isAdmin} />
                                 </FormControl>
@@ -1680,8 +1684,8 @@ function CreateStoreForm({ user, isAdmin, profile, onAutoCreate }: { user: any; 
                             name="description"
                             render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Store Description</FormLabel>
-                                <FormControl><Textarea placeholder="Describe what makes your store special." {...field} /></FormControl>
+                                <FormLabel>{t('store-description')}</FormLabel>
+                                <FormControl><Textarea placeholder={t('describe-what-makes-your-store-special')} {...field} /></FormControl>
                                 <FormMessage />
                             </FormItem>
                             )}
@@ -1691,7 +1695,7 @@ function CreateStoreForm({ user, isAdmin, profile, onAutoCreate }: { user: any; 
                             name="address"
                             render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Full Store Address</FormLabel>
+                                <FormLabel>{t('full-store-address')}</FormLabel>
                                 <FormControl><Input placeholder="123 Market Street, Mumbai" {...field} /></FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -1699,23 +1703,23 @@ function CreateStoreForm({ user, isAdmin, profile, onAutoCreate }: { user: any; 
                         />
                          {!isAdmin && (
                             <div className="space-y-2">
-                                    <FormLabel>Store Location (GPS)</FormLabel>
+                                    <FormLabel>{t('store-location-gps')}</FormLabel>
                                     <div className="flex items-end gap-4">
                                         <div className="grid grid-cols-2 gap-4 flex-1">
                                             <FormField control={form.control} name="latitude" render={({ field }) => (
-                                                <FormItem><FormLabel className="text-xs text-muted-foreground">Latitude</FormLabel><FormControl><Input type="number" placeholder="e.g., 19.0760" {...field} /></FormControl><FormMessage /></FormItem>
+                                                <FormItem><FormLabel className="text-xs text-muted-foreground">{t('latitude')}</FormLabel><FormControl><Input type="number" placeholder="e.g., 19.0760" {...field} /></FormControl><FormMessage /></FormItem>
                                             )} />
                                             <FormField control={form.control} name="longitude" render={({ field }) => (
-                                                <FormItem><FormLabel className="text-xs text-muted-foreground">Longitude</FormLabel><FormControl><Input type="number" placeholder="e.g., 72.8777" {...field} /></FormControl><FormMessage /></FormItem>
+                                                <FormItem><FormLabel className="text-xs text-muted-foreground">{t('longitude')}</FormLabel><FormControl><Input type="number" placeholder="e.g., 72.8777" {...field} /></FormControl><FormMessage /></FormItem>
                                             )} />
                                         </div>
                                         <Button type="button" variant="outline" onClick={() => handleGetLocation(false)}>
-                                            <MapPin className="mr-2 h-4 w-4" /> Get Current Location
+                                            <MapPin className="mr-2 h-4 w-4" /> {t('get-current-location')}
                                         </Button>
                                     </div>
                             </div>
                             )}
-                        <Button type="submit" className="w-full" disabled={isPending || !user}>{isPending ? 'Creating...' : 'Create Store'}</Button>
+                        <Button type="submit" className="w-full" disabled={isPending || !user}>{isPending ? t('creating') : t('create-store')}</Button>
                     </form>
                 </Form>
             </CardContent>
@@ -1789,7 +1793,7 @@ export default function MyStorePage() {
     const isLoading = isUserLoading || isOwnerStoreLoading || isAdminStoreLoading || isProfileLoading;
 
     if (isLoading) {
-        return <div className="container mx-auto py-12 px-4 md:px-6">Loading your store...</div>
+        return <div className="container mx-auto py-12 px-4 md:px-6">{t('loading-your-store')}...</div>
     }
 
     const renderContent = () => {
@@ -1808,14 +1812,14 @@ export default function MyStorePage() {
             return (
                  <Card className="max-w-3xl mx-auto">
                     <CardHeader>
-                        <CardTitle className="text-3xl font-headline">Complete Your Profile First</CardTitle>
+                        <CardTitle className="text-3xl font-headline">{t('complete-your-profile-first')}</CardTitle>
                         <CardDescription>
-                            To automatically create your store, we need some details from you. Please complete your profile, then come back here.
+                            {t('to-automatically-create-your-store')}
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
                          <Button asChild>
-                            <Link href="/dashboard/customer/my-profile">Go to My Profile</Link>
+                            <Link href="/dashboard/customer/my-profile">{t('go-to-my-profile')}</Link>
                         </Button>
                     </CardContent>
                 </Card>
@@ -1825,9 +1829,12 @@ export default function MyStorePage() {
         return <CreateStoreForm user={user} isAdmin={false} profile={userProfile} onAutoCreate={handleAutoCreateStore} />;
     };
     
-    const pageTitle = isAdmin
-        ? (adminStore ? `Master Catalog: ${adminStore.name}` : 'Create Master Store')
-        : (myStore ? `Dashboard: ${myStore.name}` : 'Create Your Store');
+    const pageTitleKey = isAdmin
+        ? (adminStore ? `Master Catalog: ${adminStore.name}` : 'create-master-store')
+        : (myStore ? `Dashboard: ${myStore.name}` : 'create-your-store');
+    
+    const pageTitle = (myStore || adminStore) ? pageTitleKey : t(pageTitleKey);
+
 
     return (
         <div className="container mx-auto py-12 px-4 md:px-6">

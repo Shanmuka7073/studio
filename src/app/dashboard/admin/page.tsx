@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -11,6 +12,7 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { collection, query, where } from 'firebase/firestore';
 import type { Order, Store as StoreType } from '@/lib/types';
 import { Button } from '@/components/ui/button';
+import { t } from '@/lib/locales';
 
 const ADMIN_EMAIL = 'admin@gmail.com';
 
@@ -18,7 +20,7 @@ function StatCard({ title, value, icon: Icon, loading }: { title: string, value:
     return (
         <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{title}</CardTitle>
+                <CardTitle className="text-sm font-medium">{t(title)}</CardTitle>
                 <Icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -32,12 +34,12 @@ function CreateMasterStoreCard() {
     return (
         <Alert variant="destructive" className="mb-8">
             <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Action Required: Create Master Store</AlertTitle>
+            <AlertTitle>{t('action-required-create-master-store')}</AlertTitle>
             <AlertDescription>
-                The master store for setting platform-wide product prices has not been created yet. This is required for the application to function correctly.
+                {t('the-master-store-for-setting-platform-wide')}
                 <Button asChild className="mt-4">
                     <Link href="/dashboard/owner/my-store">
-                        Create Master Store <ArrowRight className="ml-2 h-4 w-4" />
+                        {t('create-master-store')} <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                 </Button>
             </AlertDescription>
@@ -52,11 +54,11 @@ function AdminActionCard({ title, description, href, icon: Icon }: { title: stri
                 <CardHeader>
                     <div className="flex items-center gap-4">
                         <Icon className="h-8 w-8 text-primary" />
-                        <CardTitle>{title}</CardTitle>
+                        <CardTitle>{t(title)}</CardTitle>
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <CardDescription>{description}</CardDescription>
+                    <CardDescription>{t(description)}</CardDescription>
                 </CardContent>
             </Card>
         </Link>
@@ -103,10 +105,10 @@ export default function AdminDashboardPage() {
     }
 
     const statItems = [
-        { title: 'Total Customers', value: stats.totalUsers, icon: Users },
-        { title: 'Total Stores', value: stats.totalStores, icon: Store },
-        { title: 'Delivery Partners', value: stats.totalDeliveryPartners, icon: Truck },
-        { title: 'Orders Delivered', value: stats.totalOrdersDelivered, icon: ShoppingBag },
+        { title: 'total-customers', value: stats.totalUsers, icon: Users },
+        { title: 'total-stores', value: stats.totalStores, icon: Store },
+        { title: 'delivery-partners', value: stats.totalDeliveryPartners, icon: Truck },
+        { title: 'orders-delivered', value: stats.totalOrdersDelivered, icon: ShoppingBag },
     ];
 
     if (isUserLoading || adminStoreLoading) {
@@ -116,8 +118,8 @@ export default function AdminDashboardPage() {
     return (
         <div className="container mx-auto py-12 px-4 md:px-6">
             <div className="text-center mb-12">
-                <h1 className="text-4xl font-bold font-headline">Admin Dashboard</h1>
-                <p className="text-lg text-muted-foreground mt-2">A high-level overview of your application's activity.</p>
+                <h1 className="text-4xl font-bold font-headline">{t('admin-dashboard')}</h1>
+                <p className="text-lg text-muted-foreground mt-2">{t('a-high-level-overview-of-your-application')}</p>
             </div>
             
             {!masterStoreExists && <CreateMasterStoreCard />}
@@ -135,17 +137,17 @@ export default function AdminDashboardPage() {
             </div>
 
             <div className="mt-16">
-                 <h2 className="text-2xl font-bold text-center mb-8 font-headline">Admin Tools</h2>
+                 <h2 className="text-2xl font-bold text-center mb-8 font-headline">{t('admin-tools')}</h2>
                 <div className="grid gap-8 md:grid-cols-2 max-w-4xl mx-auto">
                     <AdminActionCard 
-                        title="Manage Master Store & Products"
-                        description="Add or edit products in the master catalog and set canonical prices."
+                        title="manage-master-store-and-products"
+                        description="add-or-edit-products-in-the-master-catalog"
                         href="/dashboard/owner/my-store"
                         icon={Store}
                     />
                     <AdminActionCard 
-                        title="Voice Commands Control"
-                        description="View and manage the voice commands users can say to navigate the app."
+                        title="voice-commands-control"
+                        description="view-and-manage-the-voice-commands-users-can-say"
                         href="/dashboard/voice-commands"
                         icon={Mic}
                     />

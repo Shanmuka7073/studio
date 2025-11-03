@@ -1,4 +1,5 @@
 
+
 'use client';
 import { Button } from '@/components/ui/button';
 import { getStores } from '@/lib/data';
@@ -7,6 +8,7 @@ import { useFirebase } from '@/firebase';
 import { Store } from '@/lib/types';
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
+import { t } from '@/lib/locales';
 
 
 export default function Home() {
@@ -42,18 +44,18 @@ export default function Home() {
           <div className="flex flex-col items-center space-y-8">
             <div className="space-y-4 text-center">
               <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none font-headline">
-                Shop Fresh, Shop Local, Just by Voice
+                {t('shop-fresh-shop-local-just-by-voice')}
               </h1>
               <p className="max-w-[600px] text-foreground/80 md:text-xl">
-                Your hands-free shopping assistant. Log in and start speaking to control the app.
+                {t('your-hands-free-shopping-assistant')}
               </p>
             </div>
             <div className="w-full max-w-sm space-y-4">
                  <Button asChild>
-                    <Link href="/stores">Browse All Stores</Link>
+                    <Link href="/stores">{t('browse-all-stores')}</Link>
                  </Button>
                  <p className="text-sm text-foreground/60 text-center">
-                  Try saying "Find bananas" or "Go to my orders".
+                  {t('try-saying-find-bananas')}
                 </p>
             </div>
           </div>
@@ -65,22 +67,22 @@ export default function Home() {
           <div className="flex flex-col items-center justify-center space-y-4 text-center">
             <div className="space-y-2">
               <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl font-headline">
-                Or Browse Featured Stores
+                {t('or-browse-featured-stores')}
               </h2>
               <p className="max-w-[900px] text-foreground/80 md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-                Explore top-rated local stores right in your neighborhood.
+                {t('explore-top-rated-local-stores-right-in-your-neighborhood')}
               </p>
             </div>
           </div>
           <div className="mx-auto grid grid-cols-1 gap-6 py-12 sm:grid-cols-2 lg:grid-cols-3">
             {loading ? (
-              <p>Loading stores...</p>
+              <p>{t('loading-stores')}...</p>
             ) : displayedStores.length > 0 ? (
               displayedStores.map((store) => (
                 <StoreCard key={store.id} store={store} />
               ))
             ) : (
-              <p>No stores found.</p>
+              <p>{t('no-stores-found')}</p>
             )}
           </div>
         </div>

@@ -9,6 +9,7 @@ import { useFirebase } from '@/firebase';
 import { useEffect } from 'react';
 import { UseFormReturn } from 'react-hook-form';
 import { ProfileFormValues } from '@/app/dashboard/customer/my-profile/page';
+import { t } from '@/lib/locales';
 
 
 export interface AppState {
@@ -19,6 +20,7 @@ export interface AppState {
   error: Error | null;
   fetchInitialData: (db: Firestore) => Promise<void>;
   fetchProductPrices: (db: Firestore, productNames: string[]) => Promise<void>;
+  getProductName: (product: Product) => string;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -78,7 +80,11 @@ export const useAppStore = create<AppState>((set, get) => ({
           console.error("Failed to fetch product prices:", error);
           // Optionally handle price-specific errors
       }
-  }
+  },
+  getProductName: (product: Product) => {
+    if (!product) return '';
+    return t(product.name.toLowerCase().replace(/ /g, '-'));
+  },
 }));
 
 // Custom hook to initialize the store's data on app load

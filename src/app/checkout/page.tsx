@@ -38,6 +38,7 @@ import type { User as AppUser, Store } from '@/lib/types';
 import { create } from 'zustand';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useAppStore } from '@/lib/store';
+import { t } from '@/lib/locales';
 
 const checkoutSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -50,13 +51,14 @@ const DELIVERY_FEE = 30;
 
 function OrderSummaryItem({ item, image }) {
     const { product, variant, quantity } = item;
+    const getProductName = useAppStore(state => state.getProductName);
 
     return (
         <div className="flex justify-between items-center">
             <div className="flex items-center gap-4">
                 <Image src={image.imageUrl} alt={product.name} data-ai-hint={image.imageHint} width={48} height={48} className="rounded-md" />
                 <div>
-                    <p className="font-medium">{product.name} <span className="text-sm text-muted-foreground">({variant.weight})</span></p>
+                    <p className="font-medium">{getProductName(product)} <span className="text-sm text-muted-foreground">({variant.weight})</span></p>
                     <p className="text-sm text-muted-foreground">Qty: {quantity}</p>
                 </div>
             </div>
@@ -246,13 +248,13 @@ export default function CheckoutPage() {
       return (
           <div className="container mx-auto py-24 text-center">
               <h1 className="text-4xl font-bold mb-4 font-headline">
-                  Your Cart is Empty
+                  {t('your-cart-is-empty')}
               </h1>
               <p className="text-muted-foreground mb-8">
-                  Please add items to your cart before proceeding to checkout.
+                  {t('please-add-items-to-your-cart-before-proceeding')}
               </p>
               <Button asChild size="lg">
-                  <Link href="/stores">Browse Stores</Link>
+                  <Link href="/stores">{t('browse-stores')}</Link>
               </Button>
           </div>
       );
@@ -265,7 +267,7 @@ export default function CheckoutPage() {
                 <div>
                 <Card>
                     <CardHeader>
-                    <CardTitle>Delivery & Store Selection</CardTitle>
+                    <CardTitle>{t('delivery-and-store-selection')}</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <FormField
@@ -273,7 +275,7 @@ export default function CheckoutPage() {
                             name="name"
                             render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Full Name</FormLabel>
+                                <FormLabel>{t('full-name')}</FormLabel>
                                 <FormControl>
                                 <Input placeholder="John Doe" {...field} readOnly={!!userData?.firstName} />
                                 </FormControl>
@@ -282,21 +284,21 @@ export default function CheckoutPage() {
                             )}
                         />
                         <div className="space-y-2">
-                            <FormLabel>Delivery Location</FormLabel>
+                            <FormLabel>{t('delivery-location')}</FormLabel>
                              {deliveryCoords ? (
                                 <div className="flex items-center gap-4 pt-2">
                                      <div className="flex items-center text-green-600">
                                         <CheckCircle className="mr-2 h-5 w-5" />
-                                        <span>Location captured!</span>
+                                        <span>{t('location-captured')}</span>
                                     </div>
                                     <Button type="button" variant="outline" size="sm" onClick={handleGetLocation}>
-                                        <MapPin className="mr-2 h-4 w-4" /> Re-capture
+                                        <MapPin className="mr-2 h-4 w-4" /> {t('re-capture')}
                                     </Button>
                                 </div>
                             ) : (
                                 <div className="flex items-center gap-2 text-muted-foreground p-3 bg-muted/50 rounded-md">
                                     <Loader2 className="h-4 w-4 animate-spin" />
-                                    <span>Getting your current location...</span>
+                                    <span>{t('getting-your-current-location')}</span>
                                 </div>
                             )}
                         </div>
@@ -305,7 +307,7 @@ export default function CheckoutPage() {
                             name="phone"
                             render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Phone Number</FormLabel>
+                                <FormLabel>{t('phone-number')}</FormLabel>
                                 <FormControl>
                                 <Input placeholder="(555) 123-4567" {...field} readOnly={!!userData?.phoneNumber} />
                                 </FormControl>
@@ -315,10 +317,10 @@ export default function CheckoutPage() {
                         />
                         
                         <div className="space-y-2 pt-4 border-t">
-                            <FormLabel>Fulfilling Store</FormLabel>
+                            <FormLabel>{t('fulfilling-store')}</FormLabel>
                             <Select onValueChange={setActiveStoreId} value={activeStoreId || ""}>
                                 <SelectTrigger>
-                                    <SelectValue placeholder="Select a store to fulfill your order" />
+                                    <SelectValue placeholder={t('select-a-store-to-fulfill')} />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {allStores.map(store => (
@@ -334,16 +336,16 @@ export default function CheckoutPage() {
                             {!activeStoreId && (
                                 <Alert variant="destructive" id="action-required-alert">
                                     <AlertCircle className="h-4 w-4" />
-                                    <AlertTitle>Action Required</AlertTitle>
+                                    <AlertTitle>{t('action-required')}</AlertTitle>
                                     <AlertDescription>
-                                        Please select a store to continue.
+                                        {t('please-select-a-store-to-continue')}
                                     </AlertDescription>
                                 </Alert>
                             )}
                         </div>
 
                         <Button ref={placeOrderBtnRef} type="submit" disabled={isPlacingOrder || !activeStoreId} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-                            {isPlacingOrder ? 'Placing Order...' : 'Place Order'}
+                            {isPlacingOrder ? t('placing-order') : t('place-order')}
                         </Button>
                     </CardContent>
                 </Card>
@@ -351,7 +353,7 @@ export default function CheckoutPage() {
                 <div>
                 <Card>
                     <CardHeader>
-                    <CardTitle>Order Summary</CardTitle>
+                    <CardTitle>{t('order-summary')}</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         {cartItems.map((item) => {
@@ -359,16 +361,16 @@ export default function CheckoutPage() {
                             return <OrderSummaryItem key={item.variant.sku} item={item} image={image} />
                         })}
                         <div className="flex justify-between items-center border-t pt-4">
-                            <p className="font-medium">Subtotal</p>
+                            <p className="font-medium">{t('subtotal')}</p>
                             <p>₹{cartTotal.toFixed(2)}</p>
                         </div>
                         <div className="flex justify-between items-center">
-                            <p className="font-medium">Delivery Fee</p>
+                            <p className="font-medium">{t('delivery-fee')}</p>
                             <p>₹{DELIVERY_FEE.toFixed(2)}</p>
                         </div>
                     </CardContent>
                     <CardFooter className="flex justify-between font-bold text-lg border-t pt-4">
-                        <span>Total</span>
+                        <span>{t('total')}</span>
                         <span id="final-total-amount">₹{finalTotal.toFixed(2)}</span>
                     </CardFooter>
                 </Card>

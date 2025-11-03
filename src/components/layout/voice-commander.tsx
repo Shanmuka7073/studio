@@ -14,6 +14,7 @@ import { useProfileFormStore } from '@/lib/store';
 import { ProfileFormValues } from '@/app/dashboard/customer/my-profile/page';
 import { useCheckoutStore } from '@/app/checkout/page';
 import { getCommands } from '@/app/actions';
+import { t } from '@/lib/locales';
 
 export interface Command {
   command: string;
@@ -61,13 +62,14 @@ export function VoiceCommander({
   const storesRef = useRef<Store[]>([]);
   const masterProductsRef = useRef<Product[]>([]);
   const productPricesRef = useRef<Record<string, ProductPrice>>({});
-  const commandActionsRef = useRef<Record<string, Function>>({});
+  const commandActionsRef = useRef<any>({});
   const fileCommandsRef = useRef<any>({});
   
   const formFieldToFillRef = useRef<keyof ProfileFormValues | null>(null);
   const [isWaitingForStoreName, setIsWaitingForStoreName] = useState(false);
+  const [clarificationStores, setClarificationStores] = useState<Store[]>([]);
   const hasSpokenCheckoutPrompt = useRef(false);
-
+  
   useEffect(() => {
     isEnabledRef.current = enabled;
     if (recognition) {
@@ -105,8 +107,7 @@ export function VoiceCommander({
       if (onEndCallback) {
         onEndCallback();
       }
-      // The main `onend` handler for recognition will restart it
-       if (isEnabledRef.current) {
+      if (isEnabledRef.current) {
         try {
           recognition?.start();
         } catch(e) {
@@ -126,16 +127,13 @@ export function VoiceCommander({
 
   // Proactive prompt on checkout page
   useEffect(() => {
-    // Reset the flag when navigating away from checkout
     if (pathname !== '/checkout') {
       hasSpokenCheckoutPrompt.current = false;
-      setIsWaitingForStoreName(false); // Reset this state as well
+      setIsWaitingForStoreName(false);
       return;
     }
 
-    // Only speak once per page visit and if voice is enabled
     if (enabled && !hasSpokenCheckoutPrompt.current) {
-      // Use a timeout to ensure the DOM is ready for querying
       const speakTimeout = setTimeout(() => {
         const actionAlert = document.getElementById('action-required-alert');
         if (actionAlert) {
@@ -149,28 +147,34 @@ export function VoiceCommander({
           }
           setIsWaitingForStoreName(false);
         }
-        hasSpokenCheckoutPrompt.current = true; // Mark as spoken
-      }, 1500); // 1.5-second delay
+        hasSpokenCheckoutPrompt.current = true;
+      }, 1500);
 
       return () => clearTimeout(speakTimeout);
     }
   }, [pathname, enabled, speak]);
 
 
-  const findProductAndVariant = useCallback(async (productName: string, desiredWeight?: string): Promise<{ product: Product | null, variant: ProductVariant | null, storeId: string | null }> => {
+  const findProductAndVariant = useCallback(async (productName: string, desiredWeight?: string): Promise<{ product: Product | null, variant: ProductVariant | null }> => {
     const lowerProductName = productName.toLowerCase();
-    const productMatch = masterProductsRef.current.find(p => p.name.toLowerCase() === lowerProductName);
-
-    if (!productMatch) return { product: null, variant: null, storeId: null };
     
-    // We don't need a storeId to add to cart anymore, so product is fine as is.
+    // Find product in master list by matching english or telugu name
+    const productMatch = masterProductsRef.current.find(p => {
+        const pKey = p.name.toLowerCase().replace(/ /g, '-');
+        const translated = t(pKey, 'te');
+        const englishName = t(pKey, 'en');
+        return englishName.toLowerCase() === lowerProductName || translated === lowerProductName;
+    });
+
+    if (!productMatch) return { product: null, variant: null };
+    
     const finalProduct = { ...productMatch }; 
 
-    let priceData = productPricesRef.current[lowerProductName];
+    let priceData = productPricesRef.current[productMatch.name.toLowerCase()];
     if (!priceData && firestore) {
-        priceData = await getProductPrice(firestore, lowerProductName);
+        priceData = await getProductPrice(firestore, productMatch.name.toLowerCase());
         if (priceData) {
-            productPricesRef.current[lowerProductName] = priceData;
+            productPricesRef.current[productMatch.name.toLowerCase()] = priceData;
         }
     }
     
@@ -178,22 +182,22 @@ export function VoiceCommander({
         if (desiredWeight) {
             const lowerDesiredWeight = desiredWeight.replace(/\s/g, '').toLowerCase();
             const variantMatch = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === lowerDesiredWeight);
-            if (variantMatch) return { product: finalProduct, variant: variantMatch, storeId: activeStoreId };
+            if (variantMatch) return { product: finalProduct, variant: variantMatch };
         }
         
         if (!desiredWeight || desiredWeight === 'one') {
           const onePieceVariant = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === '1pc');
-          if (onePieceVariant) return { product: finalProduct, variant: onePieceVariant, storeId: activeStoreId };
+          if (onePieceVariant) return { product: finalProduct, variant: onePieceVariant };
 
            const firstVariant = priceData.variants.sort((a,b) => a.price - b.price)[0];
-           if (firstVariant) return { product: finalProduct, variant: firstVariant, storeId: activeStoreId };
+           if (firstVariant) return { product: finalProduct, variant: firstVariant };
         }
 
-        return { product: finalProduct, variant: priceData.variants[0], storeId: activeStoreId };
+        return { product: finalProduct, variant: priceData.variants[0] };
     }
     
-    return { product: null, variant: null, storeId: null };
-  }, [activeStoreId, firestore]);
+    return { product: null, variant: null };
+  }, [firestore]);
 
 
   const handleProfileFormInteraction = useCallback(() => {
@@ -225,13 +229,36 @@ export function VoiceCommander({
         return;
     }
     
-    const handleCommand = async (command: string) => {
-        onStatusUpdate(`Processing: "${command}"`);
+    const handleCommand = async (commandText: string) => {
+        onStatusUpdate(`Processing: "${commandText}"`);
         try {
             if (!firestore || !user) return;
 
+            if (clarificationStores.length > 0) {
+                const chosenIndex = parseInt(commandText.replace(/[^0-9]/g, ''), 10) - 1;
+                let chosenStore: Store | undefined = clarificationStores[chosenIndex];
+
+                if (!chosenStore) {
+                    const bestMatch = clarificationStores
+                        .map(store => ({ ...store, similarity: calculateSimilarity(commandText, store.address.toLowerCase()) }))
+                        .sort((a, b) => b.similarity - a.similarity)[0];
+                    if (bestMatch && bestMatch.similarity > 0.6) {
+                        chosenStore = bestMatch;
+                    }
+                }
+                
+                if (chosenStore) {
+                    speak(`Okay, navigating to ${chosenStore.name} at ${chosenStore.address}.`);
+                    router.push(`/stores/${chosenStore.id}`);
+                } else {
+                    speak(`Sorry, I didn't understand that. Please say the address or number of the store you want.`);
+                }
+                setClarificationStores([]);
+                return;
+            }
+
             if (isWaitingForStoreName) {
-                const spokenStoreName = command.toLowerCase();
+                const spokenStoreName = commandText.toLowerCase();
                 const bestMatch = storesRef.current
                     .map(store => ({ ...store, similarity: calculateSimilarity(spokenStoreName, store.name.toLowerCase()) }))
                     .sort((a, b) => b.similarity - a.similarity)[0];
@@ -240,18 +267,17 @@ export function VoiceCommander({
                     setIsWaitingForStoreName(false);
                     speak(`Okay, ordering from ${bestMatch.name}.`);
                     setActiveStoreId(bestMatch.id);
-                    // Use a short delay to allow React state to update before clicking
                     setTimeout(() => {
                         placeOrderBtnRef?.current?.click();
                     }, 500);
                 } else {
-                    speak(`Sorry, I couldn't find a store named ${command}. Please try again.`);
+                    speak(`Sorry, I couldn't find a store named ${commandText}. Please try again.`);
                 }
                 return;
             }
 
             if (formFieldToFillRef.current && profileForm) {
-                profileForm.setValue(formFieldToFillRef.current, command, { shouldValidate: true });
+                profileForm.setValue(formFieldToFillRef.current, commandText, { shouldValidate: true });
                 formFieldToFillRef.current = null;
                 handleProfileFormInteraction();
                 return;
@@ -259,10 +285,10 @@ export function VoiceCommander({
             
             const orderItemTemplate = fileCommandsRef.current.orderItem;
             if (orderItemTemplate) {
-                for (const alias of orderItemTemplate.aliases) {
-                    const pattern = alias.replace(/{quantity}/g, '(.+)').replace(/{product}/g, '(.+)');
+                for (const alias of [...orderItemTemplate.aliases, ...orderItemTemplate.aliases_te]) {
+                    const pattern = alias.replace('{quantity}', '(.+)').replace('{product}', '(.+)');
                     const regex = new RegExp(`^${pattern}$`, 'i');
-                    const match = command.match(regex);
+                    const match = commandText.match(regex);
                     
                     if (match) {
                         const quantity = match[1]?.trim();
@@ -277,7 +303,7 @@ export function VoiceCommander({
                 }
             }
 
-            const perfectMatch = commandsRef.current.find((c) => command === c.command);
+            const perfectMatch = commandsRef.current.find((c) => commandText === c.command);
             if (perfectMatch) {
                 speak(perfectMatch.reply);
                 perfectMatch.action();
@@ -286,7 +312,7 @@ export function VoiceCommander({
             }
             
             const potentialMatches = commandsRef.current
-              .map((c) => ({ ...c, similarity: calculateSimilarity(command, c.command) }))
+              .map((c) => ({ ...c, similarity: calculateSimilarity(commandText, c.command) }))
               .filter((c) => c.similarity > 0.7)
               .sort((a, b) => b.similarity - a.similarity)
               .filter((value, index, self) => self.findIndex((v) => v.display === value.display) === index)
@@ -296,11 +322,11 @@ export function VoiceCommander({
               speak("I'm not sure. Did you mean one of these?");
               onSuggestions(potentialMatches);
             } else {
-              speak(`Sorry, I don't recognize the command "${command}".`);
+              speak(`Sorry, I don't recognize the command "${commandText}".`);
               toast({
                   variant: 'destructive',
                   title: 'Command Not Recognized',
-                  description: `I heard "${command}", but I don't know what to do.`,
+                  description: `I heard "${commandText}", but I don't know what to do.`,
               });
               onSuggestions([]);
             }
@@ -351,14 +377,14 @@ export function VoiceCommander({
         const { product: foundProduct, variant } = await findProductAndVariant(product, quantity);
         if (foundProduct && variant) {
           addItemToCart(foundProduct, variant, 1);
-          speak(`Added ${variant.weight} of ${product} to your cart.`);
+          speak(`Added ${variant.weight} of ${t(foundProduct.name.toLowerCase().replace(/ /g, '-'))} to your cart.`);
           onOpenCart();
         } else {
           speak(`Sorry, I could not find ${product} in the store.`);
         }
       },
     };
-
+    
     recognition.continuous = false;
     recognition.interimResults = false;
     recognition.lang = 'en-IN';
@@ -380,17 +406,12 @@ export function VoiceCommander({
     };
     
     recognition.onend = () => {
-      // Robustly restart listening only if the feature is still enabled by the user
-      // and we are not currently speaking. This handles interruptions from speaking.
       if (isEnabledRef.current && !isSpeakingRef.current) {
         setTimeout(() => {
           try {
             recognition?.start();
-          } catch (e) {
-            // This can happen if start() is called while it's already starting.
-            // console.error('Could not restart recognition service: ', e);
-          }
-        }, 100); // A short delay can help prevent race conditions.
+          } catch (e) {}
+        }, 100);
       }
     };
 
@@ -404,19 +425,28 @@ export function VoiceCommander({
           let builtCommands: Command[] = [];
 
           stores.forEach((store) => {
-            if (store.name === 'LocalBasket') return; // Exclude the master store from voice commands
+            if (store.name === 'LocalBasket') return;
             const coreName = store.name.toLowerCase().replace(/shop|store|kirana/g, '').trim();
             const variations = [...new Set([
               store.name.toLowerCase(), coreName, `go to ${store.name.toLowerCase()}`, `open ${store.name.toLowerCase()}`,
-              `visit ${store.name.toLowerCase()}`, `show ${store.name.toLowerCase()}`
             ])];
             variations.forEach(variation => {
               builtCommands.push({
                 command: variation,
                 display: `Go to ${store.name}`,
                 action: () => {
-                  setActiveStoreId(store.id);
-                  router.push(`/stores/${store.id}`);
+                  const matchingStores = stores.filter(s => s.name.toLowerCase() === store.name.toLowerCase());
+                  if (matchingStores.length > 1) {
+                      setClarificationStores(matchingStores);
+                      let prompt = `I found ${matchingStores.length} stores named ${store.name}. `;
+                      matchingStores.forEach((s, i) => {
+                          prompt += `Number ${i + 1} is at ${s.address}. `;
+                      });
+                      prompt += "Which one would you like?";
+                      speak(prompt);
+                  } else {
+                      router.push(`/stores/${store.id}`);
+                  }
                 },
                 reply: `Navigating to ${store.name}.`
               });
@@ -440,12 +470,12 @@ export function VoiceCommander({
     
     return () => {
       if (recognition) {
-        recognition.onend = null; // Prevent restart on component unmount
+        recognition.onend = null;
         recognition.abort();
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firestore, user, cartItems, profileForm, isWaitingForStoreName, activeStoreId, placeOrderBtnRef, enabled, pathname, findProductAndVariant, handleProfileFormInteraction, speak, toast, router, onSuggestions, onStatusUpdate, onCloseCart, onOpenCart, setActiveStoreId]);
+  }, [firestore, user, cartItems, profileForm, isWaitingForStoreName, activeStoreId, placeOrderBtnRef, enabled, pathname, findProductAndVariant, handleProfileFormInteraction, speak, toast, router, onSuggestions, onStatusUpdate, onCloseCart, onOpenCart, setActiveStoreId, clarificationStores]);
 
   return null;
 }

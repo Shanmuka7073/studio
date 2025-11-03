@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import Image from 'next/image';
@@ -11,6 +12,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from './ui/skeleton';
+import { useAppStore } from '@/lib/store';
+import { t } from '@/lib/locales';
 
 interface ProductCardProps {
   product: Product;
@@ -24,6 +27,7 @@ interface ProductCardProps {
 export default function ProductCard({ product, image, priceData }: ProductCardProps) {
   const { addItem } = useCart();
   const { toast } = useToast();
+  const getProductName = useAppStore(state => state.getProductName);
   
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
   
@@ -77,7 +81,7 @@ export default function ProductCard({ product, image, priceData }: ProductCardPr
         />
       </CardHeader>
       <CardContent className="p-2 pb-1 flex-1 text-center">
-        <CardTitle className="text-sm font-headline truncate">{product.name}</CardTitle>
+        <CardTitle className="text-sm font-headline truncate">{getProductName(product)}</CardTitle>
         {isLoadingPrice ? (
             <Skeleton className="h-6 w-20 mx-auto mt-1" />
         ) : (
@@ -90,7 +94,7 @@ export default function ProductCard({ product, image, priceData }: ProductCardPr
          ) : priceVariants.length > 1 ? (
              <Select onValueChange={handleVariantChange} defaultValue={selectedVariant?.sku}>
                 <SelectTrigger className="text-xs h-9">
-                    <SelectValue placeholder="Select weight" />
+                    <SelectValue placeholder={t('select-weight')} />
                 </SelectTrigger>
                 <SelectContent>
                     {priceVariants.map(variant => (
@@ -106,7 +110,7 @@ export default function ProductCard({ product, image, priceData }: ProductCardPr
             </div>
          ) : (
             <div className="h-9 flex items-center justify-center">
-                <p className="text-xs text-destructive">No prices set</p>
+                <p className="text-xs text-destructive">{t('no-prices-set')}</p>
             </div>
          )}
         <Button
@@ -115,7 +119,7 @@ export default function ProductCard({ product, image, priceData }: ProductCardPr
           disabled={!selectedVariant || isLoadingPrice}
         >
           <ShoppingCart className="mr-1 h-3.5 w-3.5" />
-          Add to Cart
+          {t('add-to-cart')}
         </Button>
       </CardFooter>
     </Card>

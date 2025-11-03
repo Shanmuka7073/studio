@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useCart } from '@/lib/cart';
@@ -24,12 +25,15 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import { useEffect, useState } from 'react';
+import { useAppStore } from '@/lib/store';
+import { t } from '@/lib/locales';
 
 const DELIVERY_FEE = 30;
 
 function CartRow({ item, image }) {
   const { removeItem, updateQuantity } = useCart();
   const { product, variant, quantity } = item;
+  const getProductName = useAppStore(state => state.getProductName);
 
   return (
     <TableRow>
@@ -44,7 +48,7 @@ function CartRow({ item, image }) {
             className="rounded-md object-cover"
           />
           <div>
-            <span className="font-medium">{product.name}</span>
+            <span className="font-medium">{getProductName(product)}</span>
             <p className="text-sm text-muted-foreground">{variant.weight}</p>
           </div>
         </div>
@@ -76,6 +80,7 @@ function CartRow({ item, image }) {
 function MobileCartItem({ item, image }) {
     const { removeItem, updateQuantity } = useCart();
     const { product, variant, quantity } = item;
+    const getProductName = useAppStore(state => state.getProductName);
 
     return (
         <Card>
@@ -89,7 +94,7 @@ function MobileCartItem({ item, image }) {
                     className="rounded-lg object-cover"
                 />
                 <div className="flex-1 space-y-2">
-                    <p className="font-semibold">{product.name} <span className="font-normal text-muted-foreground">({variant.weight})</span></p>
+                    <p className="font-semibold">{getProductName(product)} <span className="font-normal text-muted-foreground">({variant.weight})</span></p>
                     <p className="font-bold text-lg">₹{(variant.price * quantity).toFixed(2)}</p>
                      <div className="flex items-center gap-2">
                         <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => updateQuantity(variant.sku, quantity - 1)}>
@@ -142,14 +147,14 @@ export default function CartPage() {
     return (
       <div className="container mx-auto py-24 text-center">
         <h1 className="text-4xl font-bold mb-4 font-headline">
-          Your Cart is Empty
+          {t('your-cart-is-empty')}
         </h1>
         <p className="text-muted-foreground mb-8">
-          Looks like you haven't added anything to your cart yet.
+          {t('looks-like-you-havent-added-anything')}
         </p>
         <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
           <Button asChild size="lg">
-            <Link href="/stores">Browse Stores</Link>
+            <Link href="/stores">{t('browse-stores')}</Link>
           </Button>
         </div>
       </div>
@@ -159,7 +164,7 @@ export default function CartPage() {
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
       <h1 className="text-3xl md:text-4xl font-bold mb-8 font-headline">
-        Your Shopping Cart
+        {t('your-shopping-cart')}
       </h1>
       <div className="grid lg:grid-cols-3 gap-8 lg:gap-12">
         <div className="lg:col-span-2 space-y-4">
@@ -178,10 +183,10 @@ export default function CartPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Product</TableHead>
-                        <TableHead>Price</TableHead>
-                        <TableHead className="text-center">Quantity</TableHead>
-                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead>{t('product')}</TableHead>
+                        <TableHead>{t('price')}</TableHead>
+                        <TableHead className="text-center">{t('quantity')}</TableHead>
+                        <TableHead className="text-right">{t('total')}</TableHead>
                         <TableHead></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -199,23 +204,23 @@ export default function CartPage() {
         <div className="space-y-8">
           <Card>
             <CardHeader>
-              <CardTitle>Order Summary</CardTitle>
+              <CardTitle>{t('order-summary')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex justify-between">
-                <span>Subtotal</span>
+                <span>{t('subtotal')}</span>
                 <span>₹{cartTotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Delivery Fee</span>
+                <span>{t('delivery-fee')}</span>
                 <span>₹{DELIVERY_FEE.toFixed(2)}</span>
               </div>
               <div className="flex justify-between font-bold text-lg">
-                <span>Total</span>
+                <span>{t('total')}</span>
                 <span>₹{(cartTotal + DELIVERY_FEE).toFixed(2)}</span>
               </div>
               <Button asChild className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-                <Link href="/checkout">Proceed to Checkout</Link>
+                <Link href="/checkout">{t('proceed-to-checkout')}</Link>
               </Button>
             </CardContent>
           </Card>
