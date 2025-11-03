@@ -9,7 +9,7 @@ import { useFirebase } from '@/firebase';
 import { useEffect } from 'react';
 import { UseFormReturn } from 'react-hook-form';
 import { ProfileFormValues } from '@/app/dashboard/customer/my-profile/page';
-import { t } from '@/lib/locales';
+import { t as translate } from '@/lib/locales';
 
 
 export interface AppState {
@@ -18,8 +18,10 @@ export interface AppState {
   productPrices: Record<string, ProductPrice | null>;
   loading: boolean;
   error: Error | null;
+  language: string; // e.g., 'en-IN', 'te-IN'
   fetchInitialData: (db: Firestore) => Promise<void>;
   fetchProductPrices: (db: Firestore, productNames: string[]) => Promise<void>;
+  setLanguage: (language: string) => void;
   getProductName: (product: Product) => string;
 }
 
@@ -29,6 +31,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   productPrices: {},
   loading: true,
   error: null,
+  language: 'en-IN', // Default language
 
   fetchInitialData: async (db: Firestore) => {
     // Prevent re-fetching if data is already present
@@ -81,9 +84,16 @@ export const useAppStore = create<AppState>((set, get) => ({
           // Optionally handle price-specific errors
       }
   },
+
+  setLanguage: (language: string) => {
+    localStorage.setItem('language', language);
+    set({ language });
+  },
+
   getProductName: (product: Product) => {
     if (!product) return '';
-    return t(product.name.toLowerCase().replace(/ /g, '-'));
+    const lang = get().language;
+    return translate(product.name.toLowerCase().replace(/ /g, '-'), lang);
   },
 }));
 

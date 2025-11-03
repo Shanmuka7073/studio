@@ -58,7 +58,7 @@ export function VoiceCommander({
   const { clearCart, addItem: addItemToCart, updateQuantity, activeStoreId, setActiveStoreId } = useCart();
   
   // Get data from the central Zustand store
-  const { stores, masterProducts, productPrices, fetchInitialData, fetchProductPrices } = useAppStore();
+  const { stores, masterProducts, productPrices, fetchInitialData, fetchProductPrices, language } = useAppStore();
 
   const { form: profileForm } = useProfileFormStore();
   const { placeOrderBtnRef, setIsWaitingForQuickOrderConfirmation, isWaitingForQuickOrderConfirmation } = useCheckoutStore();
@@ -93,6 +93,7 @@ export function VoiceCommander({
     isEnabledRef.current = enabled;
     if (recognition) {
       if (enabled) {
+        recognition.lang = language;
         try {
           recognition.start();
         } catch (e) {
@@ -102,7 +103,7 @@ export function VoiceCommander({
         recognition.abort();
       }
     }
-  }, [enabled]);
+  }, [enabled, language]);
 
   const speak = useCallback((text: string, onEndCallback?: () => void) => {
     if (typeof window === 'undefined' || !window.speechSynthesis) {
@@ -110,16 +111,15 @@ export function VoiceCommander({
       return;
     }
     
-    // Cancel any ongoing speech
     window.speechSynthesis.cancel();
     
     isSpeakingRef.current = true;
-    recognition?.stop(); // Stop listening while speaking
+    recognition?.stop();
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.pitch = 1;
     utterance.rate = 1.1;
-    utterance.lang = 'en-US';
+    utterance.lang = language; // Use the dynamic language
 
     utterance.onend = () => {
       isSpeakingRef.current = false;
@@ -142,7 +142,7 @@ export function VoiceCommander({
     };
 
     window.speechSynthesis.speak(utterance);
-  }, []);
+  }, [language]);
 
   const handleProfileFormInteraction = useCallback(() => {
     if (!profileForm) {
@@ -228,8 +228,8 @@ export function VoiceCommander({
     const productMatch = masterProducts.find(p => {
         if (!p.name) return false;
         const aliases = getAllAliases(p.name.toLowerCase().replace(/ /g, '-'));
-        const allNames = [...aliases.en, ...aliases.te].map(name => name.toLowerCase());
-        return allNames.includes(lowerProductName);
+        const allAliasValues = Object.values(aliases).flat().map(name => name.toLowerCase());
+        return allAliasValues.includes(lowerProductName);
     });
 
     if (!productMatch) return { product: null, variant: null };
@@ -238,9 +238,7 @@ export function VoiceCommander({
 
     let priceData = productPrices[productMatch.name.toLowerCase()];
     if (priceData === undefined && firestore) {
-        // Fetch price if not in cache
         await fetchProductPrices(firestore, [productMatch.name]);
-        // After fetching, get the updated value from the store
         priceData = useAppStore.getState().productPrices[productMatch.name.toLowerCase()];
     }
     
@@ -286,7 +284,6 @@ export function VoiceCommander({
                 setIsWaitingForQuickOrderConfirmation(false);
             };
 
-            // Priority -1: Handle direct confirmation for quick order
             if (isWaitingForQuickOrderConfirmation) {
                 const confirmAliases = fileCommandsRef.current.quickOrderConfirm?.aliases || [];
                 if (confirmAliases.includes(commandText.toLowerCase())) {
@@ -300,8 +297,6 @@ export function VoiceCommander({
                 return;
             }
 
-
-             // Priority 0: Handle contextual responses (quantity, store name)
             if (isWaitingForQuantity && itemToUpdateSkuRef.current) {
                 const wordToNum: Record<string, number> = { one: 1, to: 2, two: 2, three: 3, four: 4, for: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
                 const parts = commandText.toLowerCase().split(' ');
@@ -338,7 +333,6 @@ export function VoiceCommander({
                     setIsWaitingForStoreName(false);
                     speak(`Okay, ordering from ${bestMatch.name}.`);
                     setActiveStoreId(bestMatch.id);
-                    // Give React time to update the state before clicking
                     setTimeout(() => {
                         placeOrderBtnRef?.current?.click();
                     }, 500); 
@@ -349,7 +343,6 @@ export function VoiceCommander({
                 return;
             }
 
-            // Handle filling out the profile form
             if (formFieldToFillRef.current && profileForm) {
                 profileForm.setValue(formFieldToFillRef.current, commandText, { shouldValidate: true });
                 formFieldToFillRef.current = null;
@@ -357,7 +350,6 @@ export function VoiceCommander({
                 return;
             }
             
-            // Priority 1: Check for a perfect match with simple action commands first.
             const perfectMatch = commandsRef.current.find((c) => c.command === commandText);
             if (perfectMatch) {
                 speak(perfectMatch.reply);
@@ -366,7 +358,6 @@ export function VoiceCommander({
                 return;
             }
             
-            // Priority 1.5: Check for quick order command
             const quickOrderTemplate = fileCommandsRef.current.quickOrder;
             if(quickOrderTemplate) {
                  const isQuickOrder = quickOrderTemplate.aliases.some(alias => {
@@ -381,8 +372,6 @@ export function VoiceCommander({
                  }
             }
 
-
-            // Priority 2: Check if it's an "order item" command using templates.
             const orderItemTemplate = fileCommandsRef.current.orderItem;
             if (orderItemTemplate) {
                 let parsed = false;
@@ -427,7 +416,7 @@ export function VoiceCommander({
                                 parsed = true;
                             }
                         }
-                    } else { // It's a simple, non-template alias
+                    } else {
                          if (commandText === alias) {
                             const productFromAlias = alias.replace(/add|i want|get|buy|oka|naaku/i, '').replace(/kavali/i, '').trim();
                             await commandActionsRef.current.orderItem({ product: productFromAlias });
@@ -439,8 +428,6 @@ export function VoiceCommander({
                 if(parsed) return;
             }
 
-
-            // Handle multi-store clarification
             if (clarificationStores.length > 0) {
                 const chosenIndex = parseInt(commandText.replace(/[^0-9]/g, ''), 10) - 1;
                 let chosenStore: Store | undefined = clarificationStores[chosenIndex];
@@ -464,7 +451,6 @@ export function VoiceCommander({
                 return;
             }
             
-            // Priority 3: Check if the command itself is a product name.
             const productAsCommandMatch = await findProductAndVariant(commandText);
             if (productAsCommandMatch.product && productAsCommandMatch.variant) {
                 await commandActionsRef.current.orderItem({ product: commandText });
@@ -472,7 +458,6 @@ export function VoiceCommander({
                 return;
             }
             
-            // Priority 4: Fuzzy matching for suggestions if no direct match is found.
             const potentialMatches = commandsRef.current
               .map((c) => ({ ...c, similarity: calculateSimilarity(commandText, c.command) }))
               .filter((c) => c.similarity > 0.7)
@@ -538,16 +523,14 @@ export function VoiceCommander({
       orderItem: async ({ product, quantity }: { product: string, quantity?: string }) => {
         const { product: foundProduct, variant } = await findProductAndVariant(product, quantity);
         if (foundProduct && variant) {
-          addItemToCart(foundProduct, variant, 1); // Always add 1 initially
+          addItemToCart(foundProduct, variant, 1);
           onOpenCart();
           
           if (!quantity) {
-             // If no quantity was spoken, ask for it.
              itemToUpdateSkuRef.current = variant.sku;
              setIsWaitingForQuantity(true);
              speak(`Added. What quantity would you like?`);
           } else {
-             // If quantity was spoken, just confirm.
              const productName = t(foundProduct.name.toLowerCase().replace(/ /g, '-')).split(' / ')[0];
              speak(`Added ${variant.weight} of ${productName} to your cart.`);
           }
@@ -567,26 +550,22 @@ export function VoiceCommander({
         if ('error' in response) {
             speak(response.error);
         } else {
-            // Clear the cart and add just this one item.
             clearCart();
             addItemToCart(response.product, response.variant, 1);
             setActiveStoreId(response.store.id);
             
             setIsWaitingForQuickOrderConfirmation(true);
             router.push('/checkout');
-            
-            // The message is now spoken via useEffect on the checkout page
-            // speak(response.userFriendlyMessage);
         }
       },
     };
     
     recognition.continuous = false;
     recognition.interimResults = false;
-    recognition.lang = 'en-IN';
+    recognition.lang = language; // Use dynamic language
 
     recognition.onstart = () => {
-      onStatusUpdate('🎧 Listening...');
+      onStatusUpdate(`🎧 Listening in ${language}...`);
     };
 
     recognition.onresult = (event) => {
@@ -612,7 +591,6 @@ export function VoiceCommander({
     };
 
     if (firestore && user) {
-      // Fetch user profile once and store it
       const userDocRef = doc(firestore, 'users', user.uid);
       getDoc(userDocRef).then(docSnap => {
           if (docSnap.exists()) {
@@ -620,7 +598,6 @@ export function VoiceCommander({
           }
       });
       
-      // We are now getting stores and products from Zustand, but we still need to build the commands.
       getCommands().then((fileCommands) => {
         fileCommandsRef.current = fileCommands;
         let builtCommands: Command[] = [];
@@ -637,7 +614,6 @@ export function VoiceCommander({
               display: `Go to ${store.name}`,
               action: () => {
                 if (pathname === '/checkout') {
-                  // Special handling for checkout page
                   setIsWaitingForStoreName(false);
                   speak(`Okay, ordering from ${store.name}.`);
                   setActiveStoreId(store.id);
@@ -666,7 +642,7 @@ export function VoiceCommander({
         });
 
         Object.entries(fileCommands).forEach(([key, { display, aliases, reply }]: [string, any]) => {
-          if (key !== 'orderItem' && key !== 'quickOrder' && key !== 'quickOrderConfirm') { // These are handled separately
+          if (key !== 'orderItem' && key !== 'quickOrder' && key !== 'quickOrderConfirm') {
               const action = commandActionsRef.current[key];
               if (action) {
                   aliases.forEach((alias: string) => {
@@ -687,7 +663,7 @@ export function VoiceCommander({
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firestore, user, cartItems, profileForm, isWaitingForStoreName, activeStoreId, placeOrderBtnRef, enabled, pathname, findProductAndVariant, handleProfileFormInteraction, speak, toast, router, onSuggestions, onStatusUpdate, onCloseCart, onOpenCart, setActiveStoreId, clarificationStores, isWaitingForQuantity, updateQuantity, isWaitingForQuickOrderConfirmation, clearCart, setIsWaitingForQuickOrderConfirmation, stores, masterProducts]);
+  }, [firestore, user, cartItems, profileForm, isWaitingForStoreName, activeStoreId, placeOrderBtnRef, enabled, pathname, findProductAndVariant, handleProfileFormInteraction, speak, toast, router, onSuggestions, onStatusUpdate, onCloseCart, onOpenCart, setActiveStoreId, clarificationStores, isWaitingForQuantity, updateQuantity, isWaitingForQuickOrderConfirmation, clearCart, setIsWaitingForQuickOrderConfirmation, stores, masterProducts, language]);
 
   return null;
 }

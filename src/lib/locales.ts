@@ -1,5 +1,6 @@
 
 import locales from './locales.json';
+import { useAppStore } from './store';
 
 type LocaleEntry = string | string[];
 type Locales = Record<string, Record<string, LocaleEntry>>;
@@ -7,40 +8,49 @@ type Locales = Record<string, Record<string, LocaleEntry>>;
 const translations: Locales = locales;
 
 /**
- * A simple translation function.
- * If the entry for the key is an array, it returns the first item.
+ * A simple translation function that displays bilingual text.
  * @param key The key from locales.json to translate.
- * @returns A string in the format "English" or "English / తెలుగు" based on the entry type.
+ * @param lang The target language code (e.g., 'te-IN'). If not provided, it will be read from the app store.
+ * @returns A string in the format "English / తెలుగు" or just "English".
  */
-export function t(key: string): string {
+export function t(key: string, lang?: string): string {
+  const language = lang || useAppStore.getState().language;
   const entry = translations[key as keyof typeof translations];
   
   if (entry) {
     const en = Array.isArray(entry.en) ? entry.en[0] : entry.en;
-    const te = Array.isArray(entry.te) ? entry.te[0] : entry.te;
     
-    if (en && te) {
-      return `${en} / ${te}`;
+    // Do not show bilingual for English
+    if (language === 'en-IN' || !entry[language]) {
+        return en || key;
+    }
+
+    const regionalEntry = entry[language];
+    const regional = Array.isArray(regionalEntry) ? regionalEntry[0] : regionalEntry;
+    
+    if (en && regional && en !== regional) {
+      return `${en} / ${regional}`;
     }
     return en || key;
   }
   
-  // Fallback for keys that might not be in the JSON file (like dynamic product names)
-  return key;
+  return key.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
 
 /**
- * Gets all aliases for a given key.
+ * Gets all aliases for a given key in a specific language.
  * @param key The key from locales.json.
- * @returns An object with 'en' and 'te' arrays of aliases.
+ * @returns An object with arrays of aliases for all configured languages (e.g., { en: [], te: [], hi: [] }).
  */
-export function getAllAliases(key: string): { en: string[], te: string[] } {
+export function getAllAliases(key: string): Record<string, string[]> {
     const entry = translations[key as keyof typeof translations];
-    const result = { en: [] as string[], te: [] as string[] };
+    const result: Record<string, string[]> = {};
 
     if (entry) {
-        result.en = (Array.isArray(entry.en) ? entry.en : [entry.en]).filter(Boolean);
-        result.te = (Array.isArray(entry.te) ? entry.te : [entry.te]).filter(Boolean);
+        for (const langCode in entry) {
+            const langAliases = entry[langCode];
+            result[langCode] = (Array.isArray(langAliases) ? langAliases : [langAliases]).filter(Boolean);
+        }
     }
     
     return result;
