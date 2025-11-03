@@ -175,13 +175,10 @@ export default function CheckoutPage() {
   const [isPlacingOrder, startPlaceOrderTransition] = useTransition();
   const { firestore, user } = useFirebase();
 
-  const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [structuredList, setStructuredList] = useState<StructuredListItem[]>([]);
   const [availableStores, setAvailableStores] = useState<Store[]>([]);
   
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
-
   const [deliveryCoords, setDeliveryCoords] = useState<{lat: number, lng: number} | null>(null);
   const [images, setImages] = useState({});
   const placeOrderBtnRef = useRef<HTMLButtonElement>(null);
@@ -204,7 +201,8 @@ export default function CheckoutPage() {
                 },
                 () => {
                     toast({ variant: 'destructive', title: "Location Error", description: "Could not retrieve your location. Please enter your address manually and ensure permissions are enabled." });
-                }
+                },
+                { timeout: 10000 }
             );
         } else {
             toast({ variant: 'destructive', title: "Not Supported", description: "Geolocation is not supported by your browser." });
@@ -214,12 +212,18 @@ export default function CheckoutPage() {
   const shouldPromptForLocation = (hasItemsInCart || structuredList.length > 0) && !deliveryCoords;
 
   useEffect(() => {
+    const autoStart = searchParams.get('action') === 'record';
+    if (autoStart) {
+        // This is a placeholder for where the global voice commander would trigger the logic
+        // For now, we'll just log it. A user would typically initiate this via voice.
+        console.log("Checkout opened with action=record. Voice command handler would take over.");
+    }
+
     if (shouldPromptForLocation) {
-        // Auto-trigger location capture
         const timeoutId = setTimeout(() => handleGetLocation(), 1000);
         return () => clearTimeout(timeoutId);
     }
-  }, [shouldPromptForLocation, handleGetLocation]);
+  }, [shouldPromptForLocation, handleGetLocation, searchParams]);
 
   useEffect(() => {
     if (deliveryCoords) return;
@@ -331,68 +335,6 @@ export default function CheckoutPage() {
         fetchImages();
     }
   }, [cartItems]);
-
-  const handleToggleListening = useCallback(() => {
-    if (!recognitionRef.current) return;
-    
-    if (isListening) {
-        recognitionRef.current.stop();
-    } else {
-        setStructuredList([]);
-        form.setValue('shoppingList', '');
-        form.setValue('storeId', '');
-        recognitionRef.current.start();
-    }
-  }, [isListening, form]);
-  
-  useEffect(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-        recognitionRef.current = new SpeechRecognition();
-        const recognition = recognitionRef.current;
-        recognition.lang = 'en-IN';
-        recognition.interimResults = false;
-        recognition.continuous = false;
-        
-        recognition.onstart = () => {
-            setIsListening(true);
-        };
-        
-        recognition.onresult = (event) => {
-            const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
-            form.setValue('shoppingList', transcript);
-            handleUnderstandList(transcript);
-        };
-
-        recognition.onend = () => {
-            setIsListening(false);
-        };
-
-        recognition.onerror = (event) => {
-            console.error("Speech recognition error:", event.error);
-            if (event.error !== 'aborted' && event.error !== 'no-speech') {
-              toast({ variant: 'destructive', title: 'Voice Error', description: `An error occurred: ${event.error}` });
-            }
-            setIsListening(false);
-        };
-
-        const autoStart = searchParams.get('action') === 'record';
-        const timeoutId = setTimeout(() => {
-            if (autoStart) {
-                handleToggleListening();
-            }
-        }, 1000);
-
-        return () => {
-          clearTimeout(timeoutId);
-          if (recognitionRef.current) {
-            recognitionRef.current.abort();
-          }
-        }
-    } else {
-        toast({ variant: 'destructive', title: 'Not Supported', description: 'Voice recognition is not supported by your browser.' });
-    }
-  }, [toast, form, searchParams, handleToggleListening, handleUnderstandList]);
 
     const handleConfirmVoiceOrder = async (data: CheckoutFormValues) => {
         if (!firestore || !user) return;
@@ -641,16 +583,16 @@ export default function CheckoutPage() {
                                     <CardContent className="flex flex-col items-center justify-center space-y-4">
                                         <Button
                                             type="button"
-                                            onClick={handleToggleListening}
-                                            variant={isListening ? 'destructive' : 'default'}
+                                            onClick={() => router.push('/checkout?action=record')}
+                                            variant={'default'}
                                             size="lg"
                                             className="w-48"
                                         >
-                                            {isListening ? <StopCircle className="mr-2 h-5 w-5 animate-pulse" /> : <Mic className="mr-2 h-5 w-5" />}
-                                            {isListening ? 'Listening...' : 'Record List'}
+                                            <Mic className="mr-2 h-5 w-5" />
+                                            Record List
                                         </Button>
                                         <p className="text-sm text-muted-foreground text-center">
-                                            {isListening ? "I'm listening..." : "Click to record your shopping list."}
+                                            Click to have the voice assistant record your list.
                                         </p>
                                     </CardContent>
                                 </Card>
@@ -734,7 +676,7 @@ export default function CheckoutPage() {
                                     </Card>
                                     </>
                                 ) : (
-                                     form.getValues('shoppingList') && !isProcessing && !isListening && (
+                                     form.getValues('shoppingList') && !isProcessing && (
                                         <Button type="button" onClick={() => handleUnderstandList(form.getValues('shoppingList'))} className="w-full">
                                             <Bot className="mr-2 h-5 w-5" />
                                             Understand My List
@@ -761,5 +703,7 @@ export default function CheckoutPage() {
     </div>
   );
 }
+
+    
 
     
