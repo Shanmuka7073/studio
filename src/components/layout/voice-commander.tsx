@@ -69,6 +69,7 @@ export function VoiceCommander({
   const [isWaitingForStoreName, setIsWaitingForStoreName] = useState(false);
   const [clarificationStores, setClarificationStores] = useState<Store[]>([]);
   const hasSpokenCheckoutPrompt = useRef(false);
+  const hasSpokenProfilePrompt = useRef(false);
 
   const [isWaitingForQuantity, setIsWaitingForQuantity] = useState(false);
   const itemToUpdateSkuRef = useRef<string | null>(null);
@@ -135,6 +136,29 @@ export function VoiceCommander({
     window.speechSynthesis.speak(utterance);
   }, []);
 
+  const handleProfileFormInteraction = useCallback(() => {
+    if (!profileForm) {
+      speak("I can't seem to access the profile form right now.");
+      return;
+    }
+    const fields: { name: keyof ProfileFormValues; label: string }[] = [
+      { name: 'firstName', label: 'first name' },
+      { name: 'lastName', label: 'last name' },
+      { name: 'phone', label: 'phone number' },
+      { name: 'address', label: 'full address' },
+    ];
+    const formValues = profileForm.getValues();
+    const firstEmptyField = fields.find(f => !formValues[f.name]);
+    
+    if (firstEmptyField) {
+      formFieldToFillRef.current = firstEmptyField.name;
+      speak(`What is your ${firstEmptyField.label}?`);
+    } else {
+      formFieldToFillRef.current = null;
+      speak("Your profile looks complete! You can say 'save changes' to submit.");
+    }
+  }, [profileForm, speak]);
+
   // Proactive prompt on checkout page
   useEffect(() => {
     if (pathname !== '/checkout' || !hasMounted) {
@@ -163,6 +187,24 @@ export function VoiceCommander({
       return () => clearTimeout(speakTimeout);
     }
   }, [pathname, enabled, speak, hasMounted]);
+
+  // Proactive prompt on profile page
+  useEffect(() => {
+    if (pathname !== '/dashboard/customer/my-profile' || !hasMounted) {
+      hasSpokenProfilePrompt.current = false;
+      formFieldToFillRef.current = null;
+      return;
+    }
+
+    if (enabled && !hasSpokenProfilePrompt.current && profileForm) {
+      const speakTimeout = setTimeout(() => {
+        handleProfileFormInteraction();
+        hasSpokenProfilePrompt.current = true;
+      }, 1500);
+
+      return () => clearTimeout(speakTimeout);
+    }
+  }, [pathname, enabled, profileForm, hasMounted, handleProfileFormInteraction]);
 
 
   const findProductAndVariant = useCallback(async (productName: string, desiredWeight?: string): Promise<{ product: Product | null, variant: ProductVariant | null }> => {
@@ -215,29 +257,6 @@ export function VoiceCommander({
   }, [firestore]);
 
 
-  const handleProfileFormInteraction = useCallback(() => {
-    if (!profileForm) {
-      speak("I can't seem to access the profile form right now.");
-      return;
-    }
-    const fields: { name: keyof ProfileFormValues; label: string }[] = [
-      { name: 'firstName', label: 'first name' },
-      { name: 'lastName', label: 'last name' },
-      { name: 'phone', label: 'phone number' },
-      { name: 'address', label: 'full address' },
-    ];
-    const formValues = profileForm.getValues();
-    const firstEmptyField = fields.find(f => !formValues[f.name]);
-    
-    if (firstEmptyField) {
-      formFieldToFillRef.current = firstEmptyField.name;
-      speak(`What is your ${firstEmptyField.label}?`);
-    } else {
-      formFieldToFillRef.current = null;
-      speak("Your profile looks complete! You can say 'save changes' to submit.");
-    }
-  }, [profileForm, speak]);
-
   useEffect(() => {
     if (!recognition) {
         onStatusUpdate("⚠️ Voice recognition not supported in this browser.");
@@ -255,10 +274,14 @@ export function VoiceCommander({
                 const parts = commandText.toLowerCase().split(' ');
                 let quantity: number | null = null;
 
-                if (wordToNum[parts[0]]) {
-                    quantity = wordToNum[parts[0]];
-                } else if (!isNaN(parseInt(parts[0], 10))) {
-                    quantity = parseInt(parts[0], 10);
+                const firstWordAsNum = wordToNum[parts[0]];
+                if (firstWordAsNum) {
+                    quantity = firstWordAsNum;
+                } else {
+                    const parsedNum = parseInt(commandText.replace(/[^0-9]/g, ''), 10);
+                    if (!isNaN(parsedNum)) {
+                        quantity = parsedNum;
+                    }
                 }
 
                 if (quantity !== null) {
@@ -274,7 +297,7 @@ export function VoiceCommander({
                 return;
             }
 
-            if (isWaitingForStoreName) {
+            if (isWaitingForStoreName && pathname === '/checkout') {
                 const spokenStoreName = commandText.toLowerCase();
                 const bestMatch = storesRef.current
                     .map(store => ({ ...store, similarity: calculateSimilarity(spokenStoreName, store.name.toLowerCase()) }))
@@ -294,8 +317,16 @@ export function VoiceCommander({
                 return;
             }
 
+            // Handle filling out the profile form
+            if (formFieldToFillRef.current && profileForm) {
+                profileForm.setValue(formFieldToFillRef.current, commandText, { shouldValidate: true });
+                formFieldToFillRef.current = null;
+                handleProfileFormInteraction();
+                return;
+            }
+            
             // Priority 1: Check for a perfect match with simple action commands first.
-            const perfectMatch = commandsRef.current.find((c) => commandText === c.command);
+            const perfectMatch = commandsRef.current.find((c) => c.command === commandText);
             if (perfectMatch) {
                 speak(perfectMatch.reply);
                 perfectMatch.action();
@@ -306,47 +337,62 @@ export function VoiceCommander({
             // Priority 2: Check if it's an "order item" command using templates.
             const orderItemTemplate = fileCommandsRef.current.orderItem;
             if (orderItemTemplate) {
-              for (const alias of orderItemTemplate.aliases) {
-                if (alias.includes('{product}') || alias.includes('{quantity}')) {
-                    const aliasWithPlaceholders = alias.replace(/\{quantity\}/g, '([\\w\\s\\d\\.]+)')
-                                                       .replace(/\{product\}/g, '([\\w\\s]+)');
-                    const regex = new RegExp(`^${aliasWithPlaceholders}$`, 'i');
-                    const match = commandText.match(regex);
+                 for (const alias of orderItemTemplate.aliases) {
+                    const aliasParts = alias.split(/(\{product\}|\{quantity\})/g).filter(Boolean);
+                    const isTemplate = aliasParts.some(p => p === '{product}' || p === '{quantity}');
                     
-                    if (match) {
-                        const extractedValues: any = {};
-                        const quantityPlaceholderIndex = alias.indexOf('{quantity}');
-                        const productPlaceholderIndex = alias.indexOf('{product}');
+                    if (isTemplate) {
+                        let quantity: string | undefined = undefined;
+                        let product: string | undefined = undefined;
 
-                        if (quantityPlaceholderIndex !== -1 && productPlaceholderIndex !== -1) {
-                            if (quantityPlaceholderIndex < productPlaceholderIndex) {
-                                extractedValues.quantity = match[1]?.trim();
-                                extractedValues.product = match[2]?.trim();
-                            } else {
-                                extractedValues.product = match[1]?.trim();
-                                extractedValues.quantity = match[2]?.trim();
+                        // This is a simplified parser based on the alias structure
+                        if (alias.startsWith('{quantity}')) { // e.g., {quantity} {product}
+                             const match = commandText.match(/([\d\w\s]+?)\s(.+)/);
+                             if (match) {
+                                quantity = match[1];
+                                product = match[2];
+                             }
+                        } else if (alias.includes('{quantity}')) { // e.g., add {quantity} of {product}
+                            const prefix = alias.substring(0, alias.indexOf('{'));
+                            if (commandText.startsWith(prefix)) {
+                                const rest = commandText.substring(prefix.length).trim();
+                                const parts = rest.split(' of ');
+                                if(parts.length > 1) {
+                                    quantity = parts[0].trim();
+                                    product = parts[1].trim();
+                                } else {
+                                     // Handle "{quantity} {product}" case
+                                    const spaceIndex = rest.indexOf(' ');
+                                    if(spaceIndex > -1) {
+                                        quantity = rest.substring(0, spaceIndex);
+                                        product = rest.substring(spaceIndex + 1);
+                                    }
+                                }
                             }
-                        } else if (quantityPlaceholderIndex !== -1) {
-                            extractedValues.quantity = match[1]?.trim();
-                        } else if (productPlaceholderIndex !== -1) {
-                            extractedValues.product = match[1]?.trim();
+                        } else if (alias.includes('{product}')) { // e.g., "add one {product}" or just "{product}"
+                             const prefix = alias.substring(0, alias.indexOf('{'));
+                             if (commandText.startsWith(prefix)) {
+                                product = commandText.substring(prefix.length).trim();
+                                if (alias.includes('one')) quantity = '1';
+                             }
                         }
-                        
-                        if (extractedValues.product) {
-                            await commandActionsRef.current.orderItem(extractedValues);
+
+                        if (product) {
+                            await commandActionsRef.current.orderItem({ product, quantity });
                             onSuggestions([]);
                             return; 
                         }
-                    }
-                } else {
-                    // Handle simple aliases in the orderItem template that don't have placeholders
-                    if (commandText === alias) {
-                        await commandActionsRef.current.orderItem({ product: alias });
-                        onSuggestions([]);
-                        return;
+
+                    } else { // It's a simple, non-template alias like "chicken kavali"
+                         if (commandText === alias) {
+                            // Extract product from alias if possible
+                            const productFromAlias = alias.replace(/add|i want|get|buy/i, '').trim();
+                            await commandActionsRef.current.orderItem({ product: productFromAlias });
+                            onSuggestions([]);
+                            return;
+                        }
                     }
                 }
-              }
             }
 
 
@@ -373,15 +419,7 @@ export function VoiceCommander({
                 setClarificationStores([]);
                 return;
             }
-
-            // Handle filling out the profile form
-            if (formFieldToFillRef.current && profileForm) {
-                profileForm.setValue(formFieldToFillRef.current, commandText, { shouldValidate: true });
-                formFieldToFillRef.current = null;
-                handleProfileFormInteraction();
-                return;
-            }
-
+            
             // Priority 3: Check if the command itself is a product name.
             const productAsCommandMatch = await findProductAndVariant(commandText);
             if (productAsCommandMatch.product && productAsCommandMatch.variant) {
@@ -554,13 +592,13 @@ export function VoiceCommander({
           });
 
           Object.entries(fileCommands).forEach(([key, { display, aliases, reply }]: [string, any]) => {
-            if (key !== 'orderItem') {
-              const action = commandActionsRef.current[key];
-              if (action) {
-                aliases.forEach((alias: string) => {
-                  builtCommands.push({ command: alias, display, action, reply });
-                });
-              }
+            if (key !== 'orderItem') { // The orderItem is handled separately as a template
+                const action = commandActionsRef.current[key];
+                if (action) {
+                    aliases.forEach((alias: string) => {
+                        builtCommands.push({ command: alias, display, action, reply });
+                    });
+                }
             }
           });
 
