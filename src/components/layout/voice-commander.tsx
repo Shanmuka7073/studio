@@ -169,6 +169,7 @@ export function VoiceCommander({
     const lowerProductName = productName.toLowerCase();
 
     const productMatch = masterProductsRef.current.find(p => {
+        if (!p.name) return false;
         const translation = t(p.name.toLowerCase().replace(/ /g, '-'));
         const parts = translation.split(' / ');
         const englishName = parts[0]?.trim().toLowerCase();
@@ -248,18 +249,15 @@ export function VoiceCommander({
         try {
             if (!firestore || !user) return;
 
-            // Priority 0: Handle quantity clarification
+             // Priority 0: Handle contextual responses (quantity, store name)
             if (isWaitingForQuantity && itemToUpdateSkuRef.current) {
-                const wordToNum: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+                const wordToNum: Record<string, number> = { one: 1, to: 2, two: 2, three: 3, four: 4, for: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
                 const parts = commandText.toLowerCase().split(' ');
                 let quantity: number | null = null;
-                
-                // Check for number words
+
                 if (wordToNum[parts[0]]) {
                     quantity = wordToNum[parts[0]];
-                } 
-                // Check for digits
-                else if (!isNaN(parseInt(parts[0], 10))) {
+                } else if (!isNaN(parseInt(parts[0], 10))) {
                     quantity = parseInt(parts[0], 10);
                 }
 
@@ -276,6 +274,25 @@ export function VoiceCommander({
                 return;
             }
 
+            if (isWaitingForStoreName) {
+                const spokenStoreName = commandText.toLowerCase();
+                const bestMatch = storesRef.current
+                    .map(store => ({ ...store, similarity: calculateSimilarity(spokenStoreName, store.name.toLowerCase()) }))
+                    .sort((a, b) => b.similarity - a.similarity)[0];
+
+                if (bestMatch && bestMatch.similarity > 0.7) {
+                    setIsWaitingForStoreName(false);
+                    speak(`Okay, ordering from ${bestMatch.name}.`);
+                    setActiveStoreId(bestMatch.id);
+                    // Give React time to update the state before clicking
+                    setTimeout(() => {
+                        placeOrderBtnRef?.current?.click();
+                    }, 500); 
+                } else {
+                    speak(`Sorry, I couldn't find a store named ${commandText}. Please try again.`);
+                }
+                return;
+            }
 
             // Priority 1: Check for a perfect match with simple action commands first.
             const perfectMatch = commandsRef.current.find((c) => commandText === c.command);
@@ -285,40 +302,48 @@ export function VoiceCommander({
                 onSuggestions([]);
                 return;
             }
-            
+
             // Priority 2: Check if it's an "order item" command using templates.
             const orderItemTemplate = fileCommandsRef.current.orderItem;
             if (orderItemTemplate) {
               for (const alias of orderItemTemplate.aliases) {
-                const aliasWithPlaceholders = alias.replace('{quantity}', '([\\w\\s\\d\\.]+)')
-                                                    .replace('{product}', '([\\w\\s]+)');
-                const regex = new RegExp(`^${aliasWithPlaceholders}$`, 'i');
-                const match = commandText.match(regex);
-                
-                if (match) {
-                    const extractedValues: any = {};
-                    const quantityPlaceholderIndex = alias.indexOf('{quantity}');
-                    const productPlaceholderIndex = alias.indexOf('{product}');
-
-                    // Figure out the order of captures based on placeholder position
-                    if (quantityPlaceholderIndex !== -1 && productPlaceholderIndex !== -1) {
-                        if (quantityPlaceholderIndex < productPlaceholderIndex) {
-                            extractedValues.quantity = match[1]?.trim();
-                            extractedValues.product = match[2]?.trim();
-                        } else {
-                            extractedValues.product = match[1]?.trim();
-                            extractedValues.quantity = match[2]?.trim();
-                        }
-                    } else if (quantityPlaceholderIndex !== -1) {
-                        extractedValues.quantity = match[1]?.trim();
-                    } else if (productPlaceholderIndex !== -1) {
-                        extractedValues.product = match[1]?.trim();
-                    }
+                if (alias.includes('{product}') || alias.includes('{quantity}')) {
+                    const aliasWithPlaceholders = alias.replace(/\{quantity\}/g, '([\\w\\s\\d\\.]+)')
+                                                       .replace(/\{product\}/g, '([\\w\\s]+)');
+                    const regex = new RegExp(`^${aliasWithPlaceholders}$`, 'i');
+                    const match = commandText.match(regex);
                     
-                    if (extractedValues.product) {
-                        await commandActionsRef.current.orderItem(extractedValues);
+                    if (match) {
+                        const extractedValues: any = {};
+                        const quantityPlaceholderIndex = alias.indexOf('{quantity}');
+                        const productPlaceholderIndex = alias.indexOf('{product}');
+
+                        if (quantityPlaceholderIndex !== -1 && productPlaceholderIndex !== -1) {
+                            if (quantityPlaceholderIndex < productPlaceholderIndex) {
+                                extractedValues.quantity = match[1]?.trim();
+                                extractedValues.product = match[2]?.trim();
+                            } else {
+                                extractedValues.product = match[1]?.trim();
+                                extractedValues.quantity = match[2]?.trim();
+                            }
+                        } else if (quantityPlaceholderIndex !== -1) {
+                            extractedValues.quantity = match[1]?.trim();
+                        } else if (productPlaceholderIndex !== -1) {
+                            extractedValues.product = match[1]?.trim();
+                        }
+                        
+                        if (extractedValues.product) {
+                            await commandActionsRef.current.orderItem(extractedValues);
+                            onSuggestions([]);
+                            return; 
+                        }
+                    }
+                } else {
+                    // Handle simple aliases in the orderItem template that don't have placeholders
+                    if (commandText === alias) {
+                        await commandActionsRef.current.orderItem({ product: alias });
                         onSuggestions([]);
-                        return; // Command handled
+                        return;
                     }
                 }
               }
@@ -346,26 +371,6 @@ export function VoiceCommander({
                     speak(`Sorry, I didn't understand that. Please say the address or number of the store you want.`);
                 }
                 setClarificationStores([]);
-                return;
-            }
-
-            // Handle store selection on checkout page
-            if (isWaitingForStoreName) {
-                const spokenStoreName = commandText.toLowerCase();
-                const bestMatch = storesRef.current
-                    .map(store => ({ ...store, similarity: calculateSimilarity(spokenStoreName, store.name.toLowerCase()) }))
-                    .sort((a, b) => b.similarity - a.similarity)[0];
-
-                if (bestMatch && bestMatch.similarity > 0.7) {
-                    setIsWaitingForStoreName(false);
-                    speak(`Okay, ordering from ${bestMatch.name}.`);
-                    setActiveStoreId(bestMatch.id);
-                    setTimeout(() => {
-                        placeOrderBtnRef?.current?.click();
-                    }, 500);
-                } else {
-                    speak(`Sorry, I couldn't find a store named ${commandText}. Please try again.`);
-                }
                 return;
             }
 
@@ -519,6 +524,17 @@ export function VoiceCommander({
                 command: variation,
                 display: `Go to ${store.name}`,
                 action: () => {
+                  if (pathname === '/checkout') {
+                    // Special handling for checkout page
+                    setIsWaitingForStoreName(false);
+                    speak(`Okay, ordering from ${store.name}.`);
+                    setActiveStoreId(store.id);
+                    setTimeout(() => {
+                        placeOrderBtnRef?.current?.click();
+                    }, 500);
+                    return;
+                  }
+
                   const matchingStores = stores.filter(s => s.name.toLowerCase() === store.name.toLowerCase());
                   if (matchingStores.length > 1) {
                       setClarificationStores(matchingStores);
@@ -538,7 +554,6 @@ export function VoiceCommander({
           });
 
           Object.entries(fileCommands).forEach(([key, { display, aliases, reply }]: [string, any]) => {
-             // Exclude template item orders as they are handled differently
             if (key !== 'orderItem') {
               const action = commandActionsRef.current[key];
               if (action) {
