@@ -227,8 +227,8 @@ export function VoiceCommander({
 
     const productMatch = masterProducts.find(p => {
         if (!p.name) return false;
-        const aliases = getAllAliases(p.name.toLowerCase().replace(/ /g, '-'));
-        const allAliasValues = Object.values(aliases).flat().map(name => name.toLowerCase());
+        // Use the new getAllAliases function
+        const allAliasValues = Object.values(getAllAliases(p.name.toLowerCase().replace(/ /g, '-'))).flat().map(name => name.toLowerCase());
         return allAliasValues.includes(lowerProductName);
     });
 
@@ -667,3 +667,5 @@ export function VoiceCommander({
 
   return null;
 }
+
+    
