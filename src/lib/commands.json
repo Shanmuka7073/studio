@@ -83,7 +83,8 @@
       "see my basket",
       "go to basket",
       "open shopping cart",
-      "my items"
+      "my items",
+      "shopping"
     ]
   },
   "orders": {
@@ -143,8 +144,12 @@
       "start voice order",
       "start list",
       "i want to shop",
-      "start recording",
-      "take my order"
+      "take my order",
+      "let's shop",
+      "let's do shopping",
+      "shop now",
+      "add list",
+      "list items"
     ]
   },
   "checkout": {
@@ -188,7 +193,10 @@
       "submit form",
       "confirm changes",
       "save my profile",
-      "update profile"
+      "update profile",
+      "save",
+      "ok",
+      "done"
     ]
   },
   "refresh": {
@@ -200,7 +208,9 @@
       "reload app",
       "refresh screen",
       "restart page",
-      "refresh"
+      "refresh",
+      "reload",
+      "restart"
     ]
   }
 }
