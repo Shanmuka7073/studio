@@ -69,6 +69,12 @@ export function VoiceCommander({
   const [isWaitingForStoreName, setIsWaitingForStoreName] = useState(false);
   const [clarificationStores, setClarificationStores] = useState<Store[]>([]);
   const hasSpokenCheckoutPrompt = useRef(false);
+
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
   
   useEffect(() => {
     isEnabledRef.current = enabled;
@@ -127,7 +133,7 @@ export function VoiceCommander({
 
   // Proactive prompt on checkout page
   useEffect(() => {
-    if (pathname !== '/checkout') {
+    if (pathname !== '/checkout' || !hasMounted) {
       hasSpokenCheckoutPrompt.current = false;
       setIsWaitingForStoreName(false);
       return;
@@ -152,19 +158,14 @@ export function VoiceCommander({
 
       return () => clearTimeout(speakTimeout);
     }
-  }, [pathname, enabled, speak]);
+  }, [pathname, enabled, speak, hasMounted]);
 
 
   const findProductAndVariant = useCallback(async (productName: string, desiredWeight?: string): Promise<{ product: Product | null, variant: ProductVariant | null }> => {
     const lowerProductName = productName.toLowerCase();
     
-    // Find product in master list by matching english or telugu name
-    const productMatch = masterProductsRef.current.find(p => {
-        const pKey = p.name.toLowerCase().replace(/ /g, '-');
-        const translated = t(pKey, 'te');
-        const englishName = t(pKey, 'en');
-        return englishName.toLowerCase() === lowerProductName || translated === lowerProductName;
-    });
+    // Find product in master list by matching english name
+    const productMatch = masterProductsRef.current.find(p => p.name.toLowerCase() === lowerProductName);
 
     if (!productMatch) return { product: null, variant: null };
     
@@ -285,7 +286,7 @@ export function VoiceCommander({
             
             const orderItemTemplate = fileCommandsRef.current.orderItem;
             if (orderItemTemplate) {
-                for (const alias of [...orderItemTemplate.aliases, ...orderItemTemplate.aliases_te]) {
+                for (const alias of orderItemTemplate.aliases) {
                     const pattern = alias.replace('{quantity}', '(.+)').replace('{product}', '(.+)');
                     const regex = new RegExp(`^${pattern}$`, 'i');
                     const match = commandText.match(regex);
@@ -479,3 +480,5 @@ export function VoiceCommander({
 
   return null;
 }
+
+    
