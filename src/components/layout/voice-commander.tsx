@@ -253,42 +253,41 @@ export function VoiceCommander({
                 return;
             }
 
-            // Priority 2: Check if it's an "order item" command using the template.
+            // Priority 2: Check if it's an "order item" command using a two-stage parse.
             const orderItemTemplate = fileCommandsRef.current.orderItem;
             if (orderItemTemplate) {
-                for (const alias of orderItemTemplate.aliases) {
-                    const pattern = alias
-                        .replace('{quantity}', '([\\d\\w\\s]+?)') // More flexible quantity (numbers, words, spaces)
-                        .replace('{product}', '([\\w\\s]+)');    // Product name
-                    const regex = new RegExp(`^${pattern}$`, 'i');
-                    const match = commandText.match(regex);
-                    
-                    if (match) {
-                        let quantity: string | undefined = undefined;
-                        let product: string | undefined = undefined;
-                        
-                        const quantityIndexInAlias = alias.indexOf('{quantity}');
-                        const productIndexInAlias = alias.indexOf('{product}');
+              for (const alias of orderItemTemplate.aliases) {
+                // This alias is a template like "add {product}" or "get {quantity} of {product}"
+                // We'll use it to find the *action* part, not for a regex.
+                const actionPart = alias.replace(/\{quantity\}/g, '').replace(/\{product\}/g, '').trim();
 
-                        if (quantityIndexInAlias !== -1 && productIndexInAlias !== -1) {
-                            if (quantityIndexInAlias < productIndexInAlias) {
-                                quantity = match[1]?.trim();
-                                product = match[2]?.trim();
-                            } else {
-                                product = match[1]?.trim();
-                                quantity = match[2]?.trim();
-                            }
-                        } else if (productIndexInAlias !== -1) {
-                            product = match[1]?.trim();
-                        }
-                        
-                        if(product) {
-                           commandActionsRef.current.orderItem({ product, quantity });
-                           onSuggestions([]);
-                           return; 
-                        }
-                    }
+                if (commandText.startsWith(actionPart)) {
+                  // We found a match like "add..." or "i want..."
+                  // Now, let's intelligently parse the rest of the string.
+                  let restOfString = commandText.substring(actionPart.length).trim();
+                  
+                  // More robust parsing logic
+                  const quantityRegex = /^(one|two|three|four|five|six|seven|eight|nine|ten|[\d\.]+)\s*(kg|kilo|kilos|gram|grams|gm|g)?/i;
+                  const quantityMatch = restOfString.match(quantityRegex);
+                  
+                  let quantity: string | undefined = undefined;
+                  let product: string | undefined = undefined;
+
+                  if (quantityMatch) {
+                    quantity = quantityMatch[0].trim();
+                    product = restOfString.substring(quantity.length).trim();
+                  } else {
+                    // No quantity found at the start, assume the whole string is the product
+                    product = restOfString;
+                  }
+                  
+                  if(product) {
+                     commandActionsRef.current.orderItem({ product, quantity });
+                     onSuggestions([]);
+                     return; 
+                  }
                 }
+              }
             }
 
 
