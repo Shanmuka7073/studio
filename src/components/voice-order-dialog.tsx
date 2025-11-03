@@ -32,6 +32,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { getStores, getStore } from '@/lib/data';
 import { useCheckoutStore } from '@/app/checkout/page';
+import { translateProductNames } from '@/ai/flows/translation-flow';
 
 
 const checkoutSchema = z.object({
@@ -70,13 +71,16 @@ async function matchItemsToCatalog(text: string, db: any): Promise<StructuredLis
     }
     
     let cleanedText = text.replace(/(\d+\s*kg\s*)\1+/gi, '$1');
+    cleanedText = cleanedText.replace(/(one\s*kg\s*)\1+/gi, '$1');
+    cleanedText = cleanedText.replace(/(one\s*kilo\s*)\1+/gi, '$1');
 
     const matchedItems: StructuredListItem[] = [];
-    const pattern = /(\d+)\s*(kg|kilo|kilogram|grams|gm|g)?\s*([a-zA-Z\s]+)/gi;
+    const pattern = /(one|\d+)\s*(kg|kilo|kilogram|grams|gm|g)?\s*([a-zA-Z\s]+)/gi;
     let match;
 
     while ((match = pattern.exec(cleanedText)) !== null) {
-        const quantity = parseInt(match[1], 10);
+        const quantityStr = match[1].toLowerCase();
+        const quantity = quantityStr === 'one' ? 1 : parseInt(quantityStr, 10);
         let unit = (match[2] || 'kg').toLowerCase(); // Default to 'kg' if no unit
         const itemName = match[3].trim().toLowerCase();
 
@@ -97,7 +101,7 @@ async function matchItemsToCatalog(text: string, db: any): Promise<StructuredLis
             if (variantMatch) {
                 matchedItems.push({
                     productName: productMatch.productName,
-                    quantity: quantity,
+                    quantity: 1,
                     price: variantMatch.price,
                     variant: variantMatch
                 });
@@ -265,6 +269,11 @@ export function VoiceOrderDialog({ isOpen, onClose, orderInfo }: { isOpen: boole
         }
         
         const totalAmount = finalTotal;
+
+        // Generate translated list
+        const productNames = structuredList.map(item => item.productName);
+        const translations = await translateProductNames(productNames);
+        const translatedListString = translations.map(t => `${t.englishName} (${t.teluguName})`).join(', ');
         
         let orderData: any = {
             userId: user.uid,
@@ -279,7 +288,7 @@ export function VoiceOrderDialog({ isOpen, onClose, orderInfo }: { isOpen: boole
             orderDate: serverTimestamp(),
             status: 'Pending' as 'Pending',
             totalAmount,
-            translatedList: data.shoppingList,
+            translatedList: translatedListString,
             items: structuredList.map(item => ({
                 productName: item.productName,
                 variantWeight: item.variant.weight,

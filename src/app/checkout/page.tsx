@@ -33,6 +33,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import type { ProductPrice, ProductVariant, Store, User as AppUser } from '@/lib/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { create } from 'zustand';
+import { translateProductNames } from '@/ai/flows/translation-flow';
 
 const checkoutSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -92,13 +93,17 @@ async function matchItemsToCatalog(text: string, db: any): Promise<StructuredLis
     
     // Clean duplicates like "1 kg 1 kg chicken" -> "1 kg chicken"
     let cleanedText = text.replace(/(\d+\s*kg\s*)\1+/gi, '$1');
+    cleanedText = cleanedText.replace(/(one\s*kg\s*)\1+/gi, '$1');
+    cleanedText = cleanedText.replace(/(one\s*kilo\s*)\1+/gi, '$1');
+
 
     const matchedItems: StructuredListItem[] = [];
-    const pattern = /(\d+)\s*(kg|kilo|kilogram|grams|gm|g)?\s*([a-zA-Z\s]+)/gi;
+    const pattern = /(one|\d+)\s*(kg|kilo|kilogram|grams|gm|g)?\s*([a-zA-Z\s]+)/gi;
     let match;
 
     while ((match = pattern.exec(cleanedText)) !== null) {
-        const quantity = parseInt(match[1], 10);
+        const quantityStr = match[1].toLowerCase();
+        const quantity = quantityStr === 'one' ? 1 : parseInt(quantityStr, 10);
         let unit = (match[2] || 'kg').toLowerCase(); // Default to 'kg' if no unit
         const itemName = match[3].trim().toLowerCase();
 
@@ -121,7 +126,7 @@ async function matchItemsToCatalog(text: string, db: any): Promise<StructuredLis
             if (variantMatch) {
                 matchedItems.push({
                     productName: productMatch.productName,
-                    quantity: quantity, // The quantity is part of the variant
+                    quantity: 1, // The quantity is part of the variant
                     price: variantMatch.price,
                     variant: variantMatch
                 });
@@ -210,6 +215,7 @@ export default function CheckoutPage() {
   const shouldPromptForLocation = (hasItemsInCart || structuredList.length > 0) && !deliveryCoords;
 
   useEffect(() => {
+    if (deliveryCoords) return;
     setPlaceOrderBtnRef(placeOrderBtnRef);
     setFinalTotalGetter(() => finalTotal);
     setShouldPromptForLocation(shouldPromptForLocation);
@@ -222,7 +228,7 @@ export default function CheckoutPage() {
       setShouldPromptForLocation(false);
       setHandleGetLocation(() => {});
     }
-  }, [setPlaceOrderBtnRef, setFinalTotalGetter, finalTotal, shouldPromptForLocation, setShouldPromptForLocation, handleGetLocation, setHandleGetLocation]);
+  }, [setPlaceOrderBtnRef, setFinalTotalGetter, finalTotal, shouldPromptForLocation, setShouldPromptForLocation, handleGetLocation, setHandleGetLocation, deliveryCoords]);
 
 
    const userDocRef = useMemoFirebase(() => {
@@ -335,8 +341,8 @@ export default function CheckoutPage() {
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
-        speechRecognitionRef.current = new SpeechRecognition();
-        const recognition = speechRecognitionRef.current;
+        recognitionRef.current = new SpeechRecognition();
+        const recognition = recognitionRef.current;
         recognition.lang = 'en-IN';
         recognition.interimResults = false;
         recognition.continuous = false;
@@ -398,6 +404,11 @@ export default function CheckoutPage() {
             }
             
             const totalAmount = voiceOrderSubtotal + DELIVERY_FEE;
+
+            // Generate translated list
+            const productNames = structuredList.map(item => item.productName);
+            const translations = await translateProductNames(productNames);
+            const translatedListString = translations.map(t => `${t.englishName} (${t.teluguName})`).join(', ');
             
             let orderData: any = {
                 userId: user.uid,
@@ -412,7 +423,7 @@ export default function CheckoutPage() {
                 orderDate: serverTimestamp(),
                 status: 'Pending' as 'Pending',
                 totalAmount,
-                translatedList: data.shoppingList,
+                translatedList: translatedListString,
                 items: structuredList.map(item => ({
                     productName: item.productName,
                     variantWeight: item.variant.weight,
