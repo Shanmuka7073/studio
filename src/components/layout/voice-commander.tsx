@@ -248,21 +248,28 @@ export function VoiceCommander({
         try {
             if (!firestore || !user) return;
 
-             // Priority 0: Handle quantity clarification
+            // Priority 0: Handle quantity clarification
             if (isWaitingForQuantity && itemToUpdateSkuRef.current) {
-                const quantityRegex = /^(\d+|one|two|three|four|five|six|seven|eight|nine|ten)/i;
-                const match = commandText.match(quantityRegex);
-                if (match) {
-                    let quantity = 1;
-                    const numStr = match[1].toLowerCase();
-                    const wordToNum = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
-                    quantity = wordToNum[numStr] || parseInt(numStr, 10);
-                    
+                const wordToNum: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+                const parts = commandText.toLowerCase().split(' ');
+                let quantity: number | null = null;
+                
+                // Check for number words
+                if (wordToNum[parts[0]]) {
+                    quantity = wordToNum[parts[0]];
+                } 
+                // Check for digits
+                else if (!isNaN(parseInt(parts[0], 10))) {
+                    quantity = parseInt(parts[0], 10);
+                }
+
+                if (quantity !== null) {
                     updateQuantity(itemToUpdateSkuRef.current, quantity);
                     speak(`Okay, updated to ${quantity}.`);
                 } else {
                     speak("Sorry, I didn't catch a valid quantity. Please state a number.");
                 }
+                
                 setIsWaitingForQuantity(false);
                 itemToUpdateSkuRef.current = null;
                 onSuggestions([]);
