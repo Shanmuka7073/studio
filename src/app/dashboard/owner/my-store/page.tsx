@@ -67,7 +67,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Share2, MapPin, Trash2, AlertCircle, Upload, Image as ImageIcon, Loader2, Camera, CameraOff, Sparkles, PlusCircle, Edit, Link2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
-import { generateSingleImage } from '@/ai/flows/image-generator-flow';
 import Link from 'next/link';
 import { t, getAllAliases } from '@/lib/locales';
 import { useAppStore } from '@/lib/store';
@@ -797,7 +796,6 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const { firestore } = useFirebase();
-  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -814,41 +812,6 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
     const [itemName, categoryName] = value.split('::');
     form.setValue('name', itemName);
     form.setValue('category', categoryName);
-  };
-
-  const handleGenerateImage = async () => {
-    const productName = form.getValues('name');
-    if (!productName) {
-        toast({
-            variant: 'destructive',
-            title: 'Product Name Required',
-            description: 'Please enter a product name before generating an image.',
-        });
-        return;
-    }
-
-    setIsGeneratingImage(true);
-    try {
-        const imageUrl = await generateSingleImage(productName);
-        if (imageUrl) {
-            form.setValue('imageUrl', imageUrl);
-            toast({
-                title: 'Image Generated!',
-                description: 'The AI-generated image URL has been added.',
-            });
-        } else {
-            throw new Error('Image generation returned no URL.');
-        }
-    } catch (error) {
-        console.error("Image generation failed:", error);
-        toast({
-            variant: 'destructive',
-            title: 'Image Generation Failed',
-            description: 'Could not generate image. Please try again or add a URL manually.',
-        });
-    } finally {
-        setIsGeneratingImage(false);
-    }
   };
 
   const onSubmit = (data: ProductFormValues) => {
@@ -959,10 +922,6 @@ function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolea
                         <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"/>
                         <Input placeholder="https://images.unsplash.com/..." {...field} className="pl-9" />
                     </div>
-                    <Button type="button" variant="outline" onClick={handleGenerateImage} disabled={isGeneratingImage}>
-                        {isGeneratingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                        <span className="ml-2 hidden sm:inline">{t('generate-with-ai')}</span>
-                    </Button>
                   </div>
                    <FormDescription>
                     {t('paste-a-direct-image-link-or-generate-one')}
@@ -1974,7 +1933,3 @@ export default function MyStorePage() {
         </div>
     );
 }
-
-    
-
-    
