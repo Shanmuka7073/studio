@@ -6,17 +6,16 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { useFirebase, errorEmitter } from '@/firebase';
-import { getStores, getMasterProducts, getProductPrice } from '@/lib/data';
+import { getProductPrice } from '@/lib/data';
 import type { Store, Product, ProductPrice, ProductVariant, CartItem, User } from '@/lib/types';
 import { calculateSimilarity } from '@/lib/calculate-similarity';
 import { useCart } from '@/lib/cart';
-import { useProfileFormStore } from '@/lib/store';
+import { useAppStore, useProfileFormStore } from '@/lib/store';
 import { ProfileFormValues } from '@/app/dashboard/customer/my-profile/page';
 import { useCheckoutStore } from '@/app/checkout/page';
 import { getCommands } from '@/app/actions';
 import { t } from '@/lib/locales';
-import { addDoc, collection, doc, getDoc, serverTimestamp } from 'firebase/firestore';
-import { FirestorePermissionError } from '@/firebase/errors';
+import { doc, getDoc, serverTimestamp } from 'firebase/firestore';
 
 export interface Command {
   command: string;
@@ -57,15 +56,16 @@ export function VoiceCommander({
   const { toast } = useToast();
   const { firestore, user } = useFirebase();
   const { clearCart, addItem: addItemToCart, updateQuantity, activeStoreId, setActiveStoreId } = useCart();
+  
+  // Get data from the central Zustand store
+  const { stores, masterProducts, productPrices, fetchInitialData, fetchProductPrices } = useAppStore();
+
   const { form: profileForm } = useProfileFormStore();
   const { placeOrderBtnRef, setIsWaitingForQuickOrderConfirmation, isWaitingForQuickOrderConfirmation } = useCheckoutStore();
 
   const isSpeakingRef = useRef(false);
   const isEnabledRef = useRef(enabled);
   const commandsRef = useRef<Command[]>([]);
-  const storesRef = useRef<Store[]>([]);
-  const masterProductsRef = useRef<Product[]>([]);
-  const productPricesRef = useRef<Record<string, ProductPrice>>({});
   const commandActionsRef = useRef<any>({});
   const fileCommandsRef = useRef<any>({});
   
@@ -84,7 +84,10 @@ export function VoiceCommander({
 
   useEffect(() => {
     setHasMounted(true);
-  }, []);
+    if(firestore) {
+      fetchInitialData(firestore);
+    }
+  }, [firestore, fetchInitialData]);
   
   useEffect(() => {
     isEnabledRef.current = enabled;
@@ -222,7 +225,7 @@ export function VoiceCommander({
   const findProductAndVariant = useCallback(async (productName: string, desiredWeight?: string): Promise<{ product: Product | null, variant: ProductVariant | null }> => {
     const lowerProductName = productName.toLowerCase();
 
-    const productMatch = masterProductsRef.current.find(p => {
+    const productMatch = masterProducts.find(p => {
         if (!p.name) return false;
         const translation = t(p.name.toLowerCase().replace(/ /g, '-'));
         const parts = translation.split(' / ');
@@ -239,12 +242,12 @@ export function VoiceCommander({
     
     const finalProduct = { ...productMatch }; 
 
-    let priceData = productPricesRef.current[productMatch.name.toLowerCase()];
-    if (!priceData && firestore) {
-        priceData = await getProductPrice(firestore, productMatch.name.toLowerCase());
-        if (priceData) {
-            productPricesRef.current[productMatch.name.toLowerCase()] = priceData;
-        }
+    let priceData = productPrices[productMatch.name.toLowerCase()];
+    if (priceData === undefined && firestore) {
+        // Fetch price if not in cache
+        await fetchProductPrices(firestore, [productMatch.name]);
+        // After fetching, get the updated value from the store
+        priceData = useAppStore.getState().productPrices[productMatch.name.toLowerCase()];
     }
     
     if (priceData?.variants?.length > 0) {
@@ -266,7 +269,7 @@ export function VoiceCommander({
     }
     
     return { product: null, variant: null };
-  }, [firestore]);
+  }, [firestore, masterProducts, productPrices, fetchProductPrices]);
 
 
   useEffect(() => {
@@ -333,7 +336,7 @@ export function VoiceCommander({
 
             if (isWaitingForStoreName && pathname === '/checkout') {
                 const spokenStoreName = commandText.toLowerCase();
-                const bestMatch = storesRef.current
+                const bestMatch = stores
                     .map(store => ({ ...store, similarity: calculateSimilarity(spokenStoreName, store.name.toLowerCase()) }))
                     .sort((a, b) => b.similarity - a.similarity)[0];
 
@@ -585,7 +588,7 @@ export function VoiceCommander({
         }
 
         const { product: foundProduct, variant } = await findProductAndVariant(product, quantity);
-        const foundStore = storesRef.current.find(s => s.name.toLowerCase() === storeName.toLowerCase());
+        const foundStore = stores.find(s => s.name.toLowerCase() === storeName.toLowerCase());
 
         if (!foundProduct || !variant) {
             speak(`Sorry, I could not find ${quantity || ''} of ${product}.`);
@@ -644,68 +647,65 @@ export function VoiceCommander({
               userProfileRef.current = docSnap.data() as User;
           }
       });
+      
+      // We are now getting stores and products from Zustand, but we still need to build the commands.
+      getCommands().then((fileCommands) => {
+        fileCommandsRef.current = fileCommands;
+        let builtCommands: Command[] = [];
 
-      Promise.all([ getStores(firestore), getMasterProducts(firestore), getCommands() ])
-        .then(([stores, masterProducts, fileCommands]) => {
-          storesRef.current = stores;
-          masterProductsRef.current = masterProducts;
-          fileCommandsRef.current = fileCommands;
+        stores.forEach((store) => {
+          if (store.name === 'LocalBasket') return;
+          const coreName = store.name.toLowerCase().replace(/shop|store|kirana/g, '').trim();
+          const variations = [...new Set([
+            store.name.toLowerCase(), coreName, `go to ${store.name.toLowerCase()}`, `open ${store.name.toLowerCase()}`,
+          ])];
+          variations.forEach(variation => {
+            builtCommands.push({
+              command: variation,
+              display: `Go to ${store.name}`,
+              action: () => {
+                if (pathname === '/checkout') {
+                  // Special handling for checkout page
+                  setIsWaitingForStoreName(false);
+                  speak(`Okay, ordering from ${store.name}.`);
+                  setActiveStoreId(store.id);
+                  setTimeout(() => {
+                      placeOrderBtnRef?.current?.click();
+                  }, 500);
+                  return;
+                }
 
-          let builtCommands: Command[] = [];
-
-          stores.forEach((store) => {
-            if (store.name === 'LocalBasket') return;
-            const coreName = store.name.toLowerCase().replace(/shop|store|kirana/g, '').trim();
-            const variations = [...new Set([
-              store.name.toLowerCase(), coreName, `go to ${store.name.toLowerCase()}`, `open ${store.name.toLowerCase()}`,
-            ])];
-            variations.forEach(variation => {
-              builtCommands.push({
-                command: variation,
-                display: `Go to ${store.name}`,
-                action: () => {
-                  if (pathname === '/checkout') {
-                    // Special handling for checkout page
-                    setIsWaitingForStoreName(false);
-                    speak(`Okay, ordering from ${store.name}.`);
-                    setActiveStoreId(store.id);
-                    setTimeout(() => {
-                        placeOrderBtnRef?.current?.click();
-                    }, 500);
-                    return;
-                  }
-
-                  const matchingStores = stores.filter(s => s.name.toLowerCase() === store.name.toLowerCase());
-                  if (matchingStores.length > 1) {
-                      setClarificationStores(matchingStores);
-                      let prompt = `I found ${matchingStores.length} stores named ${store.name}. `;
-                      matchingStores.forEach((s, i) => {
-                          prompt += `Number ${i + 1} is at ${s.address}. `;
-                      });
-                      prompt += "Which one would you like?";
-                      speak(prompt);
-                  } else {
-                      router.push(`/stores/${store.id}`);
-                  }
-                },
-                reply: `Navigating to ${store.name}.`
-              });
+                const matchingStores = stores.filter(s => s.name.toLowerCase() === store.name.toLowerCase());
+                if (matchingStores.length > 1) {
+                    setClarificationStores(matchingStores);
+                    let prompt = `I found ${matchingStores.length} stores named ${store.name}. `;
+                    matchingStores.forEach((s, i) => {
+                        prompt += `Number ${i + 1} is at ${s.address}. `;
+                    });
+                    prompt += "Which one would you like?";
+                    speak(prompt);
+                } else {
+                    router.push(`/stores/${store.id}`);
+                }
+              },
+              reply: `Navigating to ${store.name}.`
             });
           });
+        });
 
-          Object.entries(fileCommands).forEach(([key, { display, aliases, reply }]: [string, any]) => {
-            if (key !== 'orderItem' && key !== 'quickOrder' && key !== 'quickOrderConfirm') { // The orderItem is handled separately as a template
-                const action = commandActionsRef.current[key];
-                if (action) {
-                    aliases.forEach((alias: string) => {
-                        builtCommands.push({ command: alias, display, action, reply });
-                    });
-                }
-            }
-          });
+        Object.entries(fileCommands).forEach(([key, { display, aliases, reply }]: [string, any]) => {
+          if (key !== 'orderItem' && key !== 'quickOrder' && key !== 'quickOrderConfirm') { // These are handled separately
+              const action = commandActionsRef.current[key];
+              if (action) {
+                  aliases.forEach((alias: string) => {
+                      builtCommands.push({ command: alias, display, action, reply });
+                  });
+              }
+          }
+        });
 
-          commandsRef.current = builtCommands;
-        }).catch(console.error);
+        commandsRef.current = builtCommands;
+      }).catch(console.error);
     }
     
     return () => {
@@ -715,7 +715,7 @@ export function VoiceCommander({
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firestore, user, cartItems, profileForm, isWaitingForStoreName, activeStoreId, placeOrderBtnRef, enabled, pathname, findProductAndVariant, handleProfileFormInteraction, speak, toast, router, onSuggestions, onStatusUpdate, onCloseCart, onOpenCart, setActiveStoreId, clarificationStores, isWaitingForQuantity, updateQuantity, isWaitingForQuickOrderConfirmation, clearCart, setIsWaitingForQuickOrderConfirmation]);
+  }, [firestore, user, cartItems, profileForm, isWaitingForStoreName, activeStoreId, placeOrderBtnRef, enabled, pathname, findProductAndVariant, handleProfileFormInteraction, speak, toast, router, onSuggestions, onStatusUpdate, onCloseCart, onOpenCart, setActiveStoreId, clarificationStores, isWaitingForQuantity, updateQuantity, isWaitingForQuickOrderConfirmation, clearCart, setIsWaitingForQuickOrderConfirmation, stores, masterProducts]);
 
   return null;
 }

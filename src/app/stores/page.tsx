@@ -1,4 +1,5 @@
 
+
 'use client';
 import StoreCard from '@/components/store-card';
 import { useFirebase } from '@/firebase';
