@@ -30,7 +30,7 @@ const recipePrompt = ai.definePrompt({
   name: 'recipePrompt',
   input: { schema: RecipeInputSchema },
   output: { schema: RecipeOutputSchema },
-  model: 'gemini-1.5-flash',
+  model: 'gemini-1.5-flash-latest',
   prompt: `You are a helpful recipe assistant. The user wants to cook a dish and needs the ingredients.
     
     Dish: {{{dishName}}}

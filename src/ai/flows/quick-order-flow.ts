@@ -68,7 +68,7 @@ const parsingPrompt = ai.definePrompt({
   name: 'quickOrderParsingPrompt',
   input: { schema: QuickOrderInputSchema },
   output: { schema: ParsedOrderSchema },
-  model: 'gemini-1.5-flash',
+  model: 'gemini-1.5-flash-latest',
   prompt: `You are an expert at parsing unstructured shopping requests.
     Extract the product name, the quantity (if specified), and the store name from the following user command.
 

@@ -34,7 +34,7 @@ const packagePrompt = ai.definePrompt({
   name: 'monthlyPackagePrompt',
   input: { schema: MonthlyPackageInputSchema },
   output: { schema: MonthlyPackageOutputSchema },
-  model: 'gemini-1.5-flash',
+  model: 'gemini-1.5-flash-latest',
   prompt: `You are an expert at creating balanced, monthly grocery lists for Indian households.
 
     The user wants a standard list of essential groceries for a family of {{{memberCount}}} members for one month.
