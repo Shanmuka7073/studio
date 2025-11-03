@@ -165,7 +165,10 @@ export function VoiceCommander({
     const lowerProductName = productName.toLowerCase();
     
     // Find product in master list by matching english name
-    const productMatch = masterProductsRef.current.find(p => p.name.toLowerCase() === lowerProductName);
+    const productMatch = masterProductsRef.current.find(p => 
+        t(p.name.toLowerCase().replace(/ /g, '-')).toLowerCase().split(' / ')[0].trim() === lowerProductName ||
+        t(p.name.toLowerCase().replace(/ /g, '-')).toLowerCase().split(' / ')[1].trim() === lowerProductName
+    );
 
     if (!productMatch) return { product: null, variant: null };
     
@@ -300,7 +303,6 @@ export function VoiceCommander({
             const orderItemTemplate = fileCommandsRef.current.orderItem;
             if (orderItemTemplate) {
                 for (const alias of orderItemTemplate.aliases) {
-                    // Improved regex to handle different sentence structures
                     const pattern = alias
                         .replace('{quantity}', '(.+?)') // Non-greedy quantity
                         .replace('{product}', '(.+)');
@@ -308,20 +310,24 @@ export function VoiceCommander({
                     const match = commandText.match(regex);
                     
                     if (match) {
-                        // The regex will capture quantity and product.
-                        // Example: "add 1kg of potatoes" -> match[1]="1kg", match[2]="potatoes"
-                        // Example: "add potatoes" (if template is just "{product}") -> match[1]="potatoes"
-                        // We need to handle cases where quantity is optional in the template.
                         let quantity: string | undefined = undefined;
                         let product: string | undefined = undefined;
+                        
+                        const quantityIndex = alias.indexOf('{quantity}');
+                        const productIndex = alias.indexOf('{product}');
 
-                        if (alias.includes('{quantity}') && alias.includes('{product}')) {
-                            quantity = match[1]?.trim();
-                            product = match[2]?.trim();
-                        } else if (alias.includes('{product}')) {
+                        if (quantityIndex !== -1 && productIndex !== -1) {
+                            if (quantityIndex < productIndex) {
+                                quantity = match[1]?.trim();
+                                product = match[2]?.trim();
+                            } else {
+                                product = match[1]?.trim();
+                                quantity = match[2]?.trim();
+                            }
+                        } else if (productIndex !== -1) {
                             product = match[1]?.trim();
                         }
-
+                        
                         if(product) {
                            commandActionsRef.current.orderItem({ product, quantity });
                            onSuggestions([]);
@@ -398,7 +404,7 @@ export function VoiceCommander({
         const { product: foundProduct, variant } = await findProductAndVariant(product, quantity);
         if (foundProduct && variant) {
           addItemToCart(foundProduct, variant, 1);
-          speak(`Added ${variant.weight} of ${t(foundProduct.name.toLowerCase().replace(/ /g, '-'))} to your cart.`);
+          speak(`Added ${variant.weight} of ${t(foundProduct.name.toLowerCase().replace(/ /g, '-')).split(' / ')[0]} to your cart.`);
           onOpenCart();
         } else {
           speak(`Sorry, I could not find ${product} in the store.`);
