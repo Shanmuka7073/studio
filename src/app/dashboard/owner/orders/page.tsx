@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useFirebase, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase } from '@/firebase';
@@ -90,7 +91,7 @@ function OrderDetailsDialog({ order, isOpen, onClose }: { order: Order | null; i
                 <div className="grid gap-4 py-4 pr-6">
                      {order.translatedList && (
                         <Card>
-                            <CardHeader><CardTitle className="text-lg">Customer's List (Bilingual)</CardTitle></CardHeader>
+                            <CardHeader><CardTitle className="text-lg">Customer's List</CardTitle></CardHeader>
                             <CardContent>
                                  <p className="italic text-muted-foreground">"{order.translatedList}"</p>
                             </CardContent>
@@ -324,7 +325,7 @@ export default function OrdersDashboardPage() {
                     <div className="grid gap-4 py-4 pr-6">
                          {newOrderAlert?.translatedList && (
                             <Card>
-                                <CardHeader><CardTitle className="text-lg">Customer's List (Bilingual)</CardTitle></CardHeader>
+                                <CardHeader><CardTitle className="text-lg">Customer's List</CardTitle></CardHeader>
                                 <CardContent>
                                      <p className="italic text-muted-foreground">"{newOrderAlert.translatedList}"</p>
                                 </CardContent>

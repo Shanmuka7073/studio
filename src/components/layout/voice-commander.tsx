@@ -15,7 +15,7 @@ import { ProfileFormValues } from '@/app/dashboard/customer/my-profile/page';
 import { useCheckoutStore } from '@/app/checkout/page';
 import { getCommands } from '@/app/actions';
 import { t, getAllAliases } from '@/lib/locales';
-import { doc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore';
 
 export interface Command {
   command: string;
@@ -71,6 +71,7 @@ export function VoiceCommander({
   
   const formFieldToFillRef = useRef<keyof ProfileFormValues | null>(null);
   const [isWaitingForStoreName, setIsWaitingForStoreName] = useState(false);
+  const [isWaitingForVoiceOrder, setIsWaitingForVoiceOrder] = useState(false);
   const [clarificationStores, setClarificationStores] = useState<Store[]>([]);
   const hasSpokenCheckoutPrompt = useRef(false);
   const hasSpokenProfilePrompt = useRef(false);
@@ -290,7 +291,14 @@ export function VoiceCommander({
                 setClarificationStores([]);
                 onSuggestions([]);
                 setIsWaitingForQuickOrderConfirmation(false);
+                setIsWaitingForVoiceOrder(false);
             };
+
+            if (isWaitingForVoiceOrder) {
+              await commandActionsRef.current.createVoiceOrder(commandText);
+              resetContext();
+              return;
+            }
 
             if (isWaitingForQuickOrderConfirmation) {
                 const confirmAliases = fileCommandsRef.current.quickOrderConfirm?.aliases || [];
@@ -499,6 +507,44 @@ export function VoiceCommander({
         onCloseCart();
         router.push('/checkout');
       },
+      recordOrder: () => {
+        setIsWaitingForVoiceOrder(true);
+      },
+      createVoiceOrder: async (list: string) => {
+        if (!firestore || !user || !userProfileRef.current) {
+          speak("I can't create an order without your user profile information.");
+          return;
+        }
+
+        const voiceOrderData = {
+          userId: user.uid,
+          orderDate: serverTimestamp(),
+          status: 'Pending' as 'Pending',
+          deliveryAddress: userProfileRef.current.address,
+          translatedList: list,
+          customerName: `${userProfileRef.current.firstName} ${userProfileRef.current.lastName}`,
+          phone: userProfileRef.current.phoneNumber,
+          email: user.email,
+          totalAmount: 0, // Store owner will fill this in
+          items: [],
+        };
+        
+        try {
+          const colRef = collection(firestore, 'orders');
+          await addDoc(colRef, voiceOrderData);
+          speak("I've sent your list to the local stores. You'll be notified when a store accepts your order.");
+          router.push('/dashboard/customer/my-orders');
+        } catch (e) {
+          console.error("Error creating voice order:", e);
+          speak("Sorry, I failed to create your voice order. Please try again.");
+          const permissionError = new FirestorePermissionError({
+            path: 'orders',
+            operation: 'create',
+            requestResourceData: voiceOrderData,
+          });
+          errorEmitter.emit('permission-error', permissionError);
+        }
+      },
       placeOrder: () => {
         if (placeOrderBtnRef?.current) {
             placeOrderBtnRef.current.click();
@@ -632,7 +678,7 @@ export function VoiceCommander({
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firestore, user, cartItems, profileForm, isWaitingForStoreName, activeStoreId, placeOrderBtnRef, enabled, pathname, findProductAndVariant, handleProfileFormInteraction, speak, toast, router, onSuggestions, onStatusUpdate, onCloseCart, onOpenCart, setActiveStoreId, clarificationStores, isWaitingForQuantity, updateQuantity, isWaitingForQuickOrderConfirmation, clearCart, setIsWaitingForQuickOrderConfirmation, stores, masterProducts, language]);
+  }, [firestore, user, cartItems, profileForm, isWaitingForStoreName, activeStoreId, placeOrderBtnRef, enabled, pathname, findProductAndVariant, handleProfileFormInteraction, speak, toast, router, onSuggestions, onStatusUpdate, onCloseCart, onOpenCart, setActiveStoreId, clarificationStores, isWaitingForQuantity, updateQuantity, isWaitingForQuickOrderConfirmation, clearCart, setIsWaitingForQuickOrderConfirmation, stores, masterProducts, language, isWaitingForVoiceOrder]);
 
   return null;
 }

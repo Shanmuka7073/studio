@@ -1,13 +1,4 @@
 {
-  "quickOrder": {
-    "display": "Order an Item from a specific store",
-    "reply": "One moment...",
-    "aliases": [
-      "order {quantity} of {product} from {store}",
-      "get {quantity} of {product} from {store}",
-      "buy {quantity} of {product} from {store}"
-    ]
-  },
   "quickOrderConfirm": {
     "display": "Confirm the quick order",
     "reply": "Placing your order now.",
@@ -19,6 +10,17 @@
       "alright",
       "yes",
       "place order"
+    ]
+  },
+  "recordOrder": {
+    "display": "Record a shopping list by voice",
+    "reply": "I'm ready. Please list the items you need for your order.",
+    "aliases": [
+      "record my order",
+      "take my order",
+      "voice order",
+      "new voice order",
+      "create a shopping list"
     ]
   },
   "orderItem": {
@@ -101,23 +103,7 @@
       "see my basket",
       "go to basket",
       "open shopping cart",
-      "my items",
-      "shopping",
-      "create a shopping list",
-      "make a list",
-      "new shopping list",
-      "start my list",
-      "prepare my list",
-      "record my order",
-      "start voice order",
-      "start list",
-      "i want to shop",
-      "take my order",
-      "let's shop",
-      "let's do shopping",
-      "shop now",
-      "add list",
-      "list items"
+      "my items"
     ]
   },
   "orders": {
