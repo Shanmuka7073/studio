@@ -195,7 +195,10 @@
       "complete my order",
       "place the order",
       "placeorder",
-      "orderplace"
+      "orderplace",
+      "please order",
+      "submit",
+      "fine"
     ]
   },
   "saveChanges": {

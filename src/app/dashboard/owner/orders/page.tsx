@@ -17,7 +17,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useRouter } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Check, Hand } from 'lucide-react';
+import { Check, Hand, DollarSign, Package, PackageCheck } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const playAlarm = () => {
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -53,6 +54,24 @@ const formatDateSafe = (date: any) => {
         return format(date, 'PPP p');
     }
     return 'N/A';
+}
+
+function StatCard({ title, value, icon: Icon, loading, isCurrency = false }: { title: string, value: number, icon: React.ElementType, loading?: boolean, isCurrency?: boolean }) {
+    return (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">{title}</CardTitle>
+                <Icon className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+                {loading ? <Skeleton className="h-8 w-20" /> : (
+                    <div className="text-2xl font-bold">
+                        {isCurrency && '₹'}{isCurrency ? value.toFixed(2) : value}
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    )
 }
 
 function OrderDetailsDialog({ order, isOpen, onClose }: { order: Order | null; isOpen: boolean; onClose: () => void }) {
@@ -182,6 +201,22 @@ export default function OrdersDashboardPage() {
 
   const prevOrdersRef = useRef<Map<string, Order>>(new Map());
 
+  // Calculate stats from orders
+  const stats = useMemo(() => {
+    if (!allOrders) {
+        return { totalRevenue: 0, completedOrders: 0, activeOrders: 0 };
+    }
+    return allOrders.reduce((acc, order) => {
+        if (order.status === 'Delivered') {
+            acc.totalRevenue += order.totalAmount;
+            acc.completedOrders += 1;
+        } else if (order.status === 'Pending' || order.status === 'Processing') {
+            acc.activeOrders += 1;
+        }
+        return acc;
+    }, { totalRevenue: 0, completedOrders: 0, activeOrders: 0 });
+  }, [allOrders]);
+
   useEffect(() => {
     if (!allOrders) return;
     const currentOrdersMap = new Map(allOrders.map(order => [order.id, order]));
@@ -266,6 +301,12 @@ export default function OrdersDashboardPage() {
 
   const finalLoading = isUserLoading || isStoreLoading || ordersLoading;
 
+  const statItems = [
+      { title: 'Total Revenue', value: stats.totalRevenue, icon: DollarSign, isCurrency: true },
+      { title: 'Completed Orders', value: stats.completedOrders, icon: PackageCheck },
+      { title: 'Active Orders', value: stats.activeOrders, icon: Package },
+  ];
+
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
        <OrderDetailsDialog order={selectedOrder} isOpen={!!selectedOrder} onClose={() => setSelectedOrder(null)} />
@@ -338,6 +379,20 @@ export default function OrdersDashboardPage() {
        </AlertDialog>
 
       <h1 className="text-4xl font-bold font-headline mb-8">Order Management</h1>
+
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-8">
+            {statItems.map(item => (
+                <StatCard 
+                    key={item.title} 
+                    title={item.title}
+                    value={item.value}
+                    icon={item.icon}
+                    loading={finalLoading}
+                    isCurrency={item.isCurrency}
+                />
+            ))}
+        </div>
+
       <Card>
         <CardHeader>
           <CardTitle>{myStore ? `Incoming Orders for ${myStore.name}` : 'Your Orders'}</CardTitle>
