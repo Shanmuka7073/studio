@@ -38,6 +38,115 @@
                 "Chikoo (Sapota)", "Strawberries", "Kiwi", "Pears", "Plums", 
                 "Dates", "Dry Figs", "Coconut", "Lemons"
             ]
+        },
+        {
+            "categoryName": "Grains & Cereals",
+            "items": [
+                "Rice (Raw, Boiled, Basmati, Brown etc)", "Wheat", "Maida (Refined Flour)", "Suji (Rava/Semolina)", "Poha (Flattened Rice)",
+                "Oats", "Cornflakes", "Millets (Jowar, Bajra, Ragi, Foxtail, etc.)", "Broken Wheat (Dalia)"
+            ]
+        },
+        {
+            "categoryName": "Dals & Pulses",
+            "items": [
+                "Toor Dal (Arhar Dal)", "Moong Dal (Yellow Split)", "Masoor Dal (Red Lentil)", "Chana Dal", "Urad Dal",
+                "Rajma (Kidney Beans)", "Kabuli Chana (White Chickpeas)", "Kala Chana (Black Chickpeas)", "Green Gram",
+                "Lobia (Black Eyed Peas)", "Soya Chunks", "Horse Gram"
+            ]
+        },
+        {
+            "categoryName": "Spices & Masalas",
+            "items": [
+                "Salt", "Turmeric Powder", "Red Chili Powder", "Coriander Powder", "Cumin Seeds", "Mustard Seeds",
+                "Fenugreek Seeds", "Garam Masala", "Black Pepper", "Cloves", "Cardamom", "Cinnamon",
+                "Bay Leaf", "Fennel Seeds (Saunf)", "Curry Leaves", "Hing (Asafoetida)", "Kasuri Methi (Dried Fenugreek)",
+                "Tamarind", "Dry Red Chilies"
+            ]
+        },
+        {
+            "categoryName": "Oils & Ghee",
+            "items": [
+                "Sunflower Oil", "Groundnut Oil", "Mustard Oil", "Coconut Oil", "Palm Oil", "Olive Oil",
+                "Rice Bran Oil", "Ghee (Clarified Butter)", "Butter"
+            ]
+        },
+        {
+            "categoryName": "Sauces & Condiments",
+            "items": [
+                "Tomato Ketchup", "Soy Sauce", "Vinegar", "Green Chili Sauce", "Red Chili Sauce", "Mustard Sauce",
+                "Mayonnaise", "Pickles (Mango, Lime, Mixed, etc.)", "Chutneys (Coconut, Mint, Tamarind)"
+            ]
+        },
+        {
+            "categoryName": "Dairy & Bakery",
+            "items": [
+                "Milk", "Curd/Yogurt", "Paneer (Cottage Cheese)", "Cheese", "Fresh Cream", "Bread (White, Brown, Multigrain)",
+                "Buns", "Pav", "Biscuits", "Rusks", "Cakes", "Muffins"
+            ]
+        },
+        {
+            "categoryName": "Snacks & Breakfast",
+            "items": [
+                "Pancake Mix", "Wafers", "Breakfast Cereals"
+            ]
+        },
+        {
+            "categoryName": "Beverages",
+            "items": [
+                "Tea Powder", "Coffee Powder", "Green Tea", "Milk Powder", "Soft Drinks", "Juices",
+                "Coconut Water", "Energy Drinks"
+            ]
+        },
+        {
+            "categoryName": "Meat & Fish",
+            "items": [
+                "Chicken", "Mutton", "Fish", "Eggs", "Prawns"
+            ]
+        },
+        {
+            "categoryName": "Frozen Food",
+            "items": [
+                "Frozen Parathas", "Frozen Vegetables", "Nuggets/Cutlets", "Sausages"
+            ]
+        },
+        {
+            "categoryName": "Instant Mixes",
+            "items": [
+                "Maggi/Noodles", "Pasta", "Vermicelli", "Soup Packets", "Instant Upma/Poha Mix",
+                "Instant Rice", "Frozen Pizzas", "Ready Curries/Gravies"
+            ]
+        },
+        {
+            "categoryName": "Home Care",
+            "items": [
+                "Dishwashing Liquid", "Detergent Powder", "Floor Cleaner", "Toilet Cleaner",
+                "Scrub Pads", "Mop", "Broom", "Garbage Bags", "Room Freshener"
+            ]
+        },
+        {
+            "categoryName": "Personal Care",
+            "items": [
+                "Soap", "Shampoo", "Toothpaste", "Toothbrush", "Hair Oil", "Face Wash",
+                "Moisturizer", "Shaving Cream/Razor", "Sanitary Pads", "Hand Wash"
+            ]
+        },
+        {
+            "categoryName": "Pooja Needs",
+            "items": [
+                "Agarbatti (Incense Sticks)", "Camphor", "Cotton Wicks", "Kumkum", "Matchbox/Candle"
+            ]
+        },
+        {
+            "categoryName": "Pet Care",
+            "items": [
+                "Dog Food/Cat Food", "Pet Shampoo", "Feeding Bowl"
+            ]
+        },
+        {
+            "categoryName": "Kitchen Essentials",
+            "items": [
+                "Aluminium Foil", "Tissue Paper", "Plastic Covers", "Ziplock Bags", "Batteries", "Lighter"
+            ]
         }
     ]
 }
