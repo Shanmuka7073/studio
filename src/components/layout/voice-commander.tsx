@@ -50,7 +50,7 @@ export function VoiceCommander({
   const pathname = usePathname();
   const { toast } = useToast();
   const { firestore, user } = useFirebase();
-  const { addItem: addItemToCart, activeStoreId } = useCart();
+  const { addItem: addItemToCart, activeStoreId, setActiveStoreId } = useCart();
   const { form: profileForm } = useProfileFormStore();
   const { placeOrderBtnRef } = useCheckoutStore();
 
@@ -117,18 +117,8 @@ export function VoiceCommander({
     const productMatch = masterProductsRef.current.find(p => p.name.toLowerCase() === lowerProductName);
 
     if (!productMatch) return { product: null, variant: null, storeId: null };
-
-    // If there is no active store context, we cannot proceed.
-    // The user must first navigate to a store page.
-    if (!activeStoreId) {
-        speak("Please go to a specific store's page before adding items to your cart.", () => {
-            router.push('/stores');
-        });
-        return { product: null, variant: null, storeId: null };
-    }
-
-    // Product object needs to be updated with the correct active storeId for the cart
-    const finalProduct = { ...productMatch, storeId: activeStoreId };
+    
+    const finalProduct = { ...productMatch }; // Use master product as generic item
 
     let priceData = productPricesRef.current[lowerProductName];
     if (!priceData && firestore) {
@@ -142,22 +132,22 @@ export function VoiceCommander({
         if (desiredWeight) {
             const lowerDesiredWeight = desiredWeight.replace(/\s/g, '').toLowerCase();
             const variantMatch = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === lowerDesiredWeight);
-            if (variantMatch) return { product: finalProduct, variant: variantMatch, storeId: activeStoreId };
+            if (variantMatch) return { product: finalProduct, variant: variantMatch, storeId: null };
         }
         
         if (!desiredWeight || desiredWeight === 'one') {
           const onePieceVariant = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === '1pc');
-          if (onePieceVariant) return { product: finalProduct, variant: onePieceVariant, storeId: activeStoreId };
+          if (onePieceVariant) return { product: finalProduct, variant: onePieceVariant, storeId: null };
 
            const firstVariant = priceData.variants.sort((a,b) => a.price - b.price)[0];
-           if (firstVariant) return { product: finalProduct, variant: firstVariant, storeId: activeStoreId };
+           if (firstVariant) return { product: finalProduct, variant: firstVariant, storeId: null };
         }
 
-        return { product: finalProduct, variant: priceData.variants[0], storeId: activeStoreId };
+        return { product: finalProduct, variant: priceData.variants[0], storeId: null };
     }
     
     return { product: null, variant: null, storeId: null };
-  }, [firestore, activeStoreId, router, speak]);
+  }, [firestore]);
 
 
   const handleProfileFormInteraction = useCallback(() => {
@@ -205,7 +195,27 @@ export function VoiceCommander({
             const multiOrderMatch = command.match(multiOrderPattern);
 
             if (multiOrderMatch) {
-                speak("This feature is being updated. Please add items to your cart one by one for now.");
+                const itemsString = multiOrderMatch[1];
+                const storeName = multiOrderMatch[2];
+                const store = storesRef.current.find(s => s.name.toLowerCase() === storeName.toLowerCase());
+
+                if (!store) {
+                    speak(`Sorry, I couldn't find a store named ${storeName}.`);
+                    return;
+                }
+                
+                setActiveStoreId(store.id);
+
+                speak(`Okay, ordering from ${store.name}.`);
+
+                const itemPromises = itemsString.split(/, and |, | and /).map(itemStr => {
+                    const [quantity, ...productWords] = itemStr.trim().split(' ');
+                    const product = productWords.join(' ');
+                    return commandActionsRef.current.orderItem({ product, quantity });
+                });
+                await Promise.all(itemPromises);
+                
+                router.push('/checkout');
                 onSuggestions([]);
                 return;
             }
@@ -310,10 +320,9 @@ export function VoiceCommander({
           addItemToCart(foundProduct, variant, 1);
           speak(`Added ${variant.weight} of ${product} to your cart.`);
           onOpenCart();
-        } else if (activeStoreId) {
-          speak(`Sorry, I could not find ${product} in the currently active store.`);
+        } else {
+          speak(`Sorry, I could not find ${product} in the product catalog.`);
         }
-        // If no active store, findProductAndVariant will handle the spoken response
       },
     };
 
@@ -372,7 +381,10 @@ export function VoiceCommander({
               builtCommands.push({
                 command: variation,
                 display: `Go to ${store.name}`,
-                action: () => router.push(`/stores/${store.id}`),
+                action: () => {
+                  setActiveStoreId(store.id);
+                  router.push(`/stores/${store.id}`);
+                },
                 reply: `Navigating to ${store.name}.`
               });
             });

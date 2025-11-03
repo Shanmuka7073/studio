@@ -15,6 +15,7 @@ import { collection, query, where, documentId, getDocs, limit } from 'firebase/f
 import { cn } from '@/lib/utils';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { useAppStore } from '@/lib/store';
+import { useCart } from '@/lib/cart';
 
 // Helper to create a URL-friendly slug from a string
 const createSlug = (text: string) => {
@@ -132,6 +133,7 @@ export default function StoreDetailPage() {
   const params = useParams();
   const id = params.id as string;
   const { firestore } = useFirebase();
+  const { setActiveStoreId } = useCart();
 
   // Get all data from the central Zustand store
   const { stores, masterProducts, productPrices, loading, fetchInitialData, fetchProductPrices } = useAppStore((state) => ({
@@ -156,6 +158,16 @@ export default function StoreDetailPage() {
 
   // Find the current store from the Zustand store
   const store = useMemo(() => stores.find(s => s.id === id), [stores, id]);
+  
+  // Set the active store in the cart context when visiting this page
+  useEffect(() => {
+    setActiveStoreId(id);
+    
+    // Clear the active store when leaving the page
+    return () => {
+      setActiveStoreId(null);
+    }
+  }, [id, setActiveStoreId]);
   
   const allStoreProducts = useMemo(() => {
     if (!store || masterProducts.length === 0) return [];

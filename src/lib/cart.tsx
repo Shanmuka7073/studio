@@ -14,9 +14,7 @@ interface CartContextType {
   cartCount: number;
   cartTotal: number;
   activeStoreId: string | null;
-  mismatchedStoreInfo: { product: Product; variant: ProductVariant } | null;
-  confirmClearCart: () => void;
-  cancelClearCart: () => void;
+  setActiveStoreId: (storeId: string | null) => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -24,7 +22,6 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [activeStoreId, setActiveStoreId] = useState<string | null>(null);
-  const [mismatchedStoreInfo, setMismatchedStoreInfo] = useState<{ product: Product; variant: ProductVariant } | null>(null);
 
   const { toast } = useToast();
 
@@ -36,11 +33,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       if (storedCart) {
         const parsedCart = JSON.parse(storedCart);
         setCartItems(parsedCart);
-        if (parsedCart.length > 0) {
-            setActiveStoreId(parsedCart[0].product.storeId);
-        } else if (storedStoreId) {
-            setActiveStoreId(JSON.parse(storedStoreId));
-        }
+      }
+      if (storedStoreId) {
+        setActiveStoreId(JSON.parse(storedStoreId));
       }
     } catch (error) {
       console.error("Failed to parse cart from localStorage", error);
@@ -63,16 +58,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
 
   const addItem = useCallback((product: Product, variant: ProductVariant, quantity = 1) => {
-    // If the cart is empty, set the active store ID
-    if (cartItems.length === 0) {
-        setActiveStoreId(product.storeId);
-    } 
-    // If the item's store is different from the active store, show confirmation
-    else if (activeStoreId && product.storeId !== activeStoreId) {
-        setMismatchedStoreInfo({ product, variant });
-        return;
-    }
-    
     setCartItems((prevItems) => {
       const existingItem = prevItems.find((item) => item.variant.sku === variant.sku);
       if (existingItem) {
@@ -82,18 +67,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
             : item
         );
       }
-      return [...prevItems, { product, variant, quantity }];
+      // Add the storeId to the product object when adding to cart
+      const productWithStore = { ...product, storeId: activeStoreId || product.storeId };
+      return [...prevItems, { product: productWithStore, variant, quantity }];
     });
 
     toast({
       title: 'Item added to cart',
       description: `${product.name} (${variant.weight}) has been added.`,
     });
-  }, [cartItems, activeStoreId, toast]);
+  }, [toast, activeStoreId]);
 
   const removeItem = useCallback((variantSku: string) => {
     setCartItems((prevItems) => {
         const newItems = prevItems.filter((item) => item.variant.sku !== variantSku);
+        // If the cart becomes empty, also clear the active store
         if (newItems.length === 0) {
             setActiveStoreId(null);
         }
@@ -122,26 +110,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setActiveStoreId(null);
   }, []);
   
-  const confirmClearCart = useCallback(() => {
-    if (mismatchedStoreInfo) {
-      clearCart();
-      const { product, variant } = mismatchedStoreInfo;
-      // Use a timeout to ensure state updates before adding the new item
-      setTimeout(() => {
-        addItem(product, variant, 1);
-        setMismatchedStoreInfo(null);
-        toast({
-          title: "New Cart Started",
-          description: `Your previous cart was cleared. Started a new cart with items from ${product.name}.`
-        })
-      }, 0);
-    }
-  }, [mismatchedStoreInfo, clearCart, addItem, toast]);
-
-  const cancelClearCart = useCallback(() => {
-    setMismatchedStoreInfo(null);
-  }, []);
-  
   const cartCount = cartItems.reduce((count, item) => count + item.quantity, 0);
 
   const cartTotal = cartItems.reduce(
@@ -160,9 +128,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         cartCount,
         cartTotal,
         activeStoreId,
-        mismatchedStoreInfo,
-        confirmClearCart,
-        cancelClearCart,
+        setActiveStoreId,
       }}
     >
       {children}

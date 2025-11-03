@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -7,45 +8,6 @@ import { Footer } from '@/components/layout/footer';
 import { VoiceCommander } from '@/components/layout/voice-commander';
 import { ProfileCompletionChecker } from '@/components/profile-completion-checker';
 import { NotificationPermissionManager } from '@/components/layout/notification-permission-manager';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-
-function StoreMismatchDialog() {
-    const { mismatchedStoreInfo, confirmClearCart, cancelClearCart } = useCart();
-    
-    if (!mismatchedStoreInfo) {
-        return null;
-    }
-
-    const { product } = mismatchedStoreInfo;
-
-    return (
-        <AlertDialog open={!!mismatchedStoreInfo} onOpenChange={(open) => !open && cancelClearCart()}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Start a New Cart?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Your cart currently has items from a different store. You can only order from one store at a time.
-                        <br /><br />
-                        Would you like to clear your current cart and start a new one with items from <strong>{product.storeId}</strong>?
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel onClick={cancelClearCart}>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={confirmClearCart}>Clear Cart & Add</AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-    );
-}
 
 export function MainLayout({ children }: { children: React.ReactNode }) {
   const [voiceEnabled, setVoiceEnabled] = useState(false);
@@ -74,7 +36,6 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
         cartItems={cartItems} // Pass cart items as a prop
       />
       <ProfileCompletionChecker />
-      <StoreMismatchDialog />
       <main className="flex-1 pb-10">{children}</main>
       <NotificationPermissionManager />
       <Footer />

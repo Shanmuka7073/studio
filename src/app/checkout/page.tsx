@@ -4,7 +4,13 @@
 import { useCart } from '@/lib/cart';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -20,15 +26,17 @@ import {
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
-import { getProductImage, getStore } from '@/lib/data';
+import { getProductImage, getStore, getStores } from '@/lib/data';
 import { useTransition, useState, useCallback, useEffect, useMemo, RefObject, useRef } from 'react';
 import { useFirebase, errorEmitter, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, addDoc, serverTimestamp, doc } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { Mic, CheckCircle, MapPin, Loader2 } from 'lucide-react';
+import { CheckCircle, MapPin, Loader2, AlertCircle, Store as StoreIcon } from 'lucide-react';
 import Link from 'next/link';
-import type { User as AppUser } from '@/lib/types';
+import type { User as AppUser, Store } from '@/lib/types';
 import { create } from 'zustand';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useAppStore } from '@/lib/store';
 
 const checkoutSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -60,27 +68,15 @@ function OrderSummaryItem({ item, image }) {
 interface PassThroughState {
   placeOrderBtnRef: RefObject<HTMLButtonElement> | null;
   setPlaceOrderBtnRef: (ref: RefObject<HTMLButtonElement> | null) => void;
-  getFinalTotal: () => number;
-  setFinalTotalGetter: (getter: () => number) => void;
-  shouldPromptForLocation: boolean;
-  setShouldPromptForLocation: (should: boolean) => void;
-  handleGetLocation: () => void;
-  setHandleGetLocation: (handler: () => void) => void;
 }
 
 export const useCheckoutStore = create<PassThroughState>((set) => ({
   placeOrderBtnRef: null,
   setPlaceOrderBtnRef: (placeOrderBtnRef) => set({ placeOrderBtnRef }),
-  getFinalTotal: () => 0,
-  setFinalTotalGetter: (getter) => set({ getFinalTotal: getter }),
-  shouldPromptForLocation: false,
-  setShouldPromptForLocation: (should) => set({ shouldPromptForLocation: should }),
-  handleGetLocation: () => {},
-  setHandleGetLocation: (handler) => set({ handleGetLocation: handler }),
 }));
 
 export default function CheckoutPage() {
-  const { cartItems, cartTotal, clearCart } = useCart();
+  const { cartItems, cartTotal, clearCart, activeStoreId, setActiveStoreId } = useCart();
   const router = useRouter();
   const { toast } = useToast();
   const [isPlacingOrder, startPlaceOrderTransition] = useTransition();
@@ -90,7 +86,9 @@ export default function CheckoutPage() {
   const [images, setImages] = useState({});
   const placeOrderBtnRef = useRef<HTMLButtonElement>(null);
   
-  const { setPlaceOrderBtnRef, setFinalTotalGetter, setShouldPromptForLocation, setHandleGetLocation } = useCheckoutStore();
+  const allStores = useAppStore(state => state.stores);
+
+  const { setPlaceOrderBtnRef } = useCheckoutStore();
 
   const hasItemsInCart = cartItems.length > 0;
   const finalTotal = hasItemsInCart ? cartTotal + DELIVERY_FEE : 0;
@@ -106,7 +104,7 @@ export default function CheckoutPage() {
                     toast({ title: "Location Fetched!", description: "Your current location has been captured for delivery." });
                 },
                 () => {
-                    toast({ variant: 'destructive', title: "Location Error", description: "Could not retrieve your location. Please enter your address manually and ensure permissions are enabled." });
+                    toast({ variant: 'destructive', title: "Location Error", description: "Could not retrieve your location. Please ensure permissions are enabled." });
                 },
                 { timeout: 10000 }
             );
@@ -115,8 +113,6 @@ export default function CheckoutPage() {
         }
     }, [toast]);
     
-  const shouldPromptForLocation = hasItemsInCart && !deliveryCoords;
-
   // Automatically trigger location capture on page load if needed.
   useEffect(() => {
     if (hasItemsInCart && !deliveryCoords) {
@@ -126,20 +122,11 @@ export default function CheckoutPage() {
   }, [hasItemsInCart, deliveryCoords, handleGetLocation]);
 
   useEffect(() => {
-    if (deliveryCoords) return;
     setPlaceOrderBtnRef(placeOrderBtnRef);
-    setFinalTotalGetter(() => finalTotal);
-    setShouldPromptForLocation(shouldPromptForLocation);
-    setHandleGetLocation(() => handleGetLocation);
-
-    // Cleanup on unmount
     return () => {
       setPlaceOrderBtnRef(null);
-      setFinalTotalGetter(() => 0);
-      setShouldPromptForLocation(false);
-      setHandleGetLocation(() => {});
     }
-  }, [setPlaceOrderBtnRef, setFinalTotalGetter, finalTotal, shouldPromptForLocation, setShouldPromptForLocation, handleGetLocation, setHandleGetLocation, deliveryCoords]);
+  }, [setPlaceOrderBtnRef]);
 
 
    const userDocRef = useMemoFirebase(() => {
@@ -194,14 +181,13 @@ export default function CheckoutPage() {
         toast({ variant: 'destructive', title: 'Error', description: 'Your cart is empty. Please add items before checking out.' });
         return;
     }
-     const storeId = cartItems[0]?.product.storeId;
-     if (!storeId) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not determine the store for this order.' });
+     if (!activeStoreId) {
+        toast({ variant: 'destructive', title: 'Store Required', description: 'Please select a store to fulfill your order.' });
         return;
     }
 
     startPlaceOrderTransition(async () => {
-        const storeData = await getStore(firestore, storeId!);
+        const storeData = await getStore(firestore, activeStoreId);
         if (!storeData) {
             toast({ variant: 'destructive', title: 'Error', description: 'Selected store could not be found.' });
             return;
@@ -211,7 +197,7 @@ export default function CheckoutPage() {
         
         let orderData: any = {
             userId: user.uid,
-            storeId: storeId,
+            storeId: activeStoreId,
             storeOwnerId: storeData.ownerId, // Denormalized store owner ID
             customerName: data.name,
             deliveryAddress: 'Delivery via captured GPS coordinates',
@@ -278,7 +264,7 @@ export default function CheckoutPage() {
                 <div>
                 <Card>
                     <CardHeader>
-                    <CardTitle>Delivery Information</CardTitle>
+                    <CardTitle>Delivery & Store Selection</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <FormField
@@ -327,7 +313,35 @@ export default function CheckoutPage() {
                             )}
                         />
                         
-                        <Button ref={placeOrderBtnRef} type="submit" disabled={isPlacingOrder} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
+                        <div className="space-y-2 pt-4 border-t">
+                            <FormLabel>Fulfilling Store</FormLabel>
+                            <Select onValueChange={setActiveStoreId} value={activeStoreId || ""}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a store to fulfill your order" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {allStores.map(store => (
+                                        <SelectItem key={store.id} value={store.id}>
+                                            <div className="flex items-center gap-2">
+                                                <StoreIcon className="h-4 w-4 text-muted-foreground" />
+                                                <span>{store.name}</span>
+                                            </div>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            {!activeStoreId && (
+                                <Alert variant="destructive">
+                                    <AlertCircle className="h-4 w-4" />
+                                    <AlertTitle>Action Required</AlertTitle>
+                                    <AlertDescription>
+                                        Please select a store to continue.
+                                    </AlertDescription>
+                                </Alert>
+                            )}
+                        </div>
+
+                        <Button ref={placeOrderBtnRef} type="submit" disabled={isPlacingOrder || !activeStoreId} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
                             {isPlacingOrder ? 'Placing Order...' : 'Place Order'}
                         </Button>
                     </CardContent>
