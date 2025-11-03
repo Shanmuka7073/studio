@@ -13,6 +13,7 @@ import { useCart } from '@/lib/cart';
 import { useProfileFormStore } from '@/lib/store';
 import { ProfileFormValues } from '@/app/dashboard/customer/my-profile/page';
 import { useCheckoutStore } from '@/app/checkout/page';
+import { getCommands } from '@/app/actions';
 
 export interface Command {
   command: string;
@@ -118,6 +119,7 @@ export function VoiceCommander({
     // Reset the flag when navigating away from checkout
     if (pathname !== '/checkout') {
       hasSpokenCheckoutPrompt.current = false;
+      setIsWaitingForStoreName(false); // Reset this state as well
       return;
     }
 
@@ -146,11 +148,8 @@ export function VoiceCommander({
 
 
   const findProductAndVariant = useCallback(async (productName: string, desiredWeight?: string): Promise<{ product: Product | null, variant: ProductVariant | null, storeId: string | null }> => {
-    if (!activeStoreId) {
-        speak("Please go to a specific store's page before adding items to your cart.");
-        router.push('/stores');
-        return { product: null, variant: null, storeId: null };
-    }
+    // We allow adding without an active store now
+    const storeIdForProduct = activeStoreId || 'any';
     
     const lowerProductName = productName.toLowerCase();
     const productMatch = masterProductsRef.current.find(p => p.name.toLowerCase() === lowerProductName);
@@ -171,22 +170,22 @@ export function VoiceCommander({
         if (desiredWeight) {
             const lowerDesiredWeight = desiredWeight.replace(/\s/g, '').toLowerCase();
             const variantMatch = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === lowerDesiredWeight);
-            if (variantMatch) return { product: finalProduct, variant: variantMatch, storeId: activeStoreId };
+            if (variantMatch) return { product: finalProduct, variant: variantMatch, storeId: storeIdForProduct };
         }
         
         if (!desiredWeight || desiredWeight === 'one') {
           const onePieceVariant = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === '1pc');
-          if (onePieceVariant) return { product: finalProduct, variant: onePieceVariant, storeId: activeStoreId };
+          if (onePieceVariant) return { product: finalProduct, variant: onePieceVariant, storeId: storeIdForProduct };
 
            const firstVariant = priceData.variants.sort((a,b) => a.price - b.price)[0];
-           if (firstVariant) return { product: finalProduct, variant: firstVariant, storeId: activeStoreId };
+           if (firstVariant) return { product: finalProduct, variant: firstVariant, storeId: storeIdForProduct };
         }
 
-        return { product: finalProduct, variant: priceData.variants[0], storeId: activeStoreId };
+        return { product: finalProduct, variant: priceData.variants[0], storeId: storeIdForProduct };
     }
     
     return { product: null, variant: null, storeId: null };
-  }, [activeStoreId, firestore, router, speak]);
+  }, [activeStoreId, firestore, speak]);
 
 
   const handleProfileFormInteraction = useCallback(() => {
@@ -347,7 +346,8 @@ export function VoiceCommander({
           speak(`Added ${variant.weight} of ${product} to your cart.`);
           onOpenCart();
         } else {
-            // The findProductAndVariant function will speak the error message
+          // The findProductAndVariant function will speak the error message
+          speak(`Sorry, I could not find ${product} in the store.`);
         }
       },
     };
