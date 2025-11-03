@@ -675,6 +675,123 @@ function ProductChecklist({ storeId, adminStoreId }: { storeId: string; adminSto
 }
 
 
+function BulkUploadCard({ storeId }: { storeId: string }) {
+    const { firestore } = useFirebase();
+    const { toast } = useToast();
+    const [isUploading, startUploadTransition] = useTransition();
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        startUploadTransition(async () => {
+            try {
+                const text = await file.text();
+                const rows = text.split('\n').slice(1); // Skip header row
+                if (rows.length === 0) {
+                    toast({ variant: 'destructive', title: 'Empty CSV', description: 'The selected file has no data rows.' });
+                    return;
+                }
+
+                const batch = writeBatch(firestore);
+                let count = 0;
+
+                for (const row of rows) {
+                    if (!row.trim()) continue; // Skip empty rows
+                    
+                    const [name, category, description, imageUrl, weight, price] = row.split(',').map(s => s.trim());
+                    
+                    if (!name || !category || !weight || !price) {
+                        console.warn(`Skipping invalid row: ${row}`);
+                        continue;
+                    }
+                    
+                    const productNameLower = name.toLowerCase();
+                    const imageId = `prod-${createSlug(name)}`;
+                    
+                    // 1. Add product to the master /stores/{adminId}/products collection
+                    const productRef = doc(collection(firestore, 'stores', storeId, 'products'));
+                    batch.set(productRef, {
+                        name,
+                        category,
+                        description: description || '',
+                        imageUrl: imageUrl || '',
+                        storeId,
+                        imageId: imageId,
+                        imageHint: productNameLower,
+                    });
+
+                    // 2. Add pricing info to the canonical /productPrices collection
+                    const priceRef = doc(firestore, 'productPrices', productNameLower);
+                    const newVariant: Omit<z.infer<typeof variantSchema>, 'sku'> = {
+                        weight,
+                        price: Number(price)
+                    };
+                    batch.set(priceRef, {
+                        productName: productNameLower,
+                        variants: [{
+                            ...newVariant,
+                            sku: `${createSlug(name)}-${createSlug(weight)}-0`
+                        }]
+                    }, { merge: true }); // Use merge to add to existing variants if product exists
+
+                    count++;
+                }
+
+                if (count > 0) {
+                    await batch.commit();
+                    toast({
+                        title: 'Upload Complete!',
+                        description: `Successfully processed and added ${count} products.`,
+                    });
+                } else {
+                     toast({
+                        variant: 'destructive',
+                        title: 'No Valid Data',
+                        description: 'Could not find any valid rows to process in the CSV file.',
+                    });
+                }
+
+            } catch (error) {
+                console.error("CSV Upload failed:", error);
+                toast({ variant: 'destructive', title: 'Upload Failed', description: 'There was an error processing your file.' });
+            } finally {
+                // Reset the file input
+                if(fileInputRef.current) {
+                    fileInputRef.current.value = '';
+                }
+            }
+        });
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Bulk Product Upload</CardTitle>
+                <CardDescription>
+                    Upload a CSV file to add multiple products at once. The format should be: `name,category,description,imageUrl,weight,price`
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileChange}
+                    disabled={isUploading}
+                />
+                 {isUploading && (
+                    <div className="flex items-center gap-2 mt-4 text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Processing your file... this may take a moment.</span>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
 function AddProductForm({ storeId, isAdmin }: { storeId: string; isAdmin: boolean; }) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
@@ -1458,7 +1575,7 @@ function ManageStoreView({ store, isAdmin, adminStoreId }: { store: Store; isAdm
 
         {isAdmin ? (
              <div className="grid md:grid-cols-2 gap-8">
-                <StoreImageUploader store={store} />
+                <BulkUploadCard storeId={store.id} />
                 <AddProductForm storeId={store.id} isAdmin={true} />
             </div>
         ) : (
@@ -1843,3 +1960,5 @@ export default function MyStorePage() {
         </div>
     );
 }
+
+    
