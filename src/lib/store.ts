@@ -86,7 +86,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setLanguage: (language: string) => {
-    localStorage.setItem('language', language);
+    // We no longer store the language in localStorage as it's now dynamic
     set({ language });
   },
 

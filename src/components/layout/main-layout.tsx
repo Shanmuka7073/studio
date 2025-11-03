@@ -8,7 +8,6 @@ import { Footer } from '@/components/layout/footer';
 import { VoiceCommander } from '@/components/layout/voice-commander';
 import { ProfileCompletionChecker } from '@/components/profile-completion-checker';
 import { NotificationPermissionManager } from '@/components/layout/notification-permission-manager';
-import { LanguageDetector } from '@/components/layout/language-detector';
 
 export function MainLayout({ children }: { children: React.ReactNode }) {
   const [voiceEnabled, setVoiceEnabled] = useState(false);
@@ -19,7 +18,6 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="relative flex min-h-dvh flex-col bg-background">
-      <LanguageDetector />
       <Header 
         voiceEnabled={voiceEnabled}
         onToggleVoice={() => setVoiceEnabled(prev => !prev)}
