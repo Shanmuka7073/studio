@@ -1,14 +1,12 @@
+
 {
   "quickOrder": {
     "display": "Order an Item from a specific store",
     "reply": "Checking...",
     "aliases": [
       "order {quantity} of {product} from {store}",
-      "order {quantity} {product} from {store}",
       "get {quantity} of {product} from {store}",
-      "get {quantity} {product} from {store}",
-      "buy {quantity} of {product} from {store}",
-      "buy {quantity} {product} from {store}"
+      "buy {quantity} of {product} from {store}"
     ]
   },
   "orderItem": {

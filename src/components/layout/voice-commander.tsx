@@ -410,28 +410,36 @@ export function VoiceCommander({
             
             // Priority 1.5: Check for quick order command
             const quickOrderTemplate = fileCommandsRef.current.quickOrder;
-            if(quickOrderTemplate) {
-                for (const alias of quickOrderTemplate.aliases) {
-                    const fromSplit = alias.split(' from ');
-                    const mainPart = fromSplit[0];
+            if(quickOrderTemplate && commandText.includes(' from ')) {
+                const commandParts = commandText.split(' from ');
+                const itemPart = commandParts[0].trim();
+                const storeName = commandParts[1].trim();
+                const triggerWords = ["order", "get", "buy", "add", "i want"];
+                let foundTrigger = false;
+                let processedItemPart = itemPart;
 
-                    if(commandText.includes(' from ')) {
-                        const commandParts = commandText.split(' from ');
-                        const commandActionPart = commandParts[0];
-                        const storeName = commandParts[1].trim();
-
-                        const productAlias = mainPart.replace('{quantity}', '(\\S+)').replace('{product}', '(.+)');
-                        const regex = new RegExp(`^${productAlias}$`);
-                        const match = commandActionPart.match(regex);
-                        
-                        if(match) {
-                            const quantity = match[1];
-                            const product = match[2];
-                            await commandActionsRef.current.quickOrder({ product, quantity, storeName });
-                            resetContext();
-                            return;
-                        }
+                for(const word of triggerWords) {
+                    if(itemPart.startsWith(word + " ")) {
+                        processedItemPart = itemPart.substring(word.length + 1);
+                        foundTrigger = true;
+                        break;
                     }
+                }
+
+                if (foundTrigger && processedItemPart && storeName) {
+                    const quantityRegex = /^(one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s*(kg|kgs|kilo|kilos|gram|grams|gm|gms|pc|pcs|piece|pieces)?/i;
+                    const quantityMatch = processedItemPart.match(quantityRegex);
+                    let quantity: string | undefined = "1";
+                    let product = processedItemPart;
+
+                    if (quantityMatch) {
+                        quantity = quantityMatch[0].trim();
+                        product = processedItemPart.substring(quantityMatch[0].length).trim();
+                    }
+                    
+                    await commandActionsRef.current.quickOrder({ product, quantity, storeName });
+                    resetContext();
+                    return;
                 }
             }
 
