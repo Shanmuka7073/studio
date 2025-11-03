@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useCart } from '@/lib/cart';
@@ -173,6 +174,10 @@ export function VoiceOrderDialog({ isOpen, onClose, orderInfo }: { isOpen: boole
         setHandleGetLocation(() => {});
         setDeliveryCoords(null);
         setStructuredList([]);
+    }
+     // Cleanup on unmount
+    return () => {
+        setPlaceOrderBtnRef(null);
     }
   }, [isOpen, placeOrderBtnRef, setPlaceOrderBtnRef, finalTotal, setFinalTotalGetter, shouldPromptForLocation, setShouldPromptForLocation, handleGetLocation, setHandleGetLocation]);
 

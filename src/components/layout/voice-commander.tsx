@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -322,18 +323,21 @@ export function VoiceCommander({
         router.push('/checkout');
       },
       placeOrder: () => {
-        if (cartItems.length > 0) {
-            if (pathname !== '/checkout') {
-                speak("Okay, taking you to checkout.");
-                router.push('/checkout');
-            } else if (placeOrderBtnRef?.current) {
-                placeOrderBtnRef.current.click();
-            } else {
-                speak("I'm on the checkout page but can't find the place order button.");
-            }
-        } else {
-            speak("Your cart is empty. Please add some items first.");
+        // Priority 1: A specific button is active (in a dialog or on the checkout page)
+        if (placeOrderBtnRef?.current) {
+            placeOrderBtnRef.current.click();
+            return;
         }
+
+        // Priority 2: Cart has items, but we're not on the checkout page
+        if (cartItems.length > 0) {
+            speak("Okay, taking you to checkout.");
+            router.push('/checkout');
+            return;
+        }
+
+        // Fallback: Cart is empty
+        speak("Your cart is empty. Please add some items first.");
       },
       saveChanges: () => {
         if (pathname === '/dashboard/customer/my-profile' && profileForm) {
