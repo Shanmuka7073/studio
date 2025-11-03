@@ -1,3 +1,4 @@
+
 {
   "home": { "en": "Home", "te": "హోమ్" },
   "stores": { "en": "Stores", "te": "స్టోర్స్" },
@@ -136,6 +137,7 @@
   "chicken-gizzard": { "en": ["Chicken Gizzard"], "te": ["చికెన్ గిజార్డ్"] },
   "chicken-mince-(keema)": { "en": ["Chicken Mince", "Chicken Keema"], "te": ["చికెన్ మైన్స్", "చికెన్ కీమా"] },
   "chicken-curry-cut": { "en": ["Chicken Curry Cut"], "te": ["చికెన్ కర్రీ కట్"] },
+  "masoor-dal-red-lentil": { "en": ["Masoor Dal", "Red Lentil"], "te": ["మసూర్ పప్పు", "ఎర్ర పప్పు"] },
   "fresh-cut": { "en": "Fresh Cut", "te": "తాజా కట్" },
   "vegetables": { "en": "Vegetables", "te": "కూరగాయలు" },
   "fruits": { "en": "Fruits", "te": "పండ్లు" },
