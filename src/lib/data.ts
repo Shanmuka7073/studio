@@ -14,7 +14,7 @@ import {
 async function getImages() {
     // Dynamically import the JSON file to get the latest version.
     const placeholderData = await import('./placeholder-images.json');
-    return placeholderData.placeholderImages;
+    return placeholderData.default.placeholderImages;
 }
 
 const getImage = async (id: string) => {
@@ -32,8 +32,7 @@ const getImage = async (id: string) => {
 
 export async function getStores(db: Firestore): Promise<Store[]> {
   const storesCol = collection(db, 'stores');
-  // Correctly query for stores that are not closed.
-  const q = query(storesCol, where('isClosed', '==', false));
+  const q = query(storesCol, where('isClosed', '!=', true));
   const storeSnapshot = await getDocs(q);
   const storeList = storeSnapshot.docs.map((doc) => ({
     id: doc.id,
