@@ -16,7 +16,6 @@ import { useCheckoutStore } from '@/app/checkout/page';
 import { getCommands } from '@/app/actions';
 import { t, getAllAliases } from '@/lib/locales';
 import { doc, getDoc, serverTimestamp } from 'firebase/firestore';
-import { quickOrderFlow, QuickOrderFlowResponse } from '@/ai/flows/quick-order-flow';
 
 export interface Command {
   command: string;
@@ -124,9 +123,7 @@ export function VoiceCommander({
 
     utterance.onend = () => {
       isSpeakingRef.current = false;
-      if (onEndCallback) {
-        onEndCallback();
-      }
+      if (onEndCallback) onEndCallback();
       if (isEnabledRef.current) {
         try {
           recognition?.start();
@@ -226,7 +223,7 @@ export function VoiceCommander({
   const findProductAndVariant = useCallback(async (productName: string, desiredWeight?: string): Promise<{ product: Product | null, variant: ProductVariant | null }> => {
     const lowerProductName = productName.toLowerCase();
     
-    let bestMatch: { product: Product, alias: string } | null = null;
+    let bestMatch: { product: Product, alias: string, similarity: number } | null = null;
 
     for (const p of masterProducts) {
         if (!p.name) continue;
@@ -234,8 +231,9 @@ export function VoiceCommander({
 
         for (const alias of allAliasValues) {
             if (lowerProductName.includes(alias)) {
-                if (!bestMatch || alias.length > bestMatch.alias.length) {
-                    bestMatch = { product: p, alias: alias };
+                const similarity = calculateSimilarity(lowerProductName, alias);
+                if (!bestMatch || similarity > bestMatch.similarity) {
+                    bestMatch = { product: p, alias: alias, similarity: similarity };
                 }
             }
         }
@@ -360,34 +358,32 @@ export function VoiceCommander({
                 return;
             }
             
-            const perfectMatch = commandsRef.current.find((c) => c.command === commandText);
-            if (perfectMatch) {
-                speak(perfectMatch.reply);
-                perfectMatch.action();
-                resetContext();
-                return;
-            }
-            
-            const quickOrderTemplate = fileCommandsRef.current.quickOrder;
-            if(quickOrderTemplate) {
-                 const isQuickOrder = quickOrderTemplate.aliases.some(alias => {
-                    const simpleAlias = alias.replace(/\{.*\}/g, '').trim();
-                    return commandText.includes(simpleAlias);
-                 });
+            let allPossibleCommands: {command: Command | {alias: string, fileCommand: any, key: string}, similarity: number}[] = [];
 
-                 if(isQuickOrder) {
-                    await commandActionsRef.current.quickOrder({ commandText });
-                    resetContext();
-                    return;
-                 }
-            }
+            // 1. Check file commands (aliases)
+            Object.entries(fileCommandsRef.current).forEach(([key, fileCommand]: [string, any]) => {
+                if (key !== 'orderItem') { // orderItem is handled separately
+                    fileCommand.aliases.forEach((alias: string) => {
+                        const similarity = calculateSimilarity(commandText, alias);
+                        if (similarity > 0.7) {
+                            allPossibleCommands.push({ command: {alias, fileCommand, key}, similarity });
+                        }
+                    });
+                }
+            });
 
+            // 2. Check built commands (for stores)
+            commandsRef.current.forEach(c => {
+                const similarity = calculateSimilarity(commandText, c.command);
+                if (similarity > 0.7) {
+                    allPossibleCommands.push({ command: c, similarity });
+                }
+            });
+
+            // 3. Handle orderItem template separately
             const orderItemTemplate = fileCommandsRef.current.orderItem;
-            if (orderItemTemplate) {
-                let parsed = false;
+             if (orderItemTemplate) {
                  for (const alias of orderItemTemplate.aliases) {
-                    if(parsed) break;
-
                     const aliasParts = alias.split(/(\{product\}|\{quantity\})/g).filter(Boolean);
                     const isTemplate = aliasParts.some(p => p === '{product}' || p === '{quantity}');
                     
@@ -400,7 +396,8 @@ export function VoiceCommander({
                         const match = commandText.match(regex);
 
                         if (match) {
-                            let quantity: string | undefined = undefined;
+                            // This is a direct match, execute it.
+                             let quantity: string | undefined = undefined;
                             let product: string | undefined = undefined;
                             let quantityIndex = alias.indexOf('{quantity}');
                             let productIndex = alias.indexOf('{product}');
@@ -423,44 +420,33 @@ export function VoiceCommander({
                             if (product) {
                                 await commandActionsRef.current.orderItem({ product: product.trim(), quantity: quantity?.trim() });
                                 resetContext();
-                                parsed = true;
+                                return;
                             }
                         }
-                    } else {
-                         if (commandText === alias) {
-                            const productFromAlias = alias.replace(/add|i want|get|buy|oka|naaku/i, '').replace(/kavali/i, '').trim();
-                            await commandActionsRef.current.orderItem({ product: productFromAlias });
-                            resetContext();
-                            parsed = true;
-                        }
                     }
-                }
-                if(parsed) return;
+                 }
             }
 
-            if (clarificationStores.length > 0) {
-                const chosenIndex = parseInt(commandText.replace(/[^0-9]/g, ''), 10) - 1;
-                let chosenStore: Store | undefined = clarificationStores[chosenIndex];
 
-                if (!chosenStore) {
-                    const bestMatch = clarificationStores
-                        .map(store => ({ ...store, similarity: calculateSimilarity(commandText, store.address.toLowerCase()) }))
-                        .sort((a, b) => b.similarity - a.similarity)[0];
-                    if (bestMatch && bestMatch.similarity > 0.6) {
-                        chosenStore = bestMatch;
-                    }
-                }
-                
-                if (chosenStore) {
-                    speak(`Okay, navigating to ${chosenStore.name} at ${chosenStore.address}.`);
-                    router.push(`/stores/${chosenStore.id}`);
-                } else {
-                    speak(`Sorry, I didn't understand that. Please say the address or number of the store you want.`);
+            allPossibleCommands.sort((a, b) => b.similarity - a.similarity);
+
+            const bestMatch = allPossibleCommands[0];
+
+            if (bestMatch && bestMatch.similarity > 0.9) {
+                if ('key' in bestMatch.command) { // It's a file command
+                    const { fileCommand, key } = bestMatch.command;
+                    speak(fileCommand.reply);
+                    commandActionsRef.current[key]();
+                } else { // It's a built command
+                    const cmd = bestMatch.command as Command;
+                    speak(cmd.reply);
+                    cmd.action();
                 }
                 resetContext();
                 return;
             }
-            
+
+            // Fallback to checking if the command is just a product name
             const productAsCommandMatch = await findProductAndVariant(commandText);
             if (productAsCommandMatch.product && productAsCommandMatch.variant) {
                 await commandActionsRef.current.orderItem({ product: commandText });
@@ -468,16 +454,22 @@ export function VoiceCommander({
                 return;
             }
             
-            const potentialMatches = commandsRef.current
-              .map((c) => ({ ...c, similarity: calculateSimilarity(commandText, c.command) }))
-              .filter((c) => c.similarity > 0.7)
-              .sort((a, b) => b.similarity - a.similarity)
-              .filter((value, index, self) => self.findIndex((v) => v.display === value.display) === index)
-              .slice(0, 3);
-      
-            if (potentialMatches.length > 0) {
+            if (allPossibleCommands.length > 0) {
+              const suggestions = allPossibleCommands.slice(0, 3).map(m => {
+                  if ('key' in m.command) {
+                      const { fileCommand, key } = m.command;
+                      return {
+                          command: m.command.alias,
+                          display: fileCommand.display,
+                          action: commandActionsRef.current[key],
+                          reply: fileCommand.reply,
+                      }
+                  }
+                  return m.command as Command;
+              }).filter((value, index, self) => self.findIndex((v) => v.display === value.display) === index)
+
               speak("I'm not sure. Did you mean one of these?");
-              onSuggestions(potentialMatches);
+              onSuggestions(suggestions);
             } else {
               speak(`Sorry, I don't recognize the command "${commandText}".`);
               toast({
@@ -548,31 +540,10 @@ export function VoiceCommander({
           speak(`Sorry, I could not find ${product} in the store.`);
         }
       },
-      quickOrder: async ({ commandText }: { commandText: string }) => {
-        if (!userProfileRef.current) {
-            speak("I need your profile information before placing a quick order. Please complete your profile first.");
-            router.push('/dashboard/customer/my-profile');
-            return;
-        }
-
-        const response: QuickOrderFlowResponse = await quickOrderFlow({ command: commandText });
-
-        if ('error' in response) {
-            speak(response.error);
-        } else {
-            clearCart();
-            addItemToCart(response.product, response.variant, 1);
-            setActiveStoreId(response.store.id);
-            
-            setIsWaitingForQuickOrderConfirmation(true);
-            router.push('/checkout');
-        }
-      },
     };
     
     recognition.continuous = false;
     recognition.interimResults = false;
-    recognition.lang = 'en-IN'; // Listen in English
 
     recognition.onstart = () => {
       onStatusUpdate(`🎧 Listening...`);
@@ -650,18 +621,6 @@ export function VoiceCommander({
             });
           });
         });
-
-        Object.entries(fileCommands).forEach(([key, { display, aliases, reply }]: [string, any]) => {
-          if (key !== 'orderItem' && key !== 'quickOrder' && key !== 'quickOrderConfirm') {
-              const action = commandActionsRef.current[key];
-              if (action) {
-                  aliases.forEach((alias: string) => {
-                      builtCommands.push({ command: alias, display, action, reply });
-                  });
-              }
-          }
-        });
-
         commandsRef.current = builtCommands;
       }).catch(console.error);
     }
@@ -677,6 +636,3 @@ export function VoiceCommander({
 
   return null;
 }
-
-    
-    
