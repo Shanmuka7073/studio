@@ -165,9 +165,9 @@ export function VoiceCommander({
     const lowerProductName = productName.toLowerCase();
 
     const productMatch = masterProductsRef.current.find(p => {
-        const translation = t(p.name.toLowerCase().replace(/ /g, '-')).toLowerCase();
+        const translation = t(p.name.toLowerCase().replace(/ /g, '-'));
         const parts = translation.split(' / ');
-        const englishName = parts[0]?.trim();
+        const englishName = parts[0]?.trim().toLowerCase();
         const teluguName = parts[1]?.trim();
 
         if (englishName === lowerProductName) return true;
