@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -277,35 +278,46 @@ export function VoiceCommander({
                 onSuggestions([]);
                 return;
             }
-
-            // Priority 2: Check if it's an "order item" command.
+            
+            // Priority 2: Check if it's an "order item" command using templates.
             const orderItemTemplate = fileCommandsRef.current.orderItem;
             if (orderItemTemplate) {
               for (const alias of orderItemTemplate.aliases) {
-                  // Find the longest alias that is a prefix of the command
-                  if (commandText.startsWith(alias)) {
-                      const remainingText = commandText.substring(alias.length).trim();
-                      // This alias could be a full product name itself (e.g. "add chicken")
-                      // Or it could be a prefix to a product name (e.g. "add" for "add apples")
-                      const product = remainingText || alias.replace(/add|get|buy|i want/g, '').trim();
+                const aliasWithPlaceholders = alias.replace('{quantity}', '([\\w\\s\\d\\.]+)')
+                                                    .replace('{product}', '([\\w\\s]+)');
+                const regex = new RegExp(`^${aliasWithPlaceholders}$`, 'i');
+                const match = commandText.match(regex);
+                
+                if (match) {
+                    const extractedValues: any = {};
+                    const quantityPlaceholderIndex = alias.indexOf('{quantity}');
+                    const productPlaceholderIndex = alias.indexOf('{product}');
 
-                      if (product) {
-                        // A simplified quantity check
-                        const quantityRegex = /^(one|two|three|four|five|six|seven|eight|nine|ten|[\d\.]+)\s*(kg|kilo|kilos|gram|grams|gm|g)?/i;
-                        const quantityMatch = product.match(quantityRegex);
-                        let finalProduct = product;
-                        let quantity;
-
-                        if (quantityMatch) {
-                           quantity = quantityMatch[0].trim();
-                           finalProduct = product.substring(quantity.length).trim();
+                    // Figure out the order of captures based on placeholder position
+                    if (quantityPlaceholderIndex !== -1 && productPlaceholderIndex !== -1) {
+                        if (quantityPlaceholderIndex < productPlaceholderIndex) {
+                            extractedValues.quantity = match[1]?.trim();
+                            extractedValues.product = match[2]?.trim();
+                        } else {
+                            extractedValues.product = match[1]?.trim();
+                            extractedValues.quantity = match[2]?.trim();
                         }
-
-                        await commandActionsRef.current.orderItem({ product: finalProduct, quantity });
+                    } else if (quantityPlaceholderIndex !== -1) {
+                        extractedValues.quantity = match[1]?.trim();
+                    } else if (productPlaceholderIndex !== -1) {
+                        extractedValues.product = match[1]?.trim();
+                    } else {
+                        // This case handles aliases with no placeholders, like "add chicken"
+                        // The entire alias is effectively the product.
+                        extractedValues.product = alias.replace(/add|get|buy|i want/gi, '').trim();
+                    }
+                    
+                    if (extractedValues.product) {
+                        await commandActionsRef.current.orderItem(extractedValues);
                         onSuggestions([]);
-                        return;
-                      }
-                  }
+                        return; // Command handled
+                    }
+                }
               }
             }
 
