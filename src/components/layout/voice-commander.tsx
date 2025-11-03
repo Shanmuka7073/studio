@@ -67,7 +67,7 @@ export function VoiceCommander({
   const formFieldToFillRef = useRef<keyof ProfileFormValues | null>(null);
   const [isWaitingForStoreName, setIsWaitingForStoreName] = useState(false);
   const checkoutStateRef = useRef({ pathname: '', activeStoreId: '', hasCartItems: false });
-
+  const hasSpokenCheckoutPrompt = useRef(false);
 
   useEffect(() => {
     isEnabledRef.current = enabled;
@@ -115,28 +115,39 @@ export function VoiceCommander({
     window.speechSynthesis.speak(utterance);
   }, []);
 
-  // Proactive prompt on checkout page if no store is selected
+  // Proactive prompt on checkout page
   useEffect(() => {
-      const currentState = { pathname, activeStoreId, hasCartItems: cartItems.length > 0 };
+    // Reset the flag when navigating away from checkout
+    if (pathname !== '/checkout') {
+      hasSpokenCheckoutPrompt.current = false;
+      return;
+    }
 
-      // Check if the relevant state has changed to avoid re-triggering
-      if (
-          currentState.pathname === checkoutStateRef.current.pathname &&
-          currentState.activeStoreId === checkoutStateRef.current.activeStoreId &&
-          currentState.hasCartItems === checkoutStateRef.current.hasCartItems
-      ) {
-          return;
-      }
-      
-      checkoutStateRef.current = currentState;
-
-      if (enabled && pathname === '/checkout' && cartItems.length > 0 && !activeStoreId) {
+    // Only speak once per page visit
+    if (enabled && !hasSpokenCheckoutPrompt.current) {
+      // Use a timeout to ensure the DOM is ready
+      const speakTimeout = setTimeout(() => {
+        const actionAlert = document.getElementById('action-required-alert');
+        if (actionAlert) {
+          const alertTitle = actionAlert.querySelector('h5')?.innerText || 'Action Required';
+          const alertDescription = actionAlert.querySelector('div[role="alert"] > div:last-child')?.innerText || 'Please check the screen.';
+          speak(`${alertTitle}. ${alertDescription}`);
           setIsWaitingForStoreName(true);
-          speak("To continue, please tell me which store you'd like to order from.");
-      } else {
+        } else {
+          const totalAmountEl = document.getElementById('final-total-amount');
+          if (totalAmountEl) {
+            const totalText = totalAmountEl.innerText;
+            speak(`Your total is ${totalText}. Please say "place order" to confirm.`);
+          }
           setIsWaitingForStoreName(false);
-      }
-  }, [pathname, cartItems, activeStoreId, speak, enabled]);
+        }
+        hasSpokenCheckoutPrompt.current = true; // Mark as spoken
+      }, 1500); // 1.5-second delay
+
+      return () => clearTimeout(speakTimeout);
+    }
+  }, [pathname, enabled, speak]);
+
 
   const findProductAndVariant = useCallback(async (productName: string, desiredWeight?: string): Promise<{ product: Product | null, variant: ProductVariant | null, storeId: string | null }> => {
     if (!activeStoreId) {
@@ -258,14 +269,15 @@ export function VoiceCommander({
                 
                 setActiveStoreId(store.id);
 
-                speak(`Okay, ordering from ${store.name}.`);
-
                 const itemPromises = itemsString.split(/, and |, | and /).map(itemStr => {
                     const [quantity, ...productWords] = itemStr.trim().split(' ');
                     const product = productWords.join(' ');
                     return commandActionsRef.current.orderItem({ product, quantity });
                 });
                 await Promise.all(itemPromises);
+                
+                // Speak after all items are processed
+                speak(`Okay, ordering from ${store.name}. Taking you to checkout.`);
                 
                 router.push('/checkout');
                 onSuggestions([]);
@@ -340,20 +352,17 @@ export function VoiceCommander({
         router.push('/checkout');
       },
       placeOrder: () => {
-        // Priority 1: A specific component (like the checkout page) has registered its button.
         if (placeOrderBtnRef?.current) {
             placeOrderBtnRef.current.click();
             return;
         }
         
-        // Priority 2: User has items in the main cart and is not on the checkout page.
         if (cartItems.length > 0) {
             speak("Okay, taking you to checkout.");
             router.push('/checkout');
             return;
         }
         
-        // Priority 3: Cart is empty.
         speak("Your cart is empty. Please add some items first.");
       },
       saveChanges: () => {
@@ -366,14 +375,12 @@ export function VoiceCommander({
       },
       refresh: () => window.location.reload(),
       orderItem: async ({ product, quantity }: { product: string, quantity?: string }) => {
-        speak(`Looking for ${product}.`);
         const { product: foundProduct, variant } = await findProductAndVariant(product, quantity);
         if (foundProduct && variant) {
           addItemToCart(foundProduct, variant, 1);
           speak(`Added ${variant.weight} of ${product} to your cart.`);
           onOpenCart();
         } else {
-            // The findProductAndVariant function will speak the error message if no store is selected.
             if (activeStoreId) {
                 speak(`Sorry, I could not find ${product} in the product catalog.`);
             }
@@ -381,7 +388,7 @@ export function VoiceCommander({
       },
     };
 
-    recognition.continuous = true;
+    recognition.continuous = false; // Set to false to allow onend to fire reliably
     recognition.interimResults = false;
     recognition.lang = 'en-IN';
 
@@ -390,12 +397,8 @@ export function VoiceCommander({
     };
 
     recognition.onresult = (event) => {
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-                const transcript = event.results[i][0].transcript.toLowerCase().trim();
-                handleCommand(transcript);
-            }
-        }
+        const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
+        handleCommand(transcript);
     };
 
     recognition.onerror = (event) => {
@@ -406,14 +409,14 @@ export function VoiceCommander({
     };
     
     recognition.onend = () => {
-      if (isEnabledRef.current) {
+      if (isEnabledRef.current && !isSpeakingRef.current) {
         setTimeout(() => {
           try {
             recognition?.start();
           } catch (e) {
             console.error('Could not restart recognition service: ', e);
           }
-        }, 100);
+        }, 250); // Add a short delay before restarting
       }
     };
 
@@ -446,7 +449,7 @@ export function VoiceCommander({
           });
 
           Object.entries(fileCommands).forEach(([key, { display, aliases, reply }]) => {
-            if (key !== 'orderItem' && key !== 'orderChicken') { // Exclude specific and template item orders
+            if (key !== 'orderItem') { // Exclude template item orders
               const action = commandActionsRef.current[key];
               if (action) {
                 aliases.forEach(alias => {
@@ -454,20 +457,6 @@ export function VoiceCommander({
                 });
               }
             }
-          });
-          
-          Object.entries(fileCommands).forEach(([key, value]) => {
-            const { display, aliases, reply } = value as { display: string; aliases: string[]; reply: string; };
-              if (key === 'orderChicken') {
-                  aliases.forEach(alias => {
-                      builtCommands.push({
-                          command: alias,
-                          display: 'Order Chicken (Specific)',
-                          action: () => commandActionsRef.current.orderItem({ product: 'chicken', quantity: '1kg' }),
-                          reply
-                      });
-                  });
-              }
           });
 
           commandsRef.current = builtCommands;
@@ -480,7 +469,7 @@ export function VoiceCommander({
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firestore, user, cartItems, profileForm, isWaitingForStoreName, activeStoreId, placeOrderBtnRef, enabled]); // Add dependencies
+  }, [firestore, user, cartItems, profileForm, isWaitingForStoreName, activeStoreId, placeOrderBtnRef, enabled, pathname]);
 
   return null;
 }

@@ -331,7 +331,7 @@ export default function CheckoutPage() {
                                 </SelectContent>
                             </Select>
                             {!activeStoreId && (
-                                <Alert variant="destructive">
+                                <Alert variant="destructive" id="action-required-alert">
                                     <AlertCircle className="h-4 w-4" />
                                     <AlertTitle>Action Required</AlertTitle>
                                     <AlertDescription>
@@ -368,7 +368,7 @@ export default function CheckoutPage() {
                     </CardContent>
                     <CardFooter className="flex justify-between font-bold text-lg border-t pt-4">
                         <span>Total</span>
-                        <span>₹{finalTotal.toFixed(2)}</span>
+                        <span id="final-total-amount">₹{finalTotal.toFixed(2)}</span>
                     </CardFooter>
                 </Card>
                 </div>
