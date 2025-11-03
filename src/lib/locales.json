@@ -298,7 +298,8 @@
   "potatoes": {
     "en": [
       "Potatoes",
-      "Potato"
+      "Potato",
+      "potato"
     ],
     "te": [
       "బంగాళదుంపలు",
@@ -875,7 +876,8 @@
   "masoor-dal-(red-lentil)": {
     "en": [
       "Masoor Dal",
-      "Red Lentil"
+      "Red Lentil",
+      "masoor dal"
     ],
     "te": [
       "మసూర్ పప్పు",
@@ -1359,5 +1361,15 @@
   "loading-your-quick-order-item": {
     "en": "Loading your quick order item...",
     "te": "మీ త్వరిత ఆర్డర్ అంశం లోడ్ అవుతోంది..."
+  },
+  "apple": {
+    "en": [
+      "apple"
+    ]
+  },
+  "banana": {
+    "en": [
+      "banana"
+    ]
   }
 }

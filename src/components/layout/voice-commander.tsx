@@ -262,11 +262,16 @@ export function VoiceCommander({
 
     for (const p of masterProducts) {
         if (!p.name) continue;
-        // Check against all aliases for all languages
+        
+        // --- FIX: Include the product's own name in the list of aliases to check ---
+        const aliasesToCheck = [p.name.toLowerCase()];
         const allAliasValues = Object.values(getAllAliases(p.name.toLowerCase().replace(/ /g, '-'))).flat().map(name => name.toLowerCase());
+        aliasesToCheck.push(...allAliasValues);
+        
+        const uniqueAliases = [...new Set(aliasesToCheck)];
 
-        for (const alias of allAliasValues) {
-             if (lowerProductName.includes(alias)) {
+        for (const alias of uniqueAliases) {
+             if (lowerProductName.includes(alias) || alias.includes(lowerProductName)) {
                 const similarity = calculateSimilarity(lowerProductName, alias);
                 if (!bestMatch || similarity > bestMatch.similarity) {
                     bestMatch = { product: p, alias: alias, similarity: similarity };
@@ -413,17 +418,17 @@ export function VoiceCommander({
             // --- PASS 1: Exact match on general commands ---
              for (const key in fileCommandsRef.current) {
                 const commandGroup = fileCommandsRef.current[key];
-                const allCommandAliases: string[] = commandGroup.aliases || [];
                 
-                if (allCommandAliases.some(alias => alias.toLowerCase() === commandText.toLowerCase())) {
+                const allLangAliases = (commandGroup.aliases || []).map(a => a.toLowerCase());
+                
+                if (allLangAliases.includes(commandText.toLowerCase())) {
                     const action = commandActionsRef.current[key];
                     if (typeof action === 'function') {
-                        // Use a dynamic reply if available, otherwise a generic one.
                         const reply = commandGroup.reply || `Executing ${key}`;
                         speak(reply);
                         action();
                         resetContext();
-                        return; // Command handled
+                        return;
                     }
                 }
             }
