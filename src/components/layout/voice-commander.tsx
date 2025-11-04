@@ -71,6 +71,7 @@ export function VoiceCommander({
   const [isWaitingForVoiceOrder, setIsWaitingForVoiceOrder] = useState(false);
   const [clarificationStores, setClarificationStores] = useState<Store[]>([]);
   const hasSpokenCheckoutPrompt = useRef(false);
+  const hasSpokenProfilePrompt = useRef(false);
   const [isWaitingForAddressType, setIsWaitingForAddressType] = useState(false);
 
   const [isWaitingForQuantity, setIsWaitingForQuantity] = useState(false);
@@ -652,7 +653,7 @@ export function VoiceCommander({
             return;
         }
         
-        const combinedPhrase = quantity ? `${quantity} ${product}` : product;
+        const combinedPhrase = quantity ? `${quantity} ${product}` : itemPhrase;
         const { product: foundProduct, variant } = await findProductAndVariant(combinedPhrase);
         if (!foundProduct || !variant) {
             speak(`Sorry, I could not find ${product}.`);
@@ -806,10 +807,9 @@ export function VoiceCommander({
     homeAddressBtnRef, 
     currentLocationBtnRef, 
     hasMounted,
-    voiceTrigger // Add the trigger to the dependency array
+    voiceTrigger, // Add the trigger to the dependency array
+    isWaitingForVoiceOrder
 ]);
 
   return null;
 }
-
-    
