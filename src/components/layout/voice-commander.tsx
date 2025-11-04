@@ -17,7 +17,7 @@ import { doc, getDoc, serverTimestamp, addDoc, collection } from 'firebase/fires
 
 export interface Command {
   command: string;
-  action: (text?: string) => void;
+  action: (params?: any) => void;
   display: string;
   reply: string;
 }
@@ -458,25 +458,51 @@ export function VoiceCommander({
                 return;
             }
             
+            // --- NEW: Regex-based command parsing for quick order ---
+            const quickOrderAliases = fileCommandsRef.current.quickOrder?.aliases || [];
+            for (const alias of quickOrderAliases) {
+                // Create a regex from the alias template
+                const pattern = alias
+                    .replace(/\{(\w+)\}/g, '(.+)')
+                    .replace(/\\s\*/g, '\\s+'); // ensure spaces match one or more whitespace
+                const regex = new RegExp(`^${pattern}$`, 'i');
+                const match = commandText.match(regex);
+
+                if (match) {
+                    const params: Record<string, string> = {};
+                    const keys = (alias.match(/\{(\w+)\}/g) || []).map(key => key.slice(1, -1));
+                    keys.forEach((key, index) => {
+                        params[key] = match[index + 1]?.trim();
+                    });
+                    
+                    speak(fileCommandsRef.current.quickOrder.reply, () => commandActionsRef.current.quickOrder(params));
+                    resetContext();
+                    return; // Command found and executed
+                }
+            }
+
+
             let bestCommand: { command: Command, similarity: number } | null = null;
             
             // Combine file commands and dynamic commands
             const allCommands = [...commandsRef.current];
             for (const key in fileCommandsRef.current) {
-              const cmdGroup = fileCommandsRef.current[key];
-              const action = commandActionsRef.current[key];
-              if (action) {
-                cmdGroup.aliases.forEach((alias: string) => {
-                  allCommands.push({
-                    command: alias,
-                    action: action,
-                    display: cmdGroup.display,
-                    reply: cmdGroup.reply
-                  });
-                });
-              }
-            }
+                // Skip quickOrder as it's now handled by regex
+                if (key === 'quickOrder') continue;
 
+                const cmdGroup = fileCommandsRef.current[key];
+                const action = commandActionsRef.current[key];
+                if (action) {
+                    cmdGroup.aliases.forEach((alias: string) => {
+                    allCommands.push({
+                        command: alias,
+                        action: action,
+                        display: cmdGroup.display,
+                        reply: cmdGroup.reply
+                    });
+                    });
+                }
+            }
 
             for (const cmd of allCommands) {
                 const similarity = calculateSimilarity(commandText.toLowerCase(), cmd.command);
