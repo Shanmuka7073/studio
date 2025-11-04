@@ -17,7 +17,7 @@ import { doc, getDoc, serverTimestamp, addDoc, collection } from 'firebase/fires
 
 export interface Command {
   command: string;
-  action: () => void;
+  action: (text?: string) => void;
   display: string;
   reply: string;
 }
@@ -450,7 +450,7 @@ export function VoiceCommander({
                 cmdGroup.aliases.forEach(alias => {
                   allCommands.push({
                     command: alias,
-                    action: action,
+                    action: action.bind(null, { phrase: commandText }),
                     display: cmdGroup.display,
                     reply: cmdGroup.reply
                   });
@@ -467,7 +467,7 @@ export function VoiceCommander({
             }
 
             if (bestCommand && bestCommand.similarity > 0.7) {
-                speak(bestCommand.command.reply, () => bestCommand.command.action());
+                speak(bestCommand.command.reply, () => bestCommand.command.action(commandText));
                 resetContext();
             } else {
                 const itemPhrases = commandText.split(/,?\s+(?:and|మరియు)\s+|,/);
@@ -749,5 +749,7 @@ export function VoiceCommander({
 
   return null;
 }
+
+    
 
     
