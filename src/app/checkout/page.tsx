@@ -192,13 +192,16 @@ export default function CheckoutPage() {
 
   // Safely watch the delivery address and trigger voice prompt when it changes
   const deliveryAddressValue = form.watch('deliveryAddress');
+  
   useEffect(() => {
-    if (deliveryAddressValue && deliveryAddressValue.length > 10) {
+    // This effect will trigger the voice commander to re-evaluate the checkout page state.
+    // It runs when the address is filled out, OR when a store is selected.
+    if ((deliveryAddressValue && deliveryAddressValue.length > 10) || activeStoreId) {
       if (triggerVoicePrompt) {
         triggerVoicePrompt();
       }
     }
-  }, [deliveryAddressValue, triggerVoicePrompt]);
+  }, [deliveryAddressValue, activeStoreId, triggerVoicePrompt]);
 
 
   // Effect to pre-fill form with user data

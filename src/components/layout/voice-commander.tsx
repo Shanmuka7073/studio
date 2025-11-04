@@ -653,7 +653,7 @@ export function VoiceCommander({
             return;
         }
         
-        const combinedPhrase = quantity ? `${quantity} ${product}` : itemPhrase;
+        const combinedPhrase = quantity ? `${quantity} ${product}` : product;
         const { product: foundProduct, variant } = await findProductAndVariant(combinedPhrase);
         if (!foundProduct || !variant) {
             speak(`Sorry, I could not find ${product}.`);
@@ -813,3 +813,5 @@ export function VoiceCommander({
 
   return null;
 }
+
+    
