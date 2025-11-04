@@ -1,5 +1,19 @@
 
 {
+  "smartOrder": {
+    "display": "Smart Order (Product, Store, Destination)",
+    "reply": "Okay, preparing your quick order.",
+    "aliases": [
+      "order {quantity} of {product} from {store} to {destination}",
+      "order {quantity} {product} from {store} to {destination}",
+      "send {quantity} of {product} from {store} to {destination}",
+      "send {quantity} {product} from {store} to {destination}",
+      "order {product} from {store} to {destination}",
+      "send {product} from {store} to {destination}",
+      "order {quantity} of {product} from {store}",
+      "order {product} from {store}"
+    ]
+  },
   "quickOrder": {
     "display": "Quick Order an Item from a Store",
     "reply": "Okay, preparing your quick order.",

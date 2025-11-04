@@ -79,6 +79,8 @@ interface PassThroughState {
   setHomeAddressBtnRef: (ref: RefObject<HTMLButtonElement> | null) => void;
   currentLocationBtnRef: RefObject<HTMLButtonElement> | null;
   setCurrentLocationBtnRef: (ref: RefObject<HTMLButtonElement> | null) => void;
+  homeAddress: string | null;
+  setHomeAddress: (address: string | null) => void;
 }
 
 export const useCheckoutStore = create<PassThroughState>((set) => ({
@@ -90,6 +92,8 @@ export const useCheckoutStore = create<PassThroughState>((set) => ({
   setHomeAddressBtnRef: (ref) => set({ homeAddressBtnRef: ref }),
   currentLocationBtnRef: null,
   setCurrentLocationBtnRef: (ref) => set({ currentLocationBtnRef: ref }),
+  homeAddress: null,
+  setHomeAddress: (address) => set({homeAddress: address}),
 }));
 
 export default function CheckoutPage() {
@@ -98,6 +102,10 @@ export default function CheckoutPage() {
   const { toast } = useToast();
   const [isPlacingOrder, startPlaceOrderTransition] = useTransition();
   const { firestore, user } = useFirebase();
+  const form = useForm<CheckoutFormValues>({
+    resolver: zodResolver(checkoutSchema),
+    defaultValues: { name: '', phone: '', deliveryAddress: '' },
+  });
 
   const [deliveryCoords, setDeliveryCoords] = useState<{lat: number, lng: number} | null>(null);
   const [images, setImages] = useState({});
@@ -115,7 +123,9 @@ export default function CheckoutPage() {
       setPlaceOrderBtnRef, 
       setIsWaitingForQuickOrderConfirmation,
       setHomeAddressBtnRef,
-      setCurrentLocationBtnRef
+      setCurrentLocationBtnRef,
+      homeAddress,
+      setHomeAddress
     } = useCheckoutStore();
   
   const { triggerVoicePrompt } = useVoiceCommander();
@@ -148,7 +158,7 @@ export default function CheckoutPage() {
     } else {
         toast({ variant: 'destructive', title: "Not Supported", description: "Geolocation is not supported by your browser." });
     }
-  }, [toast]);
+  }, [toast, form]);
 
   useEffect(() => {
     setPlaceOrderBtnRef(placeOrderBtnRef);
@@ -170,10 +180,6 @@ export default function CheckoutPage() {
   }, [firestore, user]);
   const { data: userData } = useDoc<AppUser>(userDocRef);
 
-  const form = useForm<CheckoutFormValues>({
-    resolver: zodResolver(checkoutSchema),
-    defaultValues: { name: '', phone: '', deliveryAddress: '' },
-  });
   
   const handleUseHomeAddress = useCallback(() => {
     if (userData) {
@@ -204,6 +210,14 @@ export default function CheckoutPage() {
     }
   }, [deliveryAddressValue, activeStoreId, triggerVoicePrompt]);
 
+   // Effect for smart order: set home address if provided
+  useEffect(() => {
+    if (homeAddress) {
+        form.setValue('deliveryAddress', homeAddress, { shouldValidate: true });
+        // Clean up the state so it doesn't persist
+        setHomeAddress(null);
+    }
+  }, [homeAddress, form, setHomeAddress]);
 
   // Effect to pre-fill form with user data
   useEffect(() => {

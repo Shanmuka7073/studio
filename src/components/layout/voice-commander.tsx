@@ -130,7 +130,9 @@ export function VoiceCommander({
 
     // Effect to reset context when the user navigates away from a page
     useEffect(() => {
-        resetAllContext();
+        if(pathname !== '/checkout') {
+          resetAllContext();
+        }
     }, [pathname, resetAllContext]);
 
 
@@ -457,28 +459,82 @@ export function VoiceCommander({
       return;
     }
 
+    const handleSmartOrder = async (command: string) => {
+        let remainingCommand = command.toLowerCase();
+
+        // 1. Find Store
+        let bestStoreMatch: { store: Store, similarity: number } | null = null;
+        for (const store of stores) {
+            const storeNameLower = store.name.toLowerCase();
+            if (remainingCommand.includes(storeNameLower)) {
+                const similarity = calculateSimilarity(remainingCommand, storeNameLower);
+                if (!bestStoreMatch || similarity > bestStoreMatch.similarity) {
+                    bestStoreMatch = { store, similarity };
+                }
+            }
+        }
+        if (bestStoreMatch) {
+            remainingCommand = remainingCommand.replace(bestStoreMatch.store.name.toLowerCase(), '').trim();
+        }
+
+        // 2. Find Destination ("to home")
+        let destination: 'home' | null = null;
+        const homeKeywords = ['to home', 'at home', 'home address'];
+        if (homeKeywords.some(kw => remainingCommand.includes(kw))) {
+            destination = 'home';
+            homeKeywords.forEach(kw => {
+                remainingCommand = remainingCommand.replace(kw, '');
+            });
+        }
+
+        // 3. Find Product and Variant (from the remaining text)
+        const { product, variant } = await findProductAndVariant(remainingCommand);
+
+        // 4. Validate and Execute
+        if (!product || !variant) {
+            speak(`Sorry, I couldn't find the product in your order. Please try again.`);
+            return;
+        }
+        if (!bestStoreMatch) {
+            speak(`Sorry, I couldn't identify the store. Please mention the store name clearly.`);
+            return;
+        }
+        if (destination === 'home' && (!userProfileRef.current || !userProfileRef.current.address)) {
+            speak(`I can't deliver to home because your address isn't saved. Please update your profile.`);
+            router.push('/dashboard/customer/my-profile');
+            return;
+        }
+
+        // --- Optimistic UI Flow ---
+        const qty = remainingCommand.match(/\d+/)?.[0] || '1';
+        speak(`Okay, ordering ${qty} of ${product.name} from ${bestStoreMatch.store.name}. Taking you to checkout.`);
+
+        clearCart();
+        addItemToCart(product, variant, 1);
+        setActiveStoreId(bestStoreMatch.store.id);
+
+        // Set the address in the form *before* navigating
+        if (destination === 'home' && userProfileRef.current?.address) {
+            // This is tricky because the form instance is on another page.
+            // We'll use a zustand store to pass this initial value.
+            useCheckoutStore.getState().setHomeAddress(userProfileRef.current.address);
+        } else {
+             useCheckoutStore.getState().setHomeAddress(null);
+        }
+
+        setIsWaitingForQuickOrderConfirmation(true);
+        router.push('/checkout');
+    };
+
     const handleCommand = async (commandText: string) => {
       onStatusUpdate(`Processing: "${commandText}"`);
       try {
         if (!firestore || !user) return;
         
-        // Detect language and update recognition
         const detectedLang = detectLanguage(commandText);
         updateRecognitionLanguage(detectedLang);
         setCurrentLanguage(detectedLang);
         
-        const resetContext = () => {
-          setIsWaitingForQuantity(false);
-          itemToUpdateSkuRef.current = null;
-          setIsWaitingForStoreName(false);
-          setClarificationStores([]);
-          onSuggestions([]);
-          setIsWaitingForQuickOrderConfirmation(false);
-          setIsWaitingForVoiceOrder(false);
-          setIsWaitingForAddressType(false);
-          hasSpokenCheckoutPrompt.current = false;
-        };
-
         // --- PRIORITY 1: High-priority global navigation ---
         const highPriorityCommands = ["home", "stores", "dashboard", "cart", "orders", "deliveries", "myStore", "checkout", "refresh"];
         for (const key of highPriorityCommands) {
@@ -489,33 +545,22 @@ export function VoiceCommander({
             for (const alias of allAliases) {
                 if (calculateSimilarity(commandText.toLowerCase(), alias) > 0.9) {
                      speak(cmdGroup.reply, () => commandActionsRef.current[key]());
-                     resetContext();
+                     resetAllContext();
                      return;
                 }
             }
         }
         
-        // --- PRIORITY 2: Quick Order command ---
-        const quickOrderAliases = fileCommandsRef.current.quickOrder?.aliases || [];
-        for (const alias of quickOrderAliases) {
-            const pattern = alias
-                .replace(/\{(\w+)\}/g, '(.+)')
-                .replace(/\s/g, '\\s+'); // Match one or more spaces
-            const regex = new RegExp(`^${pattern}$`, 'i');
-            const match = commandText.match(regex);
-
-            if (match) {
-                const params: Record<string, string> = {};
-                // Extract keys like {product}, {quantity}, {store}
-                const keys = (alias.match(/\{(\w+)\}/g) || []).map(key => key.slice(1, -1));
-                keys.forEach((key, index) => {
-                    params[key] = match[index + 1]?.trim();
-                });
-                
-                await commandActionsRef.current.quickOrder(params);
-                resetContext();
-                return; // Stop further processing
-            }
+        // --- PRIORITY 2: Smart Order command (isolated check) ---
+        const smartOrderAlias = (fileCommandsRef.current.smartOrder?.aliases || [])[0];
+        if(smartOrderAlias) {
+             const keywords = ['order', 'send', 'from', 'to'];
+             const commandLower = commandText.toLowerCase();
+             if (keywords.some(kw => commandLower.includes(kw)) && (commandLower.includes('from') || commandLower.includes('to'))) {
+                 await handleSmartOrder(commandText);
+                 resetAllContext();
+                 return; // Stop further processing
+             }
         }
 
         // --- PRIORITY 3: CONTEXTUAL REPLIES (Checkout, Forms, etc.) ---
@@ -541,13 +586,13 @@ export function VoiceCommander({
           } else {
             speak("Sorry, I didn't understand. Please say 'home address' or 'current location'.");
           }
-          resetContext();
+          resetAllContext();
           return;
         }
 
         if (isWaitingForVoiceOrder) {
           await commandActionsRef.current.createVoiceOrder(commandText);
-          resetContext();
+          resetAllContext();
           return;
         }
 
@@ -561,7 +606,7 @@ export function VoiceCommander({
             clearCart();
             router.push('/stores');
           }
-          resetContext();
+          resetAllContext();
           return;
         }
 
@@ -590,7 +635,7 @@ export function VoiceCommander({
             speak("Sorry, I didn't catch a valid quantity. Please state a number.");
           }
           
-          resetContext();
+          resetAllContext();
           return;
         }
 
@@ -610,7 +655,7 @@ export function VoiceCommander({
           } else {
             speak(`Sorry, I couldn't find a store named ${commandText}. Please try again.`);
           }
-          resetContext();
+          resetAllContext();
           return;
         }
 
@@ -625,7 +670,7 @@ export function VoiceCommander({
         
         const allCommands = [...commandsRef.current];
         for (const key in fileCommandsRef.current) {
-          if (key === 'quickOrder') continue; // Already handled
+          if (key === 'smartOrder') continue; // Already handled
           const cmdGroup = fileCommandsRef.current[key];
           const action = commandActionsRef.current[key];
           if (action) {
@@ -658,20 +703,20 @@ export function VoiceCommander({
 
         if (bestCommand && bestCommand.similarity > 0.7) {
           speak(bestCommand.command.reply, () => bestCommand!.command.action({phrase: commandText}));
-          resetContext();
+          resetAllContext();
         } else {
           const itemPhrases = commandText.split(/,?\s+(?:and|మరియు|और)\s+|,/);
           if (itemPhrases.length > 1 || isOrderItemCommand) {
             await commandActionsRef.current.orderItem({ phrase: commandText });
-            resetContext();
+            resetAllContext();
           } else {
             const { product } = await findProductAndVariant(commandText);
             if (product) {
               await commandActionsRef.current.orderItem({ phrase: commandText });
-              resetContext();
+              resetAllContext();
             } else {
               speak("Sorry, I didn't understand that. Please try again.");
-              resetContext();
+              resetAllContext();
             }
           }
         }
@@ -809,7 +854,7 @@ export function VoiceCommander({
         }
       },
       refresh: () => window.location.reload(),
-      orderItem: async ({ phrase, quantity }: { phrase?: string, quantity?: string }) => {
+      orderItem: async ({ phrase }: { phrase?: string }) => {
         if (!phrase) return;
         const itemPhrases = phrase.split(/,?\s+(?:and|మరియు|और)\s+|,/);
         let addedItems: string[] = [];
@@ -818,8 +863,7 @@ export function VoiceCommander({
         for (const itemPhrase of itemPhrases) {
           if (!itemPhrase.trim()) continue;
           
-          const combinedPhrase = quantity ? `${quantity} ${itemPhrase}` : itemPhrase;
-          const { product: foundProduct, variant } = await findProductAndVariant(combinedPhrase);
+          const { product: foundProduct, variant } = await findProductAndVariant(itemPhrase);
 
           if (foundProduct && variant) {
             addItemToCart(foundProduct, variant, 1);
@@ -843,95 +887,19 @@ export function VoiceCommander({
           speak(`I added some items, but couldn't find ${notFoundItems.join(', ')}.`);
         }
       },
-      quickOrder: async ({ product, quantity, store: storeName }: { product: string, quantity?: string, store?: string }) => {
-        if (!storeName) {
-          speak("You need to specify a store for a quick order. For example, say 'order 1kg potatoes from Fresh Produce'.");
-          return;
-        }
-        
-        const combinedPhrase = quantity ? `${quantity} ${product}` : product;
-        const { product: foundProduct, variant } = await findProductAndVariant(combinedPhrase);
-        if (!foundProduct || !variant) {
-          speak(`Sorry, I could not find ${product}.`);
-          return;
-        }
-        
-        const spokenStoreName = storeName.toLowerCase();
-        const bestMatch = stores
-          .map(s => ({ ...s, similarity: calculateSimilarity(spokenStoreName, s.name.toLowerCase()) }))
-          .sort((a, b) => b.similarity - a.similarity)[0];
-
-        if (!bestMatch || bestMatch.similarity < 0.7) {
-          speak(`Sorry, I couldn't find a store named ${storeName}. Please try again.`);
-          return;
-        }
-
-        const qty = quantity || '1';
-        speak(`Okay, starting a quick order for ${qty} of ${product} from ${bestMatch.name}.`);
-        
-        clearCart();
-        addItemToCart(foundProduct, variant, 1);
-        setActiveStoreId(bestMatch.id);
-        
-        setIsWaitingForQuickOrderConfirmation(true);
-        setTimeout(() => {
-          router.push('/checkout');
-        }, 500);
-      },
     };
 
     if (firestore && user) {
-      const userDocRef = doc(firestore, 'users', user.uid);
-      getDoc(userDocRef).then(docSnap => {
-        if (docSnap.exists()) {
-          userProfileRef.current = docSnap.data() as User;
-        }
-      });
-      
-      getCommands().then((fileCommands) => {
-        fileCommandsRef.current = fileCommands;
-        let builtCommands: Command[] = [];
-
-        stores.forEach((store) => {
-          if (store.name === 'LocalBasket') return;
-          const coreName = store.name.toLowerCase().replace(/shop|store|kirana/g, '').trim();
-          const variations = [...new Set([
-            store.name.toLowerCase(), coreName, `go to ${store.name.toLowerCase()}`, `open ${store.name.toLowerCase()}`,
-          ])];
-          variations.forEach(variation => {
-            builtCommands.push({
-              command: variation,
-              display: `Go to ${store.name}`,
-              action: () => {
-                if (pathname === '/checkout') {
-                  setIsWaitingForStoreName(false);
-                  speak(`Okay, ordering from ${store.name}.`);
-                  setActiveStoreId(store.id);
-                  hasSpokenCheckoutPrompt.current = false;
-                  setTimeout(() => runCheckoutPrompt(), 1000);
-                  return;
-                }
-
-                const matchingStores = stores.filter(s => s.name.toLowerCase() === store.name.toLowerCase());
-                if (matchingStores.length > 1) {
-                  setClarificationStores(matchingStores);
-                  let prompt = `I found ${matchingStores.length} stores named ${store.name}. `;
-                  matchingStores.forEach((s, i) => {
-                    prompt += `Number ${i + 1} is at ${s.address}. `;
-                  });
-                  prompt += "Which one would you like?";
-                  speak(prompt);
-                } else {
-                  router.push(`/stores/${store.id}`);
-                }
-              },
-              reply: `Navigating to ${store.name}.`
-            });
-          });
+        const userDocRef = doc(firestore, 'users', user.uid);
+        getDoc(userDocRef).then(docSnap => {
+            if (docSnap.exists()) userProfileRef.current = docSnap.data() as User;
         });
-        commandsRef.current = builtCommands;
-      }).catch(console.error);
+        
+        getCommands().then((fileCommands) => {
+            fileCommandsRef.current = fileCommands;
+        }).catch(console.error);
     }
+
 
     return () => {
       if (recognition) {
