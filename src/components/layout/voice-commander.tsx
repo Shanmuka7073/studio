@@ -71,7 +71,6 @@ export function VoiceCommander({
   const [isWaitingForVoiceOrder, setIsWaitingForVoiceOrder] = useState(false);
   const [clarificationStores, setClarificationStores] = useState<Store[]>([]);
   const hasSpokenCheckoutPrompt = useRef(false);
-  const hasSpokenProfilePrompt = useRef(false);
   const [isWaitingForAddressType, setIsWaitingForAddressType] = useState(false);
 
   const [isWaitingForQuantity, setIsWaitingForQuantity] = useState(false);
@@ -214,12 +213,8 @@ export function VoiceCommander({
     const addressValue = (document.querySelector('input[name="deliveryAddress"]') as HTMLInputElement)?.value;
     
     if (isWaitingForQuickOrderConfirmation) {
-      const totalAmountEl = document.getElementById('final-total-amount');
-      if (totalAmountEl) {
-        const totalText = totalAmountEl.innerText;
-        speak(`Your total is ${totalText}. Please say "confirm order" to place your order.`);
+        speak(`Please say "confirm order" to place your order.`);
         hasSpokenCheckoutPrompt.current = true;
-      }
     } else if (!addressValue || addressValue.length < 10) {
       speak("Should I deliver to your home address or current location?");
       setIsWaitingForAddressType(true);
@@ -229,12 +224,8 @@ export function VoiceCommander({
       setIsWaitingForStoreName(true);
       hasSpokenCheckoutPrompt.current = true;
     } else if (addressValue && activeStoreId) {
-       const totalAmountEl = document.getElementById('final-total-amount');
-        if (totalAmountEl) {
-          const totalText = totalAmountEl.innerText;
-          speak(`Your total is ${totalText}. Please say "place order" to confirm.`);
-          hasSpokenCheckoutPrompt.current = true;
-        }
+        speak(`Please say "place order" to confirm.`);
+        hasSpokenCheckoutPrompt.current = true;
     }
   }, [pathname, hasMounted, enabled, isWaitingForQuickOrderConfirmation, activeStoreId, speak]);
 
@@ -250,15 +241,15 @@ export function VoiceCommander({
   // Proactive prompt on profile page
   useEffect(() => {
     if (pathname !== '/dashboard/customer/my-profile' || !hasMounted || !enabled) {
-      hasSpokenProfilePrompt.current = false;
+      hasSpokenCheckoutPrompt.current = false; // Note: using checkout prompt flag here for simplicity
       formFieldToFillRef.current = null;
       return;
     }
 
-    if (!hasSpokenProfilePrompt.current && profileForm) {
+    if (!hasSpokenCheckoutPrompt.current && profileForm) {
       const speakTimeout = setTimeout(() => {
         handleProfileFormInteraction();
-        hasSpokenProfilePrompt.current = true;
+        hasSpokenCheckoutPrompt.current = true;
       }, 1500);
 
       return () => clearTimeout(speakTimeout);
@@ -813,5 +804,7 @@ export function VoiceCommander({
 
   return null;
 }
+
+    
 
     

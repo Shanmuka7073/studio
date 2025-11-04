@@ -333,139 +333,141 @@ export default function CheckoutPage() {
         <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid md:grid-cols-2 gap-12">
                 <div>
-                <Card>
-                    <CardHeader>
-                    <CardTitle>{t('delivery-and-store-selection')}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        <FormField
-                            control={form.control}
-                            name="name"
-                            render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>{t('full-name')}</FormLabel>
-                                <FormControl>
-                                <Input placeholder="John Doe" {...field} readOnly={!!userData?.firstName} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
+                    <Card>
+                        <CardHeader>
+                        <CardTitle>{t('order-summary')}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {cartItems.map((item) => {
+                                const image = images[item.variant.sku] || { imageUrl: 'https://placehold.co/48x48/E2E8F0/64748B?text=...', imageHint: 'loading' };
+                                return <OrderSummaryItem key={item.variant.sku} item={item} image={image} />
+                            })}
+                            {cartItems.length === 0 && (
+                                <div className="text-center text-muted-foreground py-8">
+                                    <Loader2 className="mx-auto h-6 w-6 animate-spin" />
+                                    <p className="mt-2">{t('loading-your-quick-order-item')}</p>
+                                </div>
                             )}
-                        />
-                        <div className="space-y-4">
-                            <FormLabel>{t('delivery-location')}</FormLabel>
-                            <div className="grid grid-cols-2 gap-4">
-                               <Button ref={homeAddressBtnRef} type="button" variant="outline" onClick={handleUseHomeAddress} disabled={!userData?.address}>
-                                    <Home className="mr-2 h-4 w-4" /> Use Home Address
-                               </Button>
-                               <Button ref={currentLocationBtnRef} type="button" variant="outline" onClick={handleUseCurrentLocation}>
-                                    <LocateFixed className="mr-2 h-4 w-4" /> Use Current Location
-                               </Button>
+                            <div className="flex justify-between items-center border-t pt-4">
+                                <p className="font-medium">{t('subtotal')}</p>
+                                <p>₹{cartTotal.toFixed(2)}</p>
                             </div>
-                             <FormField
+                            <div className="flex justify-between items-center">
+                                <p className="font-medium">{t('delivery-fee')}</p>
+                                <p>₹{DELIVERY_FEE.toFixed(2)}</p>
+                            </div>
+                        </CardContent>
+                        <CardFooter className="flex justify-between font-bold text-lg border-t pt-4">
+                            <span>{t('total')}</span>
+                            <span id="final-total-amount">₹{finalTotal.toFixed(2)}</span>
+                        </CardFooter>
+                    </Card>
+                </div>
+                <div>
+                    <Card>
+                        <CardHeader>
+                        <CardTitle>{t('delivery-and-store-selection')}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <FormField
                                 control={form.control}
-                                name="deliveryAddress"
+                                name="name"
                                 render={({ field }) => (
                                 <FormItem>
+                                    <FormLabel>{t('full-name')}</FormLabel>
                                     <FormControl>
-                                    <Input placeholder="Select a delivery address above" {...field} />
+                                    <Input placeholder="John Doe" {...field} readOnly={!!userData?.firstName} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
                                 )}
                             />
-                        </div>
-                        <FormField
-                            control={form.control}
-                            name="phone"
-                            render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>{t('phone-number')}</FormLabel>
-                                <FormControl>
-                                <Input placeholder="(555) 123-4567" {...field} readOnly={!!userData?.phoneNumber} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                            )}
-                        />
-
-                        <div className="space-y-2">
-                            <FormLabel>{t('fulfilling-store')}</FormLabel>
-                            <Select onValueChange={setActiveStoreId} value={activeStoreId || ""}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder={t('select-a-store-to-fulfill')} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {allStores.map(store => (
-                                        <SelectItem key={store.id} value={store.id}>
-                                            <div className="flex items-center gap-2">
-                                                <StoreIcon className="h-4 w-4 text-muted-foreground" />
-                                                <span>{store.name}</span>
-                                            </div>
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            {!activeStoreId && !isWaitingForQuickOrderConfirmation && (
-                                <Alert variant="destructive" id="action-required-alert">
-                                    <AlertCircle className="h-4 w-4" />
-                                    <AlertTitle>{t('action-required')}</AlertTitle>
-                                    <AlertDescription>
-                                        {t('please-select-a-store-to-continue')}
-                                    </AlertDescription>
-                                </Alert>
-                            )}
-                             {isWaitingForQuickOrderConfirmation && !activeStoreId && (
-                                <Alert variant="default" id="action-required-alert">
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    <AlertTitle>{t('waiting-for-store')}</AlertTitle>
-                                    <AlertDescription>
-                                       {t('the-store-you-selected-with-your-voice-is-being-set')}
-                                    </AlertDescription>
-                                </Alert>
-                            )}
-                        </div>
-
-                        <Button ref={placeOrderBtnRef} type="submit" disabled={isPlacingOrder || !activeStoreId} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-                            {isPlacingOrder ? t('placing-order') : t('place-order')}
-                        </Button>
-                    </CardContent>
-                </Card>
-                </div>
-                <div>
-                <Card>
-                    <CardHeader>
-                    <CardTitle>{t('order-summary')}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        {cartItems.map((item) => {
-                            const image = images[item.variant.sku] || { imageUrl: 'https://placehold.co/48x48/E2E8F0/64748B?text=...', imageHint: 'loading' };
-                            return <OrderSummaryItem key={item.variant.sku} item={item} image={image} />
-                        })}
-                         {cartItems.length === 0 && (
-                            <div className="text-center text-muted-foreground py-8">
-                                <Loader2 className="mx-auto h-6 w-6 animate-spin" />
-                                <p className="mt-2">{t('loading-your-quick-order-item')}</p>
+                            <div className="space-y-4">
+                                <FormLabel>{t('delivery-location')}</FormLabel>
+                                <div className="grid grid-cols-2 gap-4">
+                                <Button ref={homeAddressBtnRef} type="button" variant="outline" onClick={handleUseHomeAddress} disabled={!userData?.address}>
+                                        <Home className="mr-2 h-4 w-4" /> Use Home Address
+                                </Button>
+                                <Button ref={currentLocationBtnRef} type="button" variant="outline" onClick={handleUseCurrentLocation}>
+                                        <LocateFixed className="mr-2 h-4 w-4" /> Use Current Location
+                                </Button>
+                                </div>
+                                <FormField
+                                    control={form.control}
+                                    name="deliveryAddress"
+                                    render={({ field }) => (
+                                    <FormItem>
+                                        <FormControl>
+                                        <Input placeholder="Select a delivery address above" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                    )}
+                                />
                             </div>
-                        )}
-                        <div className="flex justify-between items-center border-t pt-4">
-                            <p className="font-medium">{t('subtotal')}</p>
-                            <p>₹{cartTotal.toFixed(2)}</p>
-                        </div>
-                        <div className="flex justify-between items-center">
-                            <p className="font-medium">{t('delivery-fee')}</p>
-                            <p>₹{DELIVERY_FEE.toFixed(2)}</p>
-                        </div>
-                    </CardContent>
-                    <CardFooter className="flex justify-between font-bold text-lg border-t pt-4">
-                        <span>{t('total')}</span>
-                        <span id="final-total-amount">₹{finalTotal.toFixed(2)}</span>
-                    </CardFooter>
-                </Card>
+                            <FormField
+                                control={form.control}
+                                name="phone"
+                                render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>{t('phone-number')}</FormLabel>
+                                    <FormControl>
+                                    <Input placeholder="(555) 123-4567" {...field} readOnly={!!userData?.phoneNumber} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                                )}
+                            />
+
+                            <div className="space-y-2">
+                                <FormLabel>{t('fulfilling-store')}</FormLabel>
+                                <Select onValueChange={setActiveStoreId} value={activeStoreId || ""}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder={t('select-a-store-to-fulfill')} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {allStores.map(store => (
+                                            <SelectItem key={store.id} value={store.id}>
+                                                <div className="flex items-center gap-2">
+                                                    <StoreIcon className="h-4 w-4 text-muted-foreground" />
+                                                    <span>{store.name}</span>
+                                                </div>
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                {!activeStoreId && !isWaitingForQuickOrderConfirmation && (
+                                    <Alert variant="destructive" id="action-required-alert">
+                                        <AlertCircle className="h-4 w-4" />
+                                        <AlertTitle>{t('action-required')}</AlertTitle>
+                                        <AlertDescription>
+                                            {t('please-select-a-store-to-continue')}
+                                        </AlertDescription>
+                                    </Alert>
+                                )}
+                                {isWaitingForQuickOrderConfirmation && !activeStoreId && (
+                                    <Alert variant="default" id="action-required-alert">
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        <AlertTitle>{t('waiting-for-store')}</AlertTitle>
+                                        <AlertDescription>
+                                        {t('the-store-you-selected-with-your-voice-is-being-set')}
+                                        </AlertDescription>
+                                    </Alert>
+                                )}
+                            </div>
+
+                            <Button ref={placeOrderBtnRef} type="submit" disabled={isPlacingOrder || !activeStoreId} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
+                                {isPlacingOrder ? t('placing-order') : t('place-order')}
+                            </Button>
+                        </CardContent>
+                    </Card>
                 </div>
             </form>
         </Form>
     </div>
   );
 }
+
+    
 
     
