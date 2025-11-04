@@ -113,6 +113,27 @@ export function VoiceCommander({
     }
   }, []);
 
+    // Function to reset all contextual state variables
+    const resetAllContext = useCallback(() => {
+        setIsWaitingForQuantity(false);
+        itemToUpdateSkuRef.current = null;
+        setIsWaitingForStoreName(false);
+        setClarificationStores([]);
+        onSuggestions([]);
+        setIsWaitingForQuickOrderConfirmation(false);
+        setIsWaitingForVoiceOrder(false);
+        setIsWaitingForAddressType(false);
+        hasSpokenCheckoutPrompt.current = false;
+        formFieldToFillRef.current = null;
+    }, [onSuggestions, setIsWaitingForQuickOrderConfirmation]);
+
+
+    // Effect to reset context when the user navigates away from a page
+    useEffect(() => {
+        resetAllContext();
+    }, [pathname, resetAllContext]);
+
+
   useEffect(() => {
     setHasMounted(true);
     if(firestore) {
@@ -308,7 +329,7 @@ export function VoiceCommander({
         return;
       }
     }
-  }, [pathname, hasMounted, enabled, isSpeakingRef.current, isWaitingForQuickOrderConfirmation, checkCheckoutConditions, speak, activeStoreId, cartItems.length]);
+  }, [pathname, hasMounted, enabled, isWaitingForQuickOrderConfirmation, checkCheckoutConditions, speak, activeStoreId, cartItems.length]);
 
   // Effect to monitor checkout state changes
   useEffect(() => {
@@ -955,7 +976,8 @@ export function VoiceCommander({
     checkoutReady,
     detectLanguage,
     updateRecognitionLanguage,
-    currentRecognitionLang
+    currentRecognitionLang,
+    resetAllContext
   ]);
 
   return null;
