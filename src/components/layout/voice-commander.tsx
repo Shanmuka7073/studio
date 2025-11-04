@@ -35,8 +35,8 @@ interface VoiceCommanderProps {
 
 let recognition: SpeechRecognition | null = null;
 if (typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    recognition = new SpeechRecognition();
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SpeechRecognition();
 }
 
 export function VoiceCommander({
@@ -54,7 +54,7 @@ export function VoiceCommander({
   const { toast } = useToast();
   const { firestore, user } = useFirebase();
   const { clearCart, addItem: addItemToCart, updateQuantity, activeStoreId, setActiveStoreId } = useCart();
-  
+
   const { stores, masterProducts, productPrices, fetchInitialData, fetchProductPrices } = useAppStore();
 
   const { form: profileForm } = useProfileFormStore();
@@ -65,7 +65,7 @@ export function VoiceCommander({
   const commandsRef = useRef<Command[]>([]);
   const commandActionsRef = useRef<any>({});
   const fileCommandsRef = useRef<any>({});
-  
+
   const formFieldToFillRef = useRef<keyof ProfileFormValues | null>(null);
   const [isWaitingForStoreName, setIsWaitingForStoreName] = useState(false);
   const [isWaitingForVoiceOrder, setIsWaitingForVoiceOrder] = useState(false);
@@ -79,10 +79,9 @@ export function VoiceCommander({
   const userProfileRef = useRef<User | null>(null);
 
   const [hasMounted, setHasMounted] = useState(false);
-  
+
   const [speechSynthesisVoices, setSpeechSynthesisVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [currentLanguage, setCurrentLanguage] = useState('en-IN');
-
 
   useEffect(() => {
     setHasMounted(true);
@@ -90,14 +89,14 @@ export function VoiceCommander({
       fetchInitialData(firestore);
     }
     const getVoices = () => {
-        const allVoices = window.speechSynthesis.getVoices();
-        if (allVoices.length > 0) {
-            setSpeechSynthesisVoices(allVoices);
-        }
+      const allVoices = window.speechSynthesis.getVoices();
+      if (allVoices.length > 0) {
+        setSpeechSynthesisVoices(allVoices);
+      }
     };
-    
+
     if ('onvoiceschanged' in window.speechSynthesis) {
-        window.speechSynthesis.onvoiceschanged = getVoices;
+      window.speechSynthesis.onvoiceschanged = getVoices;
     }
     getVoices();
 
@@ -105,9 +104,9 @@ export function VoiceCommander({
       if ('onvoiceschanged' in window.speechSynthesis) {
         window.speechSynthesis.onvoiceschanged = null;
       }
-    }
+    };
   }, [firestore, fetchInitialData]);
-  
+
   useEffect(() => {
     isEnabledRef.current = enabled;
     if (recognition) {
@@ -126,13 +125,13 @@ export function VoiceCommander({
 
   const speak = useCallback((text: string, onEndCallback?: () => void) => {
     if (typeof window === 'undefined' || !window.speechSynthesis) {
-        if (onEndCallback) onEndCallback();
-        return;
+      if (onEndCallback) onEndCallback();
+      return;
     }
 
     window.speechSynthesis.cancel();
     isSpeakingRef.current = false;
-    
+
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.pitch = 1;
     utterance.rate = 1.1;
@@ -140,46 +139,44 @@ export function VoiceCommander({
 
     const desiredVoice = speechSynthesisVoices.find(voice => voice.lang === currentLanguage && voice.localService);
     if (desiredVoice) {
-        utterance.voice = desiredVoice;
+      utterance.voice = desiredVoice;
     } else {
-        const langVoices = speechSynthesisVoices.filter(v => v.lang.startsWith(currentLanguage.split('-')[0]));
-        if (langVoices.length > 0) {
-            utterance.voice = langVoices[0];
-        }
+      const langVoices = speechSynthesisVoices.filter(v => v.lang.startsWith(currentLanguage.split('-')[0]));
+      if (langVoices.length > 0) {
+        utterance.voice = langVoices[0];
+      }
     }
 
-
     utterance.onend = () => {
-        isSpeakingRef.current = false;
-        if (onEndCallback) onEndCallback();
-        if (isEnabledRef.current) {
-            try {
-                recognition?.start();
-            } catch(e) {
-                // ignore if already started
-            }
+      isSpeakingRef.current = false;
+      if (onEndCallback) onEndCallback();
+      if (isEnabledRef.current) {
+        try {
+          recognition?.start();
+        } catch(e) {
+          // ignore if already started
         }
+      }
     };
 
     utterance.onerror = (e) => {
-        if (e.error === 'interrupted') {
-          console.log('Speech was interrupted.');
-        } else {
-          console.error("Speech synthesis error:", e.error || 'Unknown speech error');
-        }
-        isSpeakingRef.current = false;
-        if (onEndCallback) onEndCallback();
-         if (isEnabledRef.current) {
-            try {
-                recognition?.start();
-            } catch(e) {}
-        }
+      if (e.error === 'interrupted') {
+        console.log('Speech was interrupted.');
+      } else {
+        console.error("Speech synthesis error:", e.error || 'Unknown speech error');
+      }
+      isSpeakingRef.current = false;
+      if (onEndCallback) onEndCallback();
+      if (isEnabledRef.current) {
+        try {
+          recognition?.start();
+        } catch(e) {}
+      }
     };
-    
+
     isSpeakingRef.current = true;
     recognition?.stop();
     window.speechSynthesis.speak(utterance);
-
   }, [currentLanguage, speechSynthesisVoices]);
 
   const handleProfileFormInteraction = useCallback(() => {
@@ -195,7 +192,7 @@ export function VoiceCommander({
     ];
     const formValues = profileForm.getValues();
     const firstEmptyField = fields.find(f => !formValues[f.name]);
-    
+
     if (firstEmptyField) {
       formFieldToFillRef.current = firstEmptyField.name;
       speak(`What is your ${firstEmptyField.label}?`);
@@ -211,37 +208,60 @@ export function VoiceCommander({
     }
 
     const addressValue = (document.querySelector('input[name="deliveryAddress"]') as HTMLInputElement)?.value;
-    
+
+    // Check if we're already waiting for order confirmation
     if (isWaitingForQuickOrderConfirmation) {
-        speak(`Please say "confirm order" to place your order.`);
-        hasSpokenCheckoutPrompt.current = true;
-    } else if (!addressValue || addressValue.length < 10) {
+      speak(`Please say "confirm order" to place your order.`);
+      hasSpokenCheckoutPrompt.current = true;
+      return;
+    }
+
+    // Check address first
+    if (!addressValue || addressValue.length < 10) {
       speak("Should I deliver to your home address or current location?");
       setIsWaitingForAddressType(true);
       hasSpokenCheckoutPrompt.current = true;
-    } else if (addressValue && !activeStoreId) {
-       speak(`Please tell me which store should fulfill your order.`);
+      return;
+    }
+
+    // Check store selection
+    if (!activeStoreId) {
+      speak(`Please tell me which store should fulfill your order.`);
       setIsWaitingForStoreName(true);
       hasSpokenCheckoutPrompt.current = true;
-    } else if (addressValue && activeStoreId) {
-        speak(`Please say "place order" to confirm.`);
-        hasSpokenCheckoutPrompt.current = true;
+      return;
     }
-  }, [pathname, hasMounted, enabled, isWaitingForQuickOrderConfirmation, activeStoreId, speak]);
 
+    // FINAL STEP: All conditions met - ask to place order
+    if (addressValue && addressValue.length >= 10 && activeStoreId && cartItems.length > 0) {
+      speak(`Everything is ready! Please say "place order" to confirm your order.`);
+      hasSpokenCheckoutPrompt.current = true;
+    }
+  }, [pathname, hasMounted, enabled, isWaitingForQuickOrderConfirmation, activeStoreId, cartItems.length, speak]);
+
+  // Effect to run checkout prompt when voiceTrigger changes
   useEffect(() => {
-    // This effect runs when the page loads, and also when voiceTrigger changes.
-    // voiceTrigger is changed by the checkout page when the address is updated.
     const speakTimeout = setTimeout(() => {
       runCheckoutPrompt();
-    }, 500); // A small delay to ensure the UI is ready
+    }, 500);
     return () => clearTimeout(speakTimeout);
   }, [voiceTrigger, runCheckoutPrompt]);
-  
+
+  // Effect to reset checkout prompt when cart items change
+  useEffect(() => {
+    if (pathname === '/checkout') {
+      const timeout = setTimeout(() => {
+        hasSpokenCheckoutPrompt.current = false;
+        runCheckoutPrompt();
+      }, 500);
+      return () => clearTimeout(timeout);
+    }
+  }, [cartItems, pathname, runCheckoutPrompt]);
+
   // Proactive prompt on profile page
   useEffect(() => {
     if (pathname !== '/dashboard/customer/my-profile' || !hasMounted || !enabled) {
-      hasSpokenCheckoutPrompt.current = false; // Note: using checkout prompt flag here for simplicity
+      hasSpokenCheckoutPrompt.current = false;
       formFieldToFillRef.current = null;
       return;
     }
@@ -256,25 +276,24 @@ export function VoiceCommander({
     }
   }, [pathname, hasMounted, enabled, profileForm, handleProfileFormInteraction]);
 
-
   const findProductAndVariant = useCallback(async (phrase: string): Promise<{ product: Product | null, variant: ProductVariant | null, remainingPhrase: string }> => {
     const lowerPhrase = phrase.toLowerCase();
-    
+
     let bestMatch: { product: Product, alias: string, similarity: number } | null = null;
 
     for (const p of masterProducts) {
-        if (!p.name) continue;
-        const aliasesToCheck = [p.name.toLowerCase(), ...Object.values(getAllAliases(p.name.toLowerCase().replace(/ /g, '-'))).flat().map(name => name.toLowerCase())];
-        const uniqueAliases = [...new Set(aliasesToCheck)];
+      if (!p.name) continue;
+      const aliasesToCheck = [p.name.toLowerCase(), ...Object.values(getAllAliases(p.name.toLowerCase().replace(/ /g, '-'))).flat().map(name => name.toLowerCase())];
+      const uniqueAliases = [...new Set(aliasesToCheck)];
 
-        for (const alias of uniqueAliases) {
-             if (lowerPhrase.includes(alias)) {
-                const similarity = calculateSimilarity(lowerPhrase, alias);
-                if (!bestMatch || similarity > bestMatch.similarity) {
-                    bestMatch = { product: p, alias: alias, similarity: similarity };
-                }
-            }
+      for (const alias of uniqueAliases) {
+        if (lowerPhrase.includes(alias)) {
+          const similarity = calculateSimilarity(lowerPhrase, alias);
+          if (!bestMatch || similarity > bestMatch.similarity) {
+            bestMatch = { product: p, alias: alias, similarity: similarity };
+          }
         }
+      }
     }
 
     if (!bestMatch) return { product: null, variant: null, remainingPhrase: phrase };
@@ -284,39 +303,37 @@ export function VoiceCommander({
 
     let priceData = productPrices[productMatch.name.toLowerCase()];
     if (priceData === undefined && firestore) {
-        await fetchProductPrices(firestore, [productMatch.name]);
-        priceData = useAppStore.getState().productPrices[productMatch.name.toLowerCase()];
+      await fetchProductPrices(firestore, [productMatch.name]);
+      priceData = useAppStore.getState().productPrices[productMatch.name.toLowerCase()];
     }
 
     if (!priceData || !priceData.variants || priceData.variants.length === 0) {
-        return { product: productMatch, variant: null, remainingPhrase: phrase };
+      return { product: productMatch, variant: null, remainingPhrase: phrase };
     }
-    
+
     const weightRegex = /(\d+)\s?(kg|kilo|kilos|g|gm|gram|grams)/i;
     const weightMatch = lowerPhrase.match(weightRegex);
 
     if (weightMatch) {
-        const number = parseInt(weightMatch[1], 10);
-        const unit = weightMatch[2].toLowerCase();
-        
-        let desiredWeightStr = `${number}${unit.startsWith('k') ? 'kg' : 'gm'}`;
+      const number = parseInt(weightMatch[1], 10);
+      const unit = weightMatch[2].toLowerCase();
+      
+      let desiredWeightStr = `${number}${unit.startsWith('k') ? 'kg' : 'gm'}`;
 
-        const variantMatch = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === desiredWeightStr);
-        if (variantMatch) {
-            return { product: productMatch, variant: variantMatch, remainingPhrase };
-        }
+      const variantMatch = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === desiredWeightStr);
+      if (variantMatch) {
+        return { product: productMatch, variant: variantMatch, remainingPhrase };
+      }
     }
-    
+
     const defaultVariant = 
-        priceData.variants.find(v => v.weight === '1kg') ||
-        priceData.variants.find(v => v.weight.includes('pack')) ||
-        priceData.variants.find(v => v.weight.includes('pc')) ||
-        priceData.variants[0];
+      priceData.variants.find(v => v.weight === '1kg') ||
+      priceData.variants.find(v => v.weight.includes('pack')) ||
+      priceData.variants.find(v => v.weight.includes('pc')) ||
+      priceData.variants[0];
 
     return { product: productMatch, variant: defaultVariant, remainingPhrase };
-
   }, [firestore, masterProducts, productPrices, fetchProductPrices]);
-
 
   useEffect(() => {
     if (pathname !== '/checkout') {
@@ -326,197 +343,198 @@ export function VoiceCommander({
 
   useEffect(() => {
     if (!recognition) {
-        onStatusUpdate("Speech recognition not supported by this browser.");
-        return;
+      onStatusUpdate("Speech recognition not supported by this browser.");
+      return;
     }
-    
+
     const handleCommand = async (commandText: string) => {
-        onStatusUpdate(`Processing: "${commandText}"`);
-        try {
-            if (!firestore || !user) return;
-            
-            const resetContext = () => {
-                setIsWaitingForQuantity(false);
-                itemToUpdateSkuRef.current = null;
-                setIsWaitingForStoreName(false);
-                setClarificationStores([]);
-                onSuggestions([]);
-                setIsWaitingForQuickOrderConfirmation(false);
-                setIsWaitingForVoiceOrder(false);
-                setIsWaitingForAddressType(false);
-                hasSpokenCheckoutPrompt.current = false;
-            };
+      onStatusUpdate(`Processing: "${commandText}"`);
+      try {
+        if (!firestore || !user) return;
+        
+        const resetContext = () => {
+          setIsWaitingForQuantity(false);
+          itemToUpdateSkuRef.current = null;
+          setIsWaitingForStoreName(false);
+          setClarificationStores([]);
+          onSuggestions([]);
+          setIsWaitingForQuickOrderConfirmation(false);
+          setIsWaitingForVoiceOrder(false);
+          setIsWaitingForAddressType(false);
+          hasSpokenCheckoutPrompt.current = false;
+        };
 
-            let detectedLang = 'en';
-            if (/[అ-హ]/.test(commandText)) detectedLang = 'te';
-            const langCode = `${detectedLang}-IN`;
-            if (currentLanguage !== langCode) {
-              setCurrentLanguage(langCode);
+        let detectedLang = 'en';
+        if (/[అ-హ]/.test(commandText)) detectedLang = 'te';
+        const langCode = `${detectedLang}-IN`;
+        if (currentLanguage !== langCode) {
+          setCurrentLanguage(langCode);
+        }
+
+        if (isWaitingForVoiceOrder) {
+          await commandActionsRef.current.createVoiceOrder(commandText);
+          resetContext();
+          return;
+        }
+
+        if (isWaitingForAddressType) {
+          const cmd = commandText.toLowerCase();
+          if (cmd.includes('home') || cmd.includes('address')) {
+            homeAddressBtnRef?.current?.click();
+          } else if (cmd.includes('current') || cmd.includes('location')) {
+            currentLocationBtnRef?.current?.click();
+          } else {
+            speak("Sorry, I didn't understand. Please say 'home address' or 'current location'.");
+          }
+          resetContext();
+          return;
+        }
+
+        if (isWaitingForQuickOrderConfirmation) {
+          const confirmAliases = fileCommandsRef.current.quickOrderConfirm?.aliases || [];
+          if (confirmAliases.includes(commandText.toLowerCase())) {
+            placeOrderBtnRef?.current?.click();
+          } else {
+            speak("Okay, cancelling the order.");
+            clearCart();
+            router.push('/stores');
+          }
+          resetContext();
+          return;
+        }
+
+        if (isWaitingForQuantity && itemToUpdateSkuRef.current) {
+          const wordToNum: Record<string, number> = { one: 1, to: 2, two: 2, three: 3, four: 4, for: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+          const parts = commandText.toLowerCase().split(' ');
+          let quantity: number | null = null;
+
+          const firstWordAsNum = wordToNum[parts[0]];
+          if (firstWordAsNum) {
+            quantity = firstWordAsNum;
+          } else {
+            const parsedNum = parseInt(commandText.replace(/[^0-9]/g, ''), 10);
+            if (!isNaN(parsedNum)) {
+              quantity = parsedNum;
             }
+          }
 
-            if (isWaitingForVoiceOrder) {
-              await commandActionsRef.current.createVoiceOrder(commandText);
-              resetContext();
-              return;
-            }
+          if (quantity !== null) {
+            updateQuantity(itemToUpdateSkuRef.current, quantity);
+            speak(`Okay, updated to ${quantity}.`);
+          } else {
+            speak("Sorry, I didn't catch a valid quantity. Please state a number.");
+          }
+          
+          resetContext();
+          return;
+        }
 
-            if (isWaitingForAddressType) {
-              const cmd = commandText.toLowerCase();
-              if (cmd.includes('home') || cmd.includes('address')) {
-                homeAddressBtnRef?.current?.click();
-              } else if (cmd.includes('current') || cmd.includes('location')) {
-                currentLocationBtnRef?.current?.click();
-              } else {
-                speak("Sorry, I didn't understand. Please say 'home address' or 'current location'.");
-              }
-              resetContext();
-              return;
-            }
+        if (isWaitingForStoreName && pathname === '/checkout') {
+          const spokenStoreName = commandText.toLowerCase();
+          const bestMatch = stores
+            .map(store => ({ ...store, similarity: calculateSimilarity(spokenStoreName, store.name.toLowerCase()) }))
+            .sort((a, b) => b.similarity - a.similarity)[0];
 
-            if (isWaitingForQuickOrderConfirmation) {
-                const confirmAliases = fileCommandsRef.current.quickOrderConfirm?.aliases || [];
-                if (confirmAliases.includes(commandText.toLowerCase())) {
-                    placeOrderBtnRef?.current?.click();
-                } else {
-                    speak("Okay, cancelling the order.");
-                    clearCart();
-                    router.push('/stores');
-                }
-                resetContext();
-                return;
-            }
+          if (bestMatch && bestMatch.similarity > 0.7) {
+            speak(`Okay, ordering from ${bestMatch.name}.`);
+            setActiveStoreId(bestMatch.id);
+            // Reset the prompt to allow the final "place order" prompt to trigger
+            hasSpokenCheckoutPrompt.current = false;
+            setTimeout(() => runCheckoutPrompt(), 500);
+          } else {
+            speak(`Sorry, I couldn't find a store named ${commandText}. Please try again.`);
+          }
+          resetContext();
+          return;
+        }
 
-            if (isWaitingForQuantity && itemToUpdateSkuRef.current) {
-                const wordToNum: Record<string, number> = { one: 1, to: 2, two: 2, three: 3, four: 4, for: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
-                const parts = commandText.toLowerCase().split(' ');
-                let quantity: number | null = null;
+        if (formFieldToFillRef.current && profileForm) {
+          profileForm.setValue(formFieldToFillRef.current, commandText, { shouldValidate: true });
+          formFieldToFillRef.current = null;
+          handleProfileFormInteraction();
+          return;
+        }
+        
+        const quickOrderAliases = fileCommandsRef.current.quickOrder?.aliases || [];
+        for (const alias of quickOrderAliases) {
+          const pattern = alias
+            .replace(/\{(\w+)\}/g, '(.+)')
+            .replace(/\\s\*/g, '\\s+');
+          const regex = new RegExp(`^${pattern}$`, 'i');
+          const match = commandText.match(regex);
 
-                const firstWordAsNum = wordToNum[parts[0]];
-                if (firstWordAsNum) {
-                    quantity = firstWordAsNum;
-                } else {
-                    const parsedNum = parseInt(commandText.replace(/[^0-9]/g, ''), 10);
-                    if (!isNaN(parsedNum)) {
-                        quantity = parsedNum;
-                    }
-                }
-
-                if (quantity !== null) {
-                    updateQuantity(itemToUpdateSkuRef.current, quantity);
-                    speak(`Okay, updated to ${quantity}.`);
-                } else {
-                    speak("Sorry, I didn't catch a valid quantity. Please state a number.");
-                }
-                
-                resetContext();
-                return;
-            }
-
-            if (isWaitingForStoreName && pathname === '/checkout') {
-                const spokenStoreName = commandText.toLowerCase();
-                const bestMatch = stores
-                    .map(store => ({ ...store, similarity: calculateSimilarity(spokenStoreName, store.name.toLowerCase()) }))
-                    .sort((a, b) => b.similarity - a.similarity)[0];
-
-                if (bestMatch && bestMatch.similarity > 0.7) {
-                    speak(`Okay, ordering from ${bestMatch.name}.`);
-                    setActiveStoreId(bestMatch.id);
-                } else {
-                    speak(`Sorry, I couldn't find a store named ${commandText}. Please try again.`);
-                }
-                resetContext();
-                return;
-            }
-
-            if (formFieldToFillRef.current && profileForm) {
-                profileForm.setValue(formFieldToFillRef.current, commandText, { shouldValidate: true });
-                formFieldToFillRef.current = null;
-                handleProfileFormInteraction();
-                return;
-            }
-            
-            const quickOrderAliases = fileCommandsRef.current.quickOrder?.aliases || [];
-            for (const alias of quickOrderAliases) {
-                const pattern = alias
-                    .replace(/\{(\w+)\}/g, '(.+)')
-                    .replace(/\\s\*/g, '\\s+');
-                const regex = new RegExp(`^${pattern}$`, 'i');
-                const match = commandText.match(regex);
-
-                if (match) {
-                    const params: Record<string, string> = {};
-                    const keys = (alias.match(/\{(\w+)\}/g) || []).map(key => key.slice(1, -1));
-                    keys.forEach((key, index) => {
-                        params[key] = match[index + 1]?.trim();
-                    });
-                    
-                    speak(fileCommandsRef.current.quickOrder.reply, () => commandActionsRef.current.quickOrder(params));
-                    resetContext();
-                    return;
-                }
-            }
-
-
-            let bestCommand: { command: Command, similarity: number } | null = null;
-            
-            const allCommands = [...commandsRef.current];
-            for (const key in fileCommandsRef.current) {
-                if (key === 'quickOrder') continue;
-
-                const cmdGroup = fileCommandsRef.current[key];
-                const action = commandActionsRef.current[key];
-                if (action) {
-                    cmdGroup.aliases.forEach((alias: string) => {
-                    allCommands.push({
-                        command: alias,
-                        action: action,
-                        display: cmdGroup.display,
-                        reply: cmdGroup.reply
-                    });
-                    });
-                }
-            }
-
-            for (const cmd of allCommands) {
-                const similarity = calculateSimilarity(commandText.toLowerCase(), cmd.command);
-                if (!bestCommand || similarity > bestCommand.similarity) {
-                    bestCommand = { command: cmd, similarity };
-                }
-            }
-            
-            const isOrderItemCommand = fileCommandsRef.current.orderItem.aliases.some(alias => {
-                const placeholderRegex = /{\w+}/g;
-                const simplifiedAlias = alias.replace(placeholderRegex, '').trim();
-                const simplifiedCommandText = commandText.toLowerCase().replace(/\d+\s*(kg|kilo|kilos|g|gm|gram|grams)?/i, '').trim();
-                return calculateSimilarity(simplifiedCommandText, simplifiedAlias) > 0.6;
+          if (match) {
+            const params: Record<string, string> = {};
+            const keys = (alias.match(/\{(\w+)\}/g) || []).map(key => key.slice(1, -1));
+            keys.forEach((key, index) => {
+              params[key] = match[index + 1]?.trim();
             });
+            
+            speak(fileCommandsRef.current.quickOrder.reply, () => commandActionsRef.current.quickOrder(params));
+            resetContext();
+            return;
+          }
+        }
 
+        let bestCommand: { command: Command, similarity: number } | null = null;
+        
+        const allCommands = [...commandsRef.current];
+        for (const key in fileCommandsRef.current) {
+          if (key === 'quickOrder') continue;
 
-            if (bestCommand && bestCommand.similarity > 0.7) {
-                speak(bestCommand.command.reply, () => bestCommand!.command.action({phrase: commandText}));
-                resetContext();
+          const cmdGroup = fileCommandsRef.current[key];
+          const action = commandActionsRef.current[key];
+          if (action) {
+            cmdGroup.aliases.forEach((alias: string) => {
+              allCommands.push({
+                command: alias,
+                action: action,
+                display: cmdGroup.display,
+                reply: cmdGroup.reply
+              });
+            });
+          }
+        }
+
+        for (const cmd of allCommands) {
+          const similarity = calculateSimilarity(commandText.toLowerCase(), cmd.command);
+          if (!bestCommand || similarity > bestCommand.similarity) {
+            bestCommand = { command: cmd, similarity };
+          }
+        }
+        
+        const isOrderItemCommand = fileCommandsRef.current.orderItem.aliases.some(alias => {
+          const placeholderRegex = /{\w+}/g;
+          const simplifiedAlias = alias.replace(placeholderRegex, '').trim();
+          const simplifiedCommandText = commandText.toLowerCase().replace(/\d+\s*(kg|kilo|kilos|g|gm|gram|grams)?/i, '').trim();
+          return calculateSimilarity(simplifiedCommandText, simplifiedAlias) > 0.6;
+        });
+
+        if (bestCommand && bestCommand.similarity > 0.7) {
+          speak(bestCommand.command.reply, () => bestCommand!.command.action({phrase: commandText}));
+          resetContext();
+        } else {
+          const itemPhrases = commandText.split(/,?\s+(?:and|మరియు)\s+|,/);
+          if (itemPhrases.length > 1 || isOrderItemCommand) {
+            await commandActionsRef.current.orderItem({ phrase: commandText });
+            resetContext();
+          } else {
+            const { product } = await findProductAndVariant(commandText);
+            if (product) {
+              await commandActionsRef.current.orderItem({ phrase: commandText });
+              resetContext();
             } else {
-                const itemPhrases = commandText.split(/,?\s+(?:and|మరియు)\s+|,/);
-                 if (itemPhrases.length > 1 || isOrderItemCommand) {
-                     await commandActionsRef.current.orderItem({ phrase: commandText });
-                     resetContext();
-                 } else {
-                    const { product } = await findProductAndVariant(commandText);
-                     if (product) {
-                        await commandActionsRef.current.orderItem({ phrase: commandText });
-                        resetContext();
-                     } else {
-                        speak("Sorry, I didn't understand that. Please try again.");
-                        resetContext();
-                     }
-                 }
+              speak("Sorry, I didn't understand that. Please try again.");
+              resetContext();
             }
+          }
+        }
 
       } catch(e) {
-          console.error("Voice command execution failed:", e);
-          onStatusUpdate(`⚠️ Action failed. Please try again.`);
-          speak("Sorry, I couldn't do that. Please check your connection and try again.");
-          onSuggestions([]);
+        console.error("Voice command execution failed:", e);
+        onStatusUpdate(`⚠️ Action failed. Please try again.`);
+        speak("Sorry, I couldn't do that. Please check your connection and try again.");
+        onSuggestions([]);
       }
     };
 
@@ -582,15 +600,16 @@ export function VoiceCommander({
         }
       },
       placeOrder: () => {
-        if (placeOrderBtnRef?.current) {
-            placeOrderBtnRef.current.click();
-            return;
+        if (pathname === '/checkout' && placeOrderBtnRef?.current) {
+          placeOrderBtnRef.current.click();
+          speak("Placing your order now.");
+          return;
         }
         
         if (cartItems.length > 0) {
-            speak("Okay, taking you to checkout.");
-            router.push('/checkout');
-            return;
+          speak("Okay, taking you to checkout.");
+          router.push('/checkout');
+          return;
         }
         
         speak("Your cart is empty. Please add some items first.");
@@ -605,60 +624,60 @@ export function VoiceCommander({
       },
       refresh: () => window.location.reload(),
       orderItem: async ({ phrase, quantity }: { phrase?: string, quantity?: string }) => {
-          if (!phrase) return;
-          const itemPhrases = phrase.split(/,?\s+(?:and|మరియు)\s+|,/);
-          let addedItems: string[] = [];
-          let notFoundItems: string[] = [];
+        if (!phrase) return;
+        const itemPhrases = phrase.split(/,?\s+(?:and|మరియు)\s+|,/);
+        let addedItems: string[] = [];
+        let notFoundItems: string[] = [];
+        
+        for (const itemPhrase of itemPhrases) {
+          if (!itemPhrase.trim()) continue;
           
-          for (const itemPhrase of itemPhrases) {
-              if (!itemPhrase.trim()) continue;
-              
-              const combinedPhrase = quantity ? `${quantity} ${itemPhrase}` : itemPhrase;
-              const { product: foundProduct, variant } = await findProductAndVariant(combinedPhrase);
+          const combinedPhrase = quantity ? `${quantity} ${itemPhrase}` : itemPhrase;
+          const { product: foundProduct, variant } = await findProductAndVariant(combinedPhrase);
 
-              if (foundProduct && variant) {
-                  addItemToCart(foundProduct, variant, 1);
-                  const productName = t(foundProduct.name.toLowerCase().replace(/ /g, '-')).split(' / ')[0];
-                  addedItems.push(productName);
-              } else if (foundProduct) {
-                  notFoundItems.push(`${itemPhrase} (variant not found)`);
-              } else {
-                  notFoundItems.push(itemPhrase);
-              }
+          if (foundProduct && variant) {
+            addItemToCart(foundProduct, variant, 1);
+            const productName = t(foundProduct.name.toLowerCase().replace(/ /g, '-')).split(' / ')[0];
+            addedItems.push(productName);
+          } else if (foundProduct) {
+            notFoundItems.push(`${itemPhrase} (variant not found)`);
+          } else {
+            notFoundItems.push(itemPhrase);
           }
-          
-          if (addedItems.length > 0) {
-              speak(`Okay, I've added ${addedItems.join(', ')} to your cart.`);
-              onOpenCart();
-          } 
-          
-          if (notFoundItems.length > 0 && addedItems.length === 0) {
-               speak(`Sorry, I couldn't find ${notFoundItems.join(', ')}.`);
-          } else if (notFoundItems.length > 0) {
-              speak(`I added some items, but couldn't find ${notFoundItems.join(', ')}.`);
-          }
-        },
+        }
+        
+        if (addedItems.length > 0) {
+          speak(`Okay, I've added ${addedItems.join(', ')} to your cart.`);
+          onOpenCart();
+        } 
+        
+        if (notFoundItems.length > 0 && addedItems.length === 0) {
+          speak(`Sorry, I couldn't find ${notFoundItems.join(', ')}.`);
+        } else if (notFoundItems.length > 0) {
+          speak(`I added some items, but couldn't find ${notFoundItems.join(', ')}.`);
+        }
+      },
       quickOrder: async ({ product, quantity, store: storeName }: { product: string, quantity?: string, store?: string }) => {
         if (!storeName) {
-            speak("You need to specify a store for a quick order. For example, say 'order 1kg potatoes from Fresh Produce'.");
-            return;
+          speak("You need to specify a store for a quick order. For example, say 'order 1kg potatoes from Fresh Produce'.");
+          return;
         }
         
         const combinedPhrase = quantity ? `${quantity} ${product}` : product;
         const { product: foundProduct, variant } = await findProductAndVariant(combinedPhrase);
         if (!foundProduct || !variant) {
-            speak(`Sorry, I could not find ${product}.`);
-            return;
+          speak(`Sorry, I could not find ${product}.`);
+          return;
         }
         
         const spokenStoreName = storeName.toLowerCase();
         const bestMatch = stores
-            .map(s => ({ ...s, similarity: calculateSimilarity(spokenStoreName, s.name.toLowerCase()) }))
-            .sort((a, b) => b.similarity - a.similarity)[0];
+          .map(s => ({ ...s, similarity: calculateSimilarity(spokenStoreName, s.name.toLowerCase()) }))
+          .sort((a, b) => b.similarity - a.similarity)[0];
 
         if (!bestMatch || bestMatch.similarity < 0.7) {
-            speak(`Sorry, I couldn't find a store named ${storeName}. Please try again.`);
-            return;
+          speak(`Sorry, I couldn't find a store named ${storeName}. Please try again.`);
+          return;
         }
 
         const qty = quantity || '1';
@@ -670,11 +689,11 @@ export function VoiceCommander({
         
         setIsWaitingForQuickOrderConfirmation(true);
         setTimeout(() => {
-            router.push('/checkout');
+          router.push('/checkout');
         }, 500);
       },
     };
-    
+
     recognition.continuous = false;
     recognition.interimResults = false;
 
@@ -683,8 +702,8 @@ export function VoiceCommander({
     };
 
     recognition.onresult = (event) => {
-        const transcript = event.results[event.results.length - 1][0].transcript.trim();
-        handleCommand(transcript);
+      const transcript = event.results[event.results.length - 1][0].transcript.trim();
+      handleCommand(transcript);
     };
 
     recognition.onerror = (event) => {
@@ -693,7 +712,7 @@ export function VoiceCommander({
         onStatusUpdate(`⚠️ Error: ${event.error}`);
       }
     };
-    
+
     recognition.onend = () => {
       if (isEnabledRef.current && !isSpeakingRef.current) {
         setTimeout(() => {
@@ -711,9 +730,9 @@ export function VoiceCommander({
     if (firestore && user) {
       const userDocRef = doc(firestore, 'users', user.uid);
       getDoc(userDocRef).then(docSnap => {
-          if (docSnap.exists()) {
-              userProfileRef.current = docSnap.data() as User;
-          }
+        if (docSnap.exists()) {
+          userProfileRef.current = docSnap.data() as User;
+        }
       });
       
       getCommands().then((fileCommands) => {
@@ -736,20 +755,21 @@ export function VoiceCommander({
                   speak(`Okay, ordering from ${store.name}.`);
                   setActiveStoreId(store.id);
                   hasSpokenCheckoutPrompt.current = false;
+                  setTimeout(() => runCheckoutPrompt(), 500);
                   return;
                 }
 
                 const matchingStores = stores.filter(s => s.name.toLowerCase() === store.name.toLowerCase());
                 if (matchingStores.length > 1) {
-                    setClarificationStores(matchingStores);
-                    let prompt = `I found ${matchingStores.length} stores named ${store.name}. `;
-                    matchingStores.forEach((s, i) => {
-                        prompt += `Number ${i + 1} is at ${s.address}. `;
-                    });
-                    prompt += "Which one would you like?";
-                    speak(prompt);
+                  setClarificationStores(matchingStores);
+                  let prompt = `I found ${matchingStores.length} stores named ${store.name}. `;
+                  matchingStores.forEach((s, i) => {
+                    prompt += `Number ${i + 1} is at ${s.address}. `;
+                  });
+                  prompt += "Which one would you like?";
+                  speak(prompt);
                 } else {
-                    router.push(`/stores/${store.id}`);
+                  router.push(`/stores/${store.id}`);
                 }
               },
               reply: `Navigating to ${store.name}.`
@@ -759,7 +779,7 @@ export function VoiceCommander({
         commandsRef.current = builtCommands;
       }).catch(console.error);
     }
-    
+
     return () => {
       if (recognition) {
         recognition.onend = null;
@@ -767,44 +787,40 @@ export function VoiceCommander({
       }
     };
   }, [
-    // Rerun this entire effect if any of these change
-    firestore, 
-    user, 
-    cartItems, 
-    profileForm, 
-    isWaitingForStoreName, 
-    activeStoreId, 
-    placeOrderBtnRef, 
-    enabled, 
-    pathname, 
-    findProductAndVariant, 
-    handleProfileFormInteraction, 
-    speak, 
-    toast, 
-    router, 
-    onSuggestions, 
-    onStatusUpdate, 
-    onCloseCart, 
-    onOpenCart, 
-    setActiveStoreId, 
-    clarificationStores, 
-    isWaitingForQuantity, 
-    updateQuantity, 
-    isWaitingForQuickOrderConfirmation, 
-    clearCart, 
-    setIsWaitingForQuickOrderConfirmation, 
-    stores, 
-    masterProducts, 
-    homeAddressBtnRef, 
-    currentLocationBtnRef, 
+    firestore,
+    user,
+    cartItems,
+    profileForm,
+    isWaitingForStoreName,
+    activeStoreId,
+    placeOrderBtnRef,
+    enabled,
+    pathname,
+    findProductAndVariant,
+    handleProfileFormInteraction,
+    speak,
+    toast,
+    router,
+    onSuggestions,
+    onStatusUpdate,
+    onCloseCart,
+    onOpenCart,
+    setActiveStoreId,
+    clarificationStores,
+    isWaitingForQuantity,
+    updateQuantity,
+    isWaitingForQuickOrderConfirmation,
+    clearCart,
+    setIsWaitingForQuickOrderConfirmation,
+    stores,
+    masterProducts,
+    homeAddressBtnRef,
+    currentLocationBtnRef,
     hasMounted,
-    voiceTrigger, // Add the trigger to the dependency array
-    isWaitingForVoiceOrder
-]);
+    voiceTrigger,
+    isWaitingForVoiceOrder,
+    runCheckoutPrompt
+  ]);
 
   return null;
 }
-
-    
-
-    
