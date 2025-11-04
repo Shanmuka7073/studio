@@ -81,10 +81,36 @@ export function VoiceCommander({
 
   const [speechSynthesisVoices, setSpeechSynthesisVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [currentLanguage, setCurrentLanguage] = useState('en-IN');
+  const [currentRecognitionLang, setCurrentRecognitionLang] = useState('en-IN');
 
   // Track checkout state
   const [checkoutReady, setCheckoutReady] = useState(false);
   const addressValueRef = useRef<string>('');
+
+  // Language detection and switching
+  const detectLanguage = useCallback((text: string): string => {
+    // Telugu characters range
+    const teluguRegex = /[\u0C00-\u0C7F]/;
+    // Hindi characters range  
+    const hindiRegex = /[\u0900-\u097F]/;
+    
+    if (teluguRegex.test(text)) {
+      return 'te-IN';
+    } else if (hindiRegex.test(text)) {
+      return 'hi-IN';
+    } else {
+      return 'en-IN';
+    }
+  }, []);
+
+  // Update recognition language dynamically
+  const updateRecognitionLanguage = useCallback((newLang: string) => {
+    if (recognition && recognition.lang !== newLang) {
+      console.log('Switching recognition language to:', newLang);
+      recognition.lang = newLang;
+      setCurrentRecognitionLang(newLang);
+    }
+  }, []);
 
   useEffect(() => {
     setHasMounted(true);
@@ -114,7 +140,8 @@ export function VoiceCommander({
     isEnabledRef.current = enabled;
     if (recognition) {
       if (enabled) {
-        recognition.lang = currentLanguage;
+        // Set initial language
+        recognition.lang = currentRecognitionLang;
         try {
           recognition.start();
         } catch (e) {
@@ -124,7 +151,7 @@ export function VoiceCommander({
         recognition.abort();
       }
     }
-  }, [enabled, currentLanguage]);
+  }, [enabled, currentRecognitionLang]);
 
   const speak = useCallback((text: string, onEndCallback?: () => void) => {
     if (typeof window === 'undefined' || !window.speechSynthesis) {
@@ -138,13 +165,22 @@ export function VoiceCommander({
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.pitch = 1;
     utterance.rate = 1.1;
-    utterance.lang = currentLanguage;
+    
+    // Detect language for speech synthesis too
+    const detectedLang = detectLanguage(text);
+    utterance.lang = detectedLang;
 
-    const desiredVoice = speechSynthesisVoices.find(voice => voice.lang === currentLanguage && voice.localService);
+    const desiredVoice = speechSynthesisVoices.find(voice => 
+      voice.lang === detectedLang && voice.localService
+    );
+    
     if (desiredVoice) {
       utterance.voice = desiredVoice;
     } else {
-      const langVoices = speechSynthesisVoices.filter(v => v.lang.startsWith(currentLanguage.split('-')[0]));
+      // Fallback to any voice that supports the language
+      const langVoices = speechSynthesisVoices.filter(v => 
+        v.lang.startsWith(detectedLang.split('-')[0])
+      );
       if (langVoices.length > 0) {
         utterance.voice = langVoices[0];
       }
@@ -180,7 +216,7 @@ export function VoiceCommander({
     isSpeakingRef.current = true;
     recognition?.stop();
     window.speechSynthesis.speak(utterance);
-  }, [currentLanguage, speechSynthesisVoices]);
+  }, [detectLanguage, speechSynthesisVoices]);
 
   const handleProfileFormInteraction = useCallback(() => {
     if (!profileForm) {
@@ -404,6 +440,11 @@ export function VoiceCommander({
       try {
         if (!firestore || !user) return;
         
+        // Detect language and update recognition
+        const detectedLang = detectLanguage(commandText);
+        updateRecognitionLanguage(detectedLang);
+        setCurrentLanguage(detectedLang);
+        
         const resetContext = () => {
           setIsWaitingForQuantity(false);
           itemToUpdateSkuRef.current = null;
@@ -416,13 +457,6 @@ export function VoiceCommander({
           hasSpokenCheckoutPrompt.current = false;
         };
 
-        let detectedLang = 'en';
-        if (/[అ-హ]/.test(commandText)) detectedLang = 'te';
-        const langCode = `${detectedLang}-IN`;
-        if (currentLanguage !== langCode) {
-          setCurrentLanguage(langCode);
-        }
-
         if (isWaitingForVoiceOrder) {
           await commandActionsRef.current.createVoiceOrder(commandText);
           resetContext();
@@ -431,18 +465,20 @@ export function VoiceCommander({
 
         if (isWaitingForAddressType) {
           const cmd = commandText.toLowerCase();
-          if (cmd.includes('home') || cmd.includes('address')) {
+          // Support multiple languages for address selection
+          const homeKeywords = ['home', 'address', 'గృహ', 'మనೆ', 'घर', 'पता'];
+          const locationKeywords = ['current', 'location', 'ప్రస్తుత', 'స్థానం', 'वर्तमान', 'स्थान'];
+          
+          if (homeKeywords.some(keyword => cmd.includes(keyword))) {
             homeAddressBtnRef?.current?.click();
             speak("Setting delivery to your home address.");
-            // Reset prompt to continue flow
             setTimeout(() => {
               hasSpokenCheckoutPrompt.current = false;
               runCheckoutPrompt();
             }, 2000);
-          } else if (cmd.includes('current') || cmd.includes('location')) {
+          } else if (locationKeywords.some(keyword => cmd.includes(keyword))) {
             currentLocationBtnRef?.current?.click();
             speak("Using your current location for delivery.");
-            // Reset prompt to continue flow
             setTimeout(() => {
               hasSpokenCheckoutPrompt.current = false;
               runCheckoutPrompt();
@@ -455,8 +491,9 @@ export function VoiceCommander({
         }
 
         if (isWaitingForQuickOrderConfirmation) {
-          const confirmAliases = ['confirm', 'confirm order', 'place order', 'yes'];
-          if (confirmAliases.some(alias => commandText.toLowerCase().includes(alias))) {
+          // Support multiple languages for confirmation
+          const confirmKeywords = ['confirm', 'confirm order', 'place order', 'yes', 'అవును', 'సమర్థించు', 'हाँ', 'पुष्टि'];
+          if (confirmKeywords.some(keyword => commandText.toLowerCase().includes(keyword))) {
             placeOrderBtnRef?.current?.click();
             speak("Placing your order now.");
           } else {
@@ -469,11 +506,20 @@ export function VoiceCommander({
         }
 
         if (isWaitingForQuantity && itemToUpdateSkuRef.current) {
-          const wordToNum: Record<string, number> = { one: 1, to: 2, two: 2, three: 3, four: 4, for: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+          // Support numbers in multiple languages
+          const numberWords: Record<string, number> = { 
+            // English
+            'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5, 'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10,
+            // Telugu
+            'ఒకటి': 1, 'రెండు': 2, 'మూడు': 3, 'నాలుగు': 4, 'ఐదు': 5, 'ఆరు': 6, 'ఏడు': 7, 'ఎనిమిది': 8, 'తొమ్మిది': 9, 'పది': 10,
+            // Hindi
+            'एक': 1, 'दो': 2, 'तीन': 3, 'चार': 4, 'पांच': 5, 'छह': 6, 'सात': 7, 'आठ': 8, 'नौ': 9, 'दस': 10
+          };
+          
           const parts = commandText.toLowerCase().split(' ');
           let quantity: number | null = null;
 
-          const firstWordAsNum = wordToNum[parts[0]];
+          const firstWordAsNum = numberWords[parts[0]];
           if (firstWordAsNum) {
             quantity = firstWordAsNum;
           } else {
@@ -503,7 +549,6 @@ export function VoiceCommander({
           if (bestMatch && bestMatch.similarity > 0.7) {
             speak(`Okay, ordering from ${bestMatch.name}.`);
             setActiveStoreId(bestMatch.id);
-            // Reset prompt to continue to final step
             setTimeout(() => {
               hasSpokenCheckoutPrompt.current = false;
               runCheckoutPrompt();
@@ -522,8 +567,9 @@ export function VoiceCommander({
           return;
         }
         
-        // Handle "place order" command directly
-        if (commandText.toLowerCase().includes('place order') || commandText.toLowerCase().includes('confirm order')) {
+        // Handle "place order" command in multiple languages
+        const placeOrderKeywords = ['place order', 'confirm order', 'ఆర్డర్ ఇవ్వండి', 'ఆర్డర్', 'ऑर्डर दें', 'ऑर्डर पुष्टि'];
+        if (placeOrderKeywords.some(keyword => commandText.toLowerCase().includes(keyword))) {
           await commandActionsRef.current.placeOrder();
           resetContext();
           return;
@@ -588,7 +634,7 @@ export function VoiceCommander({
           speak(bestCommand.command.reply, () => bestCommand!.command.action({phrase: commandText}));
           resetContext();
         } else {
-          const itemPhrases = commandText.split(/,?\s+(?:and|మరియు)\s+|,/);
+          const itemPhrases = commandText.split(/,?\s+(?:and|మరియు|और)\s+|,/);
           if (itemPhrases.length > 1 || isOrderItemCommand) {
             await commandActionsRef.current.orderItem({ phrase: commandText });
             resetContext();
@@ -679,9 +725,7 @@ export function VoiceCommander({
             placeOrderBtnRef.current.click();
             speak("Placing your order now.");
           } else if (checkoutReady) {
-            // Fallback: if button not available but checkout is ready
             speak("I'm trying to place your order. Please check the checkout page.");
-            // You might want to trigger the order placement programmatically here
           } else {
             speak("Please complete all checkout steps first.");
           }
@@ -707,7 +751,7 @@ export function VoiceCommander({
       refresh: () => window.location.reload(),
       orderItem: async ({ phrase, quantity }: { phrase?: string, quantity?: string }) => {
         if (!phrase) return;
-        const itemPhrases = phrase.split(/,?\s+(?:and|మరియు)\s+|,/);
+        const itemPhrases = phrase.split(/,?\s+(?:and|మరియు|और)\s+|,/);
         let addedItems: string[] = [];
         let notFoundItems: string[] = [];
         
@@ -780,11 +824,12 @@ export function VoiceCommander({
     recognition.interimResults = false;
 
     recognition.onstart = () => {
-      onStatusUpdate(`Listening...`);
+      onStatusUpdate(`Listening... (${currentRecognitionLang})`);
     };
 
     recognition.onresult = (event) => {
       const transcript = event.results[event.results.length - 1][0].transcript.trim();
+      console.log('Recognized:', transcript, 'Language:', currentRecognitionLang);
       handleCommand(transcript);
     };
 
@@ -902,7 +947,10 @@ export function VoiceCommander({
     voiceTrigger,
     isWaitingForVoiceOrder,
     runCheckoutPrompt,
-    checkoutReady
+    checkoutReady,
+    detectLanguage,
+    updateRecognitionLanguage,
+    currentRecognitionLang
   ]);
 
   return null;
