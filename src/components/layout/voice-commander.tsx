@@ -212,48 +212,55 @@ export function VoiceCommander({
 
   // Proactive prompt on checkout page
   useEffect(() => {
-    if (pathname !== '/checkout' || !hasMounted) {
-      hasSpokenCheckoutPrompt.current = false;
+    if (pathname !== '/checkout' || !hasMounted || !enabled || hasSpokenCheckoutPrompt.current || isSpeakingRef.current) {
       return;
     }
   
-    if (enabled && !hasSpokenCheckoutPrompt.current && !isSpeakingRef.current) {
-      const speakTimeout = setTimeout(() => {
-        // Query the DOM directly as form state might not be available here
-        const addressInput = document.querySelector('input[name="deliveryAddress"]') as HTMLInputElement;
-        const addressValue = addressInput?.value;
-        const storeActionAlert = document.getElementById('action-required-alert');
-
-        if (isWaitingForQuickOrderConfirmation) {
-          const totalAmountEl = document.getElementById('final-total-amount');
-          if (totalAmountEl) {
-            const totalText = totalAmountEl.innerText;
-            speak(`Your total is ${totalText}. Please say "confirm order" to place your order.`);
-            hasSpokenCheckoutPrompt.current = true;
-          }
-        } else if (!addressValue) {
-          speak("Should I deliver to your home address or current location?");
-          setIsWaitingForAddressType(true);
-          hasSpokenCheckoutPrompt.current = true;
-        } else if (addressValue) {
-            if (!activeStoreId || activeStoreId === '') {
-              speak("Please tell me which store should fulfill your order.");
-              setIsWaitingForStoreName(true);
-              hasSpokenCheckoutPrompt.current = true;
-            } else {
-              const totalAmountEl = document.getElementById('final-total-amount');
-              if (totalAmountEl) {
-                const totalText = totalAmountEl.innerText;
-                speak(`Your total is ${totalText}. Please say "place order" to confirm.`);
-                hasSpokenCheckoutPrompt.current = true;
-              }
-            }
-        }
-      }, 1500);
+    const speakTimeout = setTimeout(() => {
+      // Query the DOM directly as form state might not be available here
+      const addressInput = document.querySelector('input[name="deliveryAddress"]') as HTMLInputElement;
+      const addressValue = addressInput?.value;
+      const storeSelectTrigger = document.querySelector('button[role="combobox"]') as HTMLButtonElement;
+      const storeSelected = storeSelectTrigger && storeSelectTrigger.textContent !== 'Select a store to fulfill your order';
   
-      return () => clearTimeout(speakTimeout);
-    }
+      if (isWaitingForQuickOrderConfirmation) {
+        const totalAmountEl = document.getElementById('final-total-amount');
+        if (totalAmountEl) {
+          const totalText = totalAmountEl.innerText;
+          speak(`Your total is ${totalText}. Please say "confirm order" to place your order.`);
+          hasSpokenCheckoutPrompt.current = true;
+        }
+        return;
+      }
+      
+      // Step 1: Check for address
+      if (!addressValue) {
+        speak("Should I deliver to your home address or current location?");
+        setIsWaitingForAddressType(true);
+        hasSpokenCheckoutPrompt.current = true;
+        return;
+      }
+  
+      // Step 2: Check for store
+      if (!storeSelected) {
+        speak("Please tell me which store should fulfill your order.");
+        setIsWaitingForStoreName(true);
+        hasSpokenCheckoutPrompt.current = true;
+        return;
+      }
+  
+      // Step 3: Confirm order
+      const totalAmountEl = document.getElementById('final-total-amount');
+      if (totalAmountEl) {
+        const totalText = totalAmountEl.innerText;
+        speak(`Your total is ${totalText}. Please say "place order" to confirm.`);
+        hasSpokenCheckoutPrompt.current = true;
+      }
+    }, 1500);
+  
+    return () => clearTimeout(speakTimeout);
   }, [pathname, enabled, speak, hasMounted, isWaitingForQuickOrderConfirmation, activeStoreId]);
+
 
   // Proactive prompt on profile page
   useEffect(() => {
@@ -337,6 +344,13 @@ export function VoiceCommander({
 
   }, [firestore, masterProducts, productPrices, fetchProductPrices]);
 
+
+  useEffect(() => {
+    // Reset hasSpokenCheckoutPrompt whenever the path changes to something other than checkout
+    if (pathname !== '/checkout') {
+      hasSpokenCheckoutPrompt.current = false;
+    }
+  }, [pathname]);
 
   useEffect(() => {
     if (!recognition) {
@@ -768,3 +782,5 @@ export function VoiceCommander({
 
   return null;
 }
+
+    
