@@ -255,24 +255,20 @@ export function VoiceCommander({
   }, [pathname, enabled, profileForm, hasMounted, handleProfileFormInteraction]);
 
 
-  const findProductAndVariant = useCallback(async (productName: string, desiredWeight?: string): Promise<{ product: Product | null, variant: ProductVariant | null }> => {
-    const lowerProductName = productName.toLowerCase();
+  const findProductAndVariant = useCallback(async (phrase: string): Promise<{ product: Product | null, variant: ProductVariant | null, remainingPhrase: string }> => {
+    const lowerPhrase = phrase.toLowerCase();
     
     let bestMatch: { product: Product, alias: string, similarity: number } | null = null;
 
+    // --- PASS 1: Find the best product match in the phrase ---
     for (const p of masterProducts) {
         if (!p.name) continue;
-        
-        // --- FIX: Include the product's own name in the list of aliases to check ---
-        const aliasesToCheck = [p.name.toLowerCase()];
-        const allAliasValues = Object.values(getAllAliases(p.name.toLowerCase().replace(/ /g, '-'))).flat().map(name => name.toLowerCase());
-        aliasesToCheck.push(...allAliasValues);
-        
+        const aliasesToCheck = [p.name.toLowerCase(), ...Object.values(getAllAliases(p.name.toLowerCase().replace(/ /g, '-'))).flat().map(name => name.toLowerCase())];
         const uniqueAliases = [...new Set(aliasesToCheck)];
 
         for (const alias of uniqueAliases) {
-             if (lowerProductName.includes(alias) || alias.includes(lowerProductName)) {
-                const similarity = calculateSimilarity(lowerProductName, alias);
+             if (lowerPhrase.includes(alias)) {
+                const similarity = calculateSimilarity(lowerPhrase, alias);
                 if (!bestMatch || similarity > bestMatch.similarity) {
                     bestMatch = { product: p, alias: alias, similarity: similarity };
                 }
@@ -280,36 +276,49 @@ export function VoiceCommander({
         }
     }
 
-    if (!bestMatch) return { product: null, variant: null };
-    
-    const productMatch = bestMatch.product;
-    const finalProduct = { ...productMatch }; 
+    if (!bestMatch) return { product: null, variant: null, remainingPhrase: phrase };
 
+    const productMatch = bestMatch.product;
+    const remainingPhrase = lowerPhrase.replace(bestMatch.alias, '').trim();
+
+    // --- PASS 2: Find the best variant match for the found product ---
     let priceData = productPrices[productMatch.name.toLowerCase()];
     if (priceData === undefined && firestore) {
         await fetchProductPrices(firestore, [productMatch.name]);
         priceData = useAppStore.getState().productPrices[productMatch.name.toLowerCase()];
     }
-    
-    if (priceData?.variants?.length > 0) {
-        if (desiredWeight) {
-            const lowerDesiredWeight = desiredWeight.replace(/\s/g, '').toLowerCase();
-            const variantMatch = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === lowerDesiredWeight);
-            if (variantMatch) return { product: finalProduct, variant: variantMatch };
-        }
-        
-        if (!desiredWeight || desiredWeight === 'one') {
-          const onePieceVariant = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === '1pc');
-          if (onePieceVariant) return { product: finalProduct, variant: onePieceVariant };
 
-           const firstVariant = priceData.variants.sort((a,b) => a.price - b.price)[0];
-           if (firstVariant) return { product: finalProduct, variant: firstVariant };
-        }
-
-        return { product: finalProduct, variant: priceData.variants[0] };
+    if (!priceData || !priceData.variants || priceData.variants.length === 0) {
+        return { product: null, variant: null, remainingPhrase: phrase };
     }
     
-    return { product: null, variant: null };
+    // Look for explicit weight mentions in the phrase
+    const weightRegex = /(\d+)\s?(kg|g|gm|gram|grams|kilo|kilos)/i;
+    const weightMatch = lowerPhrase.match(weightRegex);
+
+    if (weightMatch) {
+        const number = parseInt(weightMatch[1], 10);
+        const unit = weightMatch[2].toLowerCase();
+        let desiredWeightStr = `${number}${unit.startsWith('g') ? 'gm' : 'kg'}`;
+        if (unit === 'g' || unit === 'gm' || unit === 'gram' || unit === 'grams') {
+            desiredWeightStr = `${number}gm`;
+        }
+        
+        const variantMatch = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === desiredWeightStr);
+        if (variantMatch) {
+            return { product: productMatch, variant: variantMatch, remainingPhrase };
+        }
+    }
+    
+    // If no weight is specified, or no match, find a sensible default (e.g., 1kg, 1 pack, or the first one)
+    const defaultVariant = 
+        priceData.variants.find(v => v.weight === '1kg') ||
+        priceData.variants.find(v => v.weight.includes('pack')) ||
+        priceData.variants.find(v => v.weight.includes('pc')) ||
+        priceData.variants[0];
+
+    return { product: productMatch, variant: defaultVariant, remainingPhrase };
+
   }, [firestore, masterProducts, productPrices, fetchProductPrices]);
 
 
@@ -334,12 +343,10 @@ export function VoiceCommander({
                 setIsWaitingForVoiceOrder(false);
             };
 
-            // --- Language Detection ---
+            // Language detection
             let detectedLang = 'en';
             if (/[అ-హ]/.test(commandText)) detectedLang = 'te';
-            else if (/[क-ह]/.test(commandText)) detectedLang = 'hi';
-            
-            if (detectedLang !== language.split('-')[0]) {
+            if (language !== `${detectedLang}-IN`) {
               setLanguage(`${detectedLang}-IN`);
             }
 
@@ -416,11 +423,12 @@ export function VoiceCommander({
             }
             
             // --- PASS 1: Exact match on general commands ---
-             for (const key in fileCommandsRef.current) {
+            for (const key in fileCommandsRef.current) {
                 const commandGroup = fileCommandsRef.current[key];
                 
-                const allLangAliases = (commandGroup.aliases || []).map(a => a.toLowerCase());
-                
+                const enAliases = commandGroup.aliases || [];
+                const allLangAliases = [...enAliases, ...Object.values(getAllAliases(key)).flat()].map(a => a.toLowerCase());
+
                 if (allLangAliases.includes(commandText.toLowerCase())) {
                     const action = commandActionsRef.current[key];
                     if (typeof action === 'function') {
@@ -433,50 +441,36 @@ export function VoiceCommander({
                 }
             }
             
-            // --- PASS 2: Template-based commands ---
-            const templates = [
-              { key: 'quickOrder', template: fileCommandsRef.current.quickOrder },
-              { key: 'orderItem', template: fileCommandsRef.current.orderItem },
-            ];
-            for (const { key, template } of templates) {
-                if (template) {
-                    for (const alias of template.aliases) {
-                        const aliasParts = alias.split(/(\{product\}|\{quantity\}|\{store\})/g).filter(Boolean);
-                        const isTemplate = aliasParts.some(p => p.startsWith('{') && p.endsWith('}'));
-                        if (isTemplate) {
-                            const regexString = alias.replace(/\{quantity\}/g, '(.*?)').replace(/\{product\}/g, '(.*?)').replace(/\{store\}/g, '(.*)');
-                            const regex = new RegExp(`^${regexString}$`, 'i');
-                            const match = commandText.match(regex);
-                            if (match) {
-                                const extracted: Record<string, string | undefined> = {};
-                                let matchIndex = 1;
-                                for (const part of aliasParts) {
-                                    if (part === '{quantity}') extracted.quantity = match[matchIndex++]?.trim();
-                                    else if (part === '{product}') extracted.product = match[matchIndex++]?.trim();
-                                    else if (part === '{store}') extracted.store = match[matchIndex++]?.trim();
-                                }
-                                if (extracted.product) {
-                                    await commandActionsRef.current[key](extracted);
-                                    resetContext();
-                                    return; // Command handled
-                                }
-                            }
-                        }
-                    }
+            // --- PASS 2: Template-based commands (order item) ---
+            const orderItemTemplate = fileCommandsRef.current.orderItem;
+            if (orderItemTemplate) {
+              for (const alias of orderItemTemplate.aliases) {
+                const regexString = alias
+                  .replace(/\{quantity\}/g, '(.*?)')
+                  .replace(/\{product\}/g, '(.*?)')
+                  .replace(/\{store\}/g, '(.*)');
+                const regex = new RegExp(`^${regexString}$`, 'i');
+                const match = commandText.match(regex);
+                if (match) {
+                  const extracted: Record<string, string | undefined> = {};
+                  let matchIndex = 1;
+                  if (alias.includes('{quantity}')) extracted.quantity = match[matchIndex++]?.trim();
+                  if (alias.includes('{product}')) extracted.product = match[matchIndex++]?.trim();
+                  if (alias.includes('{store}')) extracted.store = match[matchIndex++]?.trim();
+                  
+                  if (extracted.product) {
+                    await commandActionsRef.current.orderItem({ phrase: extracted.product, quantity: extracted.quantity });
+                    resetContext();
+                    return;
+                  }
                 }
-            }
-
-            // --- PASS 3 (Fallback): Assume the whole command is a product ---
-            const productAsCommandMatch = await findProductAndVariant(commandText);
-            if (productAsCommandMatch.product && productAsCommandMatch.variant) {
-                await commandActionsRef.current.orderItem({ product: commandText });
-                resetContext();
-                return;
+              }
             }
             
-            // If we're here, no match was found.
-            speak(`Sorry, I could not find ${commandText} in the store.`);
-            onSuggestions([]);
+            // --- PASS 3 (Fallback): Assume the whole command is an item or list of items ---
+            await commandActionsRef.current.orderItem({ phrase: commandText });
+            resetContext();
+            return;
 
       } catch(e) {
           console.error("Voice command execution failed:", e);
@@ -560,22 +554,25 @@ export function VoiceCommander({
         }
       },
       refresh: () => window.location.reload(),
-      orderItem: async ({ product, quantity }: { product: string, quantity?: string }) => {
-        const { product: foundProduct, variant } = await findProductAndVariant(product, quantity);
-        if (foundProduct && variant) {
-          addItemToCart(foundProduct, variant, 1);
-          onOpenCart();
-          
-          if (!quantity) {
-             itemToUpdateSkuRef.current = variant.sku;
-             setIsWaitingForQuantity(true);
-             speak(`Added. What quantity would you like?`);
-          } else {
-             const productName = t(foundProduct.name.toLowerCase().replace(/ /g, '-')).split(' / ')[0];
-             speak(`Added ${variant.weight} of ${productName} to your cart.`);
-          }
+      orderItem: async ({ phrase }: { phrase: string }) => {
+        const itemPhrases = phrase.split(/,?\s+and\s+|,/);
+        let addedItems: string[] = [];
+
+        for (const itemPhrase of itemPhrases) {
+            if (!itemPhrase.trim()) continue;
+            const { product: foundProduct, variant } = await findProductAndVariant(itemPhrase);
+            if (foundProduct && variant) {
+                addItemToCart(foundProduct, variant, 1);
+                const productName = t(foundProduct.name.toLowerCase().replace(/ /g, '-')).split(' / ')[0];
+                addedItems.push(productName);
+            }
+        }
+
+        if (addedItems.length > 0) {
+            speak(`Okay, I've added ${addedItems.join(', ')} to your cart.`);
+            onOpenCart();
         } else {
-          speak(`Sorry, I could not find ${product} in the store.`);
+            speak(`Sorry, I couldn't find any of the items you mentioned.`);
         }
       },
       quickOrder: async ({ product, quantity, store: storeName }: { product: string, quantity?: string, store?: string }) => {
@@ -584,7 +581,7 @@ export function VoiceCommander({
             return;
         }
 
-        const { product: foundProduct, variant } = await findProductAndVariant(product, quantity);
+        const { product: foundProduct, variant } = await findProductAndVariant(product);
         if (!foundProduct || !variant) {
             speak(`Sorry, I could not find ${product}.`);
             return;
