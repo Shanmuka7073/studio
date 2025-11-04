@@ -222,7 +222,6 @@ export function VoiceCommander({
         // Query the DOM directly as form state might not be available here
         const addressInput = document.querySelector('input[name="deliveryAddress"]') as HTMLInputElement;
         const addressValue = addressInput?.value;
-        const storeSelectTrigger = document.querySelector('[data-radix-collection-item]') as HTMLElement;
         const storeActionAlert = document.getElementById('action-required-alert');
 
         if (isWaitingForQuickOrderConfirmation) {
@@ -236,17 +235,19 @@ export function VoiceCommander({
           speak("Should I deliver to your home address or current location?");
           setIsWaitingForAddressType(true);
           hasSpokenCheckoutPrompt.current = true;
-        } else if (addressValue && !activeStoreId && storeActionAlert) {
-           speak(`Action required. Please select a store to continue, or tell me the store name.`);
-          setIsWaitingForStoreName(true);
-          hasSpokenCheckoutPrompt.current = true;
-        } else if (addressValue && activeStoreId) {
-           const totalAmountEl = document.getElementById('final-total-amount');
-          if (totalAmountEl) {
-            const totalText = totalAmountEl.innerText;
-            speak(`Your total is ${totalText}. Please say "place order" to confirm.`);
-            hasSpokenCheckoutPrompt.current = true;
-          }
+        } else if (addressValue) {
+            if (!activeStoreId || activeStoreId === '') {
+              speak("Please tell me which store should fulfill your order.");
+              setIsWaitingForStoreName(true);
+              hasSpokenCheckoutPrompt.current = true;
+            } else {
+              const totalAmountEl = document.getElementById('final-total-amount');
+              if (totalAmountEl) {
+                const totalText = totalAmountEl.innerText;
+                speak(`Your total is ${totalText}. Please say "place order" to confirm.`);
+                hasSpokenCheckoutPrompt.current = true;
+              }
+            }
         }
       }, 1500);
   
