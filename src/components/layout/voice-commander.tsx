@@ -166,7 +166,12 @@ export function VoiceCommander({
     };
 
     utterance.onerror = (e) => {
-        console.error("Speech synthesis error:", e.error || 'Unknown speech error');
+        if (e.error === 'interrupted') {
+          // This is a common, non-critical error. We can often ignore it.
+          console.log('Speech was interrupted.');
+        } else {
+          console.error("Speech synthesis error:", e.error || 'Unknown speech error');
+        }
         isSpeakingRef.current = false;
         if (onEndCallback) onEndCallback();
          if (isEnabledRef.current) {
@@ -216,7 +221,9 @@ export function VoiceCommander({
   
     if (enabled && !hasSpokenCheckoutPrompt.current) {
       const speakTimeout = setTimeout(() => {
-        const addressValue = (document.querySelector('input[name="deliveryAddress"]') as HTMLInputElement)?.value;
+        // We need to query the DOM directly as form state might not be available here
+        const addressInput = document.querySelector('input[name="deliveryAddress"]') as HTMLInputElement;
+        const addressValue = addressInput?.value;
         const storeActionAlert = document.getElementById('action-required-alert');
   
         if (isWaitingForQuickOrderConfirmation) {
@@ -228,10 +235,10 @@ export function VoiceCommander({
         } else if (!addressValue) {
           speak("Should I deliver to your home address or current location?");
           setIsWaitingForAddressType(true);
-        } else if (!activeStoreId && storeActionAlert) {
+        } else if (addressValue && !activeStoreId && storeActionAlert) {
           speak(`Action required. Please select a store to continue, or tell me the store name.`);
           setIsWaitingForStoreName(true);
-        } else if (activeStoreId && addressValue) {
+        } else if (addressValue && activeStoreId) {
           const totalAmountEl = document.getElementById('final-total-amount');
           if (totalAmountEl) {
             const totalText = totalAmountEl.innerText;
@@ -447,7 +454,7 @@ export function VoiceCommander({
               const cmdGroup = fileCommandsRef.current[key];
               const action = commandActionsRef.current[key];
               if (action) {
-                cmdGroup.aliases.forEach(alias => {
+                cmdGroup.aliases.forEach((alias: string) => {
                   allCommands.push({
                     command: alias,
                     action: action.bind(null, { phrase: commandText }),
@@ -467,7 +474,7 @@ export function VoiceCommander({
             }
 
             if (bestCommand && bestCommand.similarity > 0.7) {
-                speak(bestCommand.command.reply, () => bestCommand.command.action(commandText));
+                speak(bestCommand.command.reply, () => bestCommand!.command.action(commandText));
                 resetContext();
             } else {
                 const itemPhrases = commandText.split(/,?\s+(?:and|మరియు)\s+|,/);
@@ -749,7 +756,3 @@ export function VoiceCommander({
 
   return null;
 }
-
-    
-
-    
