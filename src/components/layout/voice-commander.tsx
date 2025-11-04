@@ -241,23 +241,14 @@ export function VoiceCommander({
 
   // Effect to run checkout prompt when voiceTrigger changes
   useEffect(() => {
+    // Reset the flag to allow the prompt to run again
+    hasSpokenCheckoutPrompt.current = false;
     const speakTimeout = setTimeout(() => {
       runCheckoutPrompt();
     }, 500);
     return () => clearTimeout(speakTimeout);
   }, [voiceTrigger, runCheckoutPrompt]);
-
-  // Effect to reset checkout prompt when cart items change
-  useEffect(() => {
-    if (pathname === '/checkout') {
-      const timeout = setTimeout(() => {
-        hasSpokenCheckoutPrompt.current = false;
-        runCheckoutPrompt();
-      }, 500);
-      return () => clearTimeout(timeout);
-    }
-  }, [cartItems, pathname, runCheckoutPrompt]);
-
+  
   // Proactive prompt on profile page
   useEffect(() => {
     if (pathname !== '/dashboard/customer/my-profile' || !hasMounted || !enabled) {
@@ -438,9 +429,6 @@ export function VoiceCommander({
           if (bestMatch && bestMatch.similarity > 0.7) {
             speak(`Okay, ordering from ${bestMatch.name}.`);
             setActiveStoreId(bestMatch.id);
-            // Reset the prompt to allow the final "place order" prompt to trigger
-            hasSpokenCheckoutPrompt.current = false;
-            setTimeout(() => runCheckoutPrompt(), 500);
           } else {
             speak(`Sorry, I couldn't find a store named ${commandText}. Please try again.`);
           }
@@ -754,8 +742,6 @@ export function VoiceCommander({
                   setIsWaitingForStoreName(false);
                   speak(`Okay, ordering from ${store.name}.`);
                   setActiveStoreId(store.id);
-                  hasSpokenCheckoutPrompt.current = false;
-                  setTimeout(() => runCheckoutPrompt(), 500);
                   return;
                 }
 
