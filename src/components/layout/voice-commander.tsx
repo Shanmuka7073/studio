@@ -154,7 +154,7 @@ export function VoiceCommander({
     };
 
     utterance.onerror = (e) => {
-        console.error("Speech synthesis error:", e.error || e);
+        console.error("Speech synthesis error:", e.error || 'Unknown speech error');
         isSpeakingRef.current = false;
         if (onEndCallback) onEndCallback();
          if (isEnabledRef.current) {
@@ -265,7 +265,7 @@ export function VoiceCommander({
   }, [pathname, enabled, profileForm, hasMounted, handleProfileFormInteraction]);
 
 
- const findProductAndVariant = useCallback(async (phrase: string): Promise<{ product: Product | null, variant: ProductVariant | null, remainingPhrase: string }> => {
+  const findProductAndVariant = useCallback(async (phrase: string): Promise<{ product: Product | null, variant: ProductVariant | null, remainingPhrase: string }> => {
     const lowerPhrase = phrase.toLowerCase();
     
     let bestMatch: { product: Product, alias: string, similarity: number } | null = null;
@@ -331,7 +331,7 @@ export function VoiceCommander({
 
   useEffect(() => {
     if (!recognition) {
-        onStatusUpdate("Listening...");
+        onStatusUpdate("Speech recognition not supported by this browser.");
         return;
     }
     
@@ -426,13 +426,11 @@ export function VoiceCommander({
                     setIsWaitingForStoreName(false);
                     speak(`Okay, ordering from ${bestMatch.name}.`);
                     setActiveStoreId(bestMatch.id);
-                    setTimeout(() => {
-                        placeOrderBtnRef?.current?.click();
-                    }, 500); 
+                    // No longer need to click the button here, the UI will react to activeStoreId change
                 } else {
                     speak(`Sorry, I couldn't find a store named ${commandText}. Please try again.`);
                 }
-                resetContext();
+                // Do not reset context here, let the UI update trigger the next voice prompt
                 return;
             }
 
@@ -443,58 +441,46 @@ export function VoiceCommander({
                 return;
             }
             
-            // --- PASS 1: Exact match on general commands in any language ---
-            for (const key in fileCommandsRef.current) {
-                const commandGroup = fileCommandsRef.current[key];
-                const commandKeyInLocales = key.replace(/([A-Z])/g, '-$1').toLowerCase();
-
-                const allLangAliases = [
-                    ...(commandGroup.aliases || []), 
-                    ...Object.values(getAllAliases(commandKeyInLocales)).flat()
-                ].map(a => a.toLowerCase());
-
-                if (allLangAliases.includes(commandText.toLowerCase())) {
-                    const action = commandActionsRef.current[key];
-                    if (typeof action === 'function') {
-                        const reply = commandGroup.reply || `Executing ${key}`;
-                        action();
-                        speak(reply);
-                        resetContext();
-                        return;
-                    }
-                }
-            }
+            let bestCommand: { command: Command, similarity: number } | null = null;
             
-            // --- PASS 2: Template-based commands (order item) ---
-            const orderItemTemplate = fileCommandsRef.current.orderItem;
-            if (orderItemTemplate) {
-              for (const alias of orderItemTemplate.aliases) {
-                const regexString = alias
-                  .replace(/\{quantity\}/g, '(.*?)')
-                  .replace(/\{product\}/g, '(.*?)')
-                  .replace(/\{store\}/g, '(.*)');
-                const regex = new RegExp(`^${regexString}$`, 'i');
-                const match = commandText.match(regex);
-                if (match) {
-                  const extracted: Record<string, string | undefined> = {};
-                  let matchIndex = 1;
-                  if (alias.includes('{quantity}')) extracted.quantity = match[matchIndex++]?.trim();
-                  if (alias.includes('{product}')) extracted.product = match[matchIndex++]?.trim();
-                  if (alias.includes('{store}')) extracted.store = match[matchIndex++]?.trim();
-                  
-                  if (extracted.product) {
-                    await commandActionsRef.current.orderItem({ phrase: extracted.product, quantity: extracted.quantity });
-                    resetContext();
-                    return;
-                  }
-                }
+            // Combine file commands and dynamic commands
+            const allCommands = [...commandsRef.current];
+            for (const key in fileCommandsRef.current) {
+              const cmdGroup = fileCommandsRef.current[key];
+              const action = commandActionsRef.current[key];
+              if (action) {
+                cmdGroup.aliases.forEach(alias => {
+                  allCommands.push({
+                    command: alias,
+                    action: action,
+                    display: cmdGroup.display,
+                    reply: cmdGroup.reply
+                  });
+                });
               }
             }
-            
-            // --- PASS 3 (Fallback): Assume the whole command is an item or list of items ---
-            await commandActionsRef.current.orderItem({ phrase: commandText });
-            resetContext();
-            return;
+
+
+            for (const cmd of allCommands) {
+                const similarity = calculateSimilarity(commandText.toLowerCase(), cmd.command);
+                if (!bestCommand || similarity > bestCommand.similarity) {
+                    bestCommand = { command: cmd, similarity };
+                }
+            }
+
+            if (bestCommand && bestCommand.similarity > 0.7) {
+                speak(bestCommand.command.reply, () => bestCommand.command.action());
+                resetContext();
+            } else {
+                 const { product } = await findProductAndVariant(commandText);
+                 if (product) {
+                     await commandActionsRef.current.orderItem({ phrase: commandText });
+                     resetContext();
+                 } else {
+                    speak("Sorry, I didn't understand that. Please try again.");
+                    resetContext();
+                 }
+            }
 
       } catch(e) {
           console.error("Voice command execution failed:", e);
@@ -657,13 +643,6 @@ export function VoiceCommander({
         setTimeout(() => {
             router.push('/checkout');
         }, 500);
-
-        // After another delay, click the final button
-        setTimeout(() => {
-            if (placeOrderBtnRef?.current) {
-                placeOrderBtnRef.current.click();
-            }
-        }, 3000); // 3-second delay to allow checkout page to load
       },
     };
     
@@ -688,11 +667,15 @@ export function VoiceCommander({
     
     recognition.onend = () => {
       if (isEnabledRef.current && !isSpeakingRef.current) {
+        // Use a small delay to prevent rapid, sequential restarts
         setTimeout(() => {
           try {
             recognition?.start();
-          } catch (e) {}
-        }, 100);
+          } catch (e) {
+            // This can happen if the component unmounts or `enabled` becomes false
+            // during the timeout. It's safe to ignore.
+          }
+        }, 250);
       }
     };
 
@@ -723,9 +706,6 @@ export function VoiceCommander({
                   setIsWaitingForStoreName(false);
                   speak(`Okay, ordering from ${store.name}.`);
                   setActiveStoreId(store.id);
-                  setTimeout(() => {
-                      placeOrderBtnRef?.current?.click();
-                  }, 500);
                   return;
                 }
 
@@ -761,5 +741,7 @@ export function VoiceCommander({
 
   return null;
 }
+
+    
 
     
