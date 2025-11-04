@@ -6,7 +6,6 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { useFirebase, errorEmitter } from '@/firebase';
-import { getProductPrice } from '@/lib/data';
 import type { Store, Product, ProductPrice, ProductVariant, CartItem, User } from '@/lib/types';
 import { calculateSimilarity } from '@/lib/calculate-similarity';
 import { useCart } from '@/lib/cart';
@@ -39,8 +38,6 @@ if (typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSp
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     recognition = new SpeechRecognition();
 }
-
-const DELIVERY_FEE = 30;
 
 export function VoiceCommander({
   enabled,
@@ -97,9 +94,12 @@ export function VoiceCommander({
         setSpeechSynthesisVoices(voices);
       }
     };
-    getVoices();
-    // Voices are loaded asynchronously, so we might need this event listener.
-    window.speechSynthesis.onvoiceschanged = getVoices;
+    
+    // Voices may load asynchronously.
+    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+        window.speechSynthesis.onvoiceschanged = getVoices;
+    }
+    getVoices(); // Also call it directly in case they are already loaded.
 
     return () => {
       window.speechSynthesis.onvoiceschanged = null;
@@ -131,15 +131,12 @@ export function VoiceCommander({
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.pitch = 1;
     utterance.rate = 1.1;
+    utterance.lang = language; // Set language directly on utterance
 
-    // --- Safer Voice Selection ---
-    // Find a voice that matches the language. Fallback to the first available voice.
+    // Find a matching voice, but don't fail if not found.
     const desiredVoice = speechSynthesisVoices.find(voice => voice.lang === language);
     if (desiredVoice) {
         utterance.voice = desiredVoice;
-    } else {
-        // If no specific voice, just set the lang property. The browser will use its default.
-        utterance.lang = language;
     }
 
     utterance.onend = () => {
@@ -155,26 +152,23 @@ export function VoiceCommander({
     };
 
     utterance.onerror = (e) => {
-        console.error("Speech synthesis error:", e);
+        console.error("Speech synthesis error:", e.error); // Log the specific error
         isSpeakingRef.current = false;
         if (onEndCallback) onEndCallback();
     };
 
-    // --- Safer Speaking Logic ---
     const speakNow = () => {
-        // Cancel any ongoing speech before starting a new one.
-        window.speechSynthesis.cancel();
+        if (window.speechSynthesis.speaking) {
+            window.speechSynthesis.cancel();
+        }
         isSpeakingRef.current = true;
         recognition?.stop();
         window.speechSynthesis.speak(utterance);
     };
 
-    // If the speech synthesis engine is already speaking, wait a tiny bit.
-    if (window.speechSynthesis.speaking) {
-        setTimeout(speakNow, 100);
-    } else {
-        speakNow();
-    }
+    // Use a small timeout to ensure the synthesis engine is ready.
+    setTimeout(speakNow, 100);
+
   }, [language, speechSynthesisVoices]);
 
   const handleProfileFormInteraction = useCallback(() => {
@@ -263,6 +257,7 @@ export function VoiceCommander({
     // --- PASS 1: Find the best product match in the phrase ---
     for (const p of masterProducts) {
         if (!p.name) continue;
+        // Ensure the product's own name is in the list of aliases to check
         const aliasesToCheck = [p.name.toLowerCase(), ...Object.values(getAllAliases(p.name.toLowerCase().replace(/ /g, '-'))).flat().map(name => name.toLowerCase())];
         const uniqueAliases = [...new Set(aliasesToCheck)];
 
@@ -422,19 +417,21 @@ export function VoiceCommander({
                 return;
             }
             
-            // --- PASS 1: Exact match on general commands ---
+            // --- PASS 1: Exact match on general commands in any language ---
             for (const key in fileCommandsRef.current) {
                 const commandGroup = fileCommandsRef.current[key];
                 
-                const enAliases = commandGroup.aliases || [];
-                const allLangAliases = [...enAliases, ...Object.values(getAllAliases(key)).flat()].map(a => a.toLowerCase());
+                const allLangAliases = [
+                    ...(commandGroup.aliases || []), 
+                    ...Object.values(getAllAliases(key)).flat()
+                ].map(a => a.toLowerCase());
 
                 if (allLangAliases.includes(commandText.toLowerCase())) {
                     const action = commandActionsRef.current[key];
                     if (typeof action === 'function') {
                         const reply = commandGroup.reply || `Executing ${key}`;
-                        speak(reply);
                         action();
+                        speak(reply);
                         resetContext();
                         return;
                     }
