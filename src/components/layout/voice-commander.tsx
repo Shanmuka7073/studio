@@ -214,38 +214,40 @@ export function VoiceCommander({
   useEffect(() => {
     if (pathname !== '/checkout' || !hasMounted) {
       hasSpokenCheckoutPrompt.current = false;
-      setIsWaitingForStoreName(false);
-      setIsWaitingForAddressType(false);
       return;
     }
   
-    if (enabled && !hasSpokenCheckoutPrompt.current) {
+    if (enabled && !hasSpokenCheckoutPrompt.current && !isSpeakingRef.current) {
       const speakTimeout = setTimeout(() => {
-        // We need to query the DOM directly as form state might not be available here
+        // Query the DOM directly as form state might not be available here
         const addressInput = document.querySelector('input[name="deliveryAddress"]') as HTMLInputElement;
         const addressValue = addressInput?.value;
+        const storeSelectTrigger = document.querySelector('[data-radix-collection-item]') as HTMLElement;
         const storeActionAlert = document.getElementById('action-required-alert');
-  
+
         if (isWaitingForQuickOrderConfirmation) {
           const totalAmountEl = document.getElementById('final-total-amount');
           if (totalAmountEl) {
             const totalText = totalAmountEl.innerText;
             speak(`Your total is ${totalText}. Please say "confirm order" to place your order.`);
+            hasSpokenCheckoutPrompt.current = true;
           }
         } else if (!addressValue) {
           speak("Should I deliver to your home address or current location?");
           setIsWaitingForAddressType(true);
+          hasSpokenCheckoutPrompt.current = true;
         } else if (addressValue && !activeStoreId && storeActionAlert) {
-          speak(`Action required. Please select a store to continue, or tell me the store name.`);
+           speak(`Action required. Please select a store to continue, or tell me the store name.`);
           setIsWaitingForStoreName(true);
+          hasSpokenCheckoutPrompt.current = true;
         } else if (addressValue && activeStoreId) {
-          const totalAmountEl = document.getElementById('final-total-amount');
+           const totalAmountEl = document.getElementById('final-total-amount');
           if (totalAmountEl) {
             const totalText = totalAmountEl.innerText;
             speak(`Your total is ${totalText}. Please say "place order" to confirm.`);
+            hasSpokenCheckoutPrompt.current = true;
           }
         }
-        hasSpokenCheckoutPrompt.current = true;
       }, 1500);
   
       return () => clearTimeout(speakTimeout);
@@ -355,6 +357,7 @@ export function VoiceCommander({
                 setIsWaitingForQuickOrderConfirmation(false);
                 setIsWaitingForVoiceOrder(false);
                 setIsWaitingForAddressType(false);
+                hasSpokenCheckoutPrompt.current = false;
             };
 
             let detectedLang = 'en';
@@ -429,13 +432,12 @@ export function VoiceCommander({
                     .sort((a, b) => b.similarity - a.similarity)[0];
 
                 if (bestMatch && bestMatch.similarity > 0.7) {
-                    setIsWaitingForStoreName(false);
                     speak(`Okay, ordering from ${bestMatch.name}.`);
                     setActiveStoreId(bestMatch.id);
                 } else {
                     speak(`Sorry, I couldn't find a store named ${commandText}. Please try again.`);
                 }
-                hasSpokenCheckoutPrompt.current = false; // Allow re-prompting for the next step
+                resetContext();
                 return;
             }
 
@@ -457,7 +459,7 @@ export function VoiceCommander({
                 cmdGroup.aliases.forEach((alias: string) => {
                   allCommands.push({
                     command: alias,
-                    action: action.bind(null, { phrase: commandText }),
+                    action: action,
                     display: cmdGroup.display,
                     reply: cmdGroup.reply
                   });
@@ -472,13 +474,21 @@ export function VoiceCommander({
                     bestCommand = { command: cmd, similarity };
                 }
             }
+            
+            const isOrderItemCommand = fileCommandsRef.current.orderItem.aliases.some(alias => {
+                const placeholderRegex = /{\w+}/g;
+                const simplifiedAlias = alias.replace(placeholderRegex, '').trim();
+                const simplifiedCommandText = commandText.toLowerCase().replace(/\d+\s*(kg|kilo|kilos|g|gm|gram|grams)?/i, '').trim();
+                return calculateSimilarity(simplifiedCommandText, simplifiedAlias) > 0.6;
+            });
+
 
             if (bestCommand && bestCommand.similarity > 0.7) {
-                speak(bestCommand.command.reply, () => bestCommand!.command.action(commandText));
+                speak(bestCommand.command.reply, () => bestCommand!.command.action({phrase: commandText}));
                 resetContext();
             } else {
                 const itemPhrases = commandText.split(/,?\s+(?:and|మరియు)\s+|,/);
-                 if (itemPhrases.length > 1) {
+                 if (itemPhrases.length > 1 || isOrderItemCommand) {
                      await commandActionsRef.current.orderItem({ phrase: commandText });
                      resetContext();
                  } else {
@@ -587,7 +597,8 @@ export function VoiceCommander({
         }
       },
       refresh: () => window.location.reload(),
-      orderItem: async ({ phrase, quantity }: { phrase: string, quantity?: string }) => {
+      orderItem: async ({ phrase, quantity }: { phrase?: string, quantity?: string }) => {
+          if (!phrase) return;
           const itemPhrases = phrase.split(/,?\s+(?:and|మరియు)\s+|,/);
           let addedItems: string[] = [];
           let notFoundItems: string[] = [];
