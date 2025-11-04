@@ -136,7 +136,7 @@ export function VoiceCommander({
     utterance.lang = currentLanguage;
 
     // Find a matching voice, but don't fail if not found.
-    const desiredVoice = speechSynthesisVoices.find(voice => voice.lang === currentLanguage);
+    const desiredVoice = speechSynthesisVoices.find(voice => voice.lang === currentLanguage && !voice.name.includes('Google'));
     if (desiredVoice) {
         utterance.voice = desiredVoice;
     }
@@ -297,28 +297,29 @@ export function VoiceCommander({
         return { product: productMatch, variant: null, remainingPhrase: phrase };
     }
     
-    const weightRegex = /(\d+)\s?(kg|g|gm|gram|grams|kilo|kilos)/i;
+    // Look for a specific weight in the phrase
+    const weightRegex = /(\d+)\s?(kg|kilo|kilos|g|gm|gram|grams)/i;
     const weightMatch = lowerPhrase.match(weightRegex);
 
     if (weightMatch) {
         const number = parseInt(weightMatch[1], 10);
-        let desiredWeightStr = `${number}kg`; // Default to kg
         const unit = weightMatch[2].toLowerCase();
-        if (unit.startsWith('g')) {
-            desiredWeightStr = `${number}gm`;
-        }
         
+        let desiredWeightStr = `${number}${unit.startsWith('k') ? 'kg' : 'gm'}`;
+
+        // Find the specific variant that matches the weight
         const variantMatch = priceData.variants.find(v => v.weight.replace(/\s/g, '').toLowerCase() === desiredWeightStr);
         if (variantMatch) {
             return { product: productMatch, variant: variantMatch, remainingPhrase };
         }
     }
     
+    // If no weight is mentioned or matched, apply a smarter default
     const defaultVariant = 
         priceData.variants.find(v => v.weight === '1kg') ||
         priceData.variants.find(v => v.weight.includes('pack')) ||
         priceData.variants.find(v => v.weight.includes('pc')) ||
-        priceData.variants[0];
+        priceData.variants[0]; // Fallback to the first variant
 
     return { product: productMatch, variant: defaultVariant, remainingPhrase };
 
@@ -428,10 +429,11 @@ export function VoiceCommander({
             // --- PASS 1: Exact match on general commands in any language ---
             for (const key in fileCommandsRef.current) {
                 const commandGroup = fileCommandsRef.current[key];
-                
+                const commandKeyInLocales = key.replace(/([A-Z])/g, '-$1').toLowerCase();
+
                 const allLangAliases = [
                     ...(commandGroup.aliases || []), 
-                    ...Object.values(getAllAliases(key)).flat()
+                    ...Object.values(getAllAliases(commandKeyInLocales)).flat()
                 ].map(a => a.toLowerCase());
 
                 if (allLangAliases.includes(commandText.toLowerCase())) {
@@ -562,25 +564,36 @@ export function VoiceCommander({
       orderItem: async ({ phrase, quantity }: { phrase: string, quantity?: string }) => {
         const itemPhrases = phrase.split(/,?\s+and\s+|,/);
         let addedItems: string[] = [];
+        let notFoundItems: string[] = [];
+        let suggestions: Command[] = [];
 
         for (const itemPhrase of itemPhrases) {
             if (!itemPhrase.trim()) continue;
-            // The quantity from the template is passed here, along with the item phrase which might also contain a quantity.
+            
             const combinedPhrase = quantity ? `${quantity} ${itemPhrase}` : itemPhrase;
             const { product: foundProduct, variant } = await findProductAndVariant(combinedPhrase);
 
             if (foundProduct && variant) {
-                addItemToCart(foundProduct, variant, 1);
+                addItemToCart(foundProduct, variant, 1); // For simplicity, always add 1. Quantity can be changed in cart.
                 const productName = t(foundProduct.name.toLowerCase().replace(/ /g, '-')).split(' / ')[0];
                 addedItems.push(productName);
+            } else if (foundProduct) {
+                // Product found, but no matching variant
+                notFoundItems.push(`${itemPhrase} (variant not found)`);
+            } else {
+                notFoundItems.push(itemPhrase);
             }
         }
-
+        
         if (addedItems.length > 0) {
             speak(`Okay, I've added ${addedItems.join(', ')} to your cart.`);
             onOpenCart();
-        } else {
-            speak(`Sorry, I couldn't find any of the items you mentioned.`);
+        } 
+        
+        if (notFoundItems.length > 0 && addedItems.length === 0) {
+             speak(`Sorry, I couldn't find ${notFoundItems.join(', ')}.`);
+        } else if (notFoundItems.length > 0) {
+            speak(`I added some items, but couldn't find ${notFoundItems.join(', ')}.`);
         }
       },
       quickOrder: async ({ product, quantity, store: storeName }: { product: string, quantity?: string, store?: string }) => {
@@ -723,4 +736,3 @@ export function VoiceCommander({
 
   return null;
 }
-
