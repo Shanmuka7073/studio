@@ -321,6 +321,43 @@ export default function CheckoutPage() {
                     <CardTitle>{t('delivery-and-store-selection')}</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-6">
+                        <div className="space-y-2">
+                            <FormLabel>{t('fulfilling-store')}</FormLabel>
+                            <Select onValueChange={setActiveStoreId} value={activeStoreId || ""}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder={t('select-a-store-to-fulfill')} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {allStores.map(store => (
+                                        <SelectItem key={store.id} value={store.id}>
+                                            <div className="flex items-center gap-2">
+                                                <StoreIcon className="h-4 w-4 text-muted-foreground" />
+                                                <span>{store.name}</span>
+                                            </div>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            {!activeStoreId && !isWaitingForQuickOrderConfirmation && (
+                                <Alert variant="destructive" id="action-required-alert">
+                                    <AlertCircle className="h-4 w-4" />
+                                    <AlertTitle>{t('action-required')}</AlertTitle>
+                                    <AlertDescription>
+                                        {t('please-select-a-store-to-continue')}
+                                    </AlertDescription>
+                                </Alert>
+                            )}
+                             {isWaitingForQuickOrderConfirmation && !activeStoreId && (
+                                <Alert variant="default" id="action-required-alert">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <AlertTitle>{t('waiting-for-store')}</AlertTitle>
+                                    <AlertDescription>
+                                       {t('the-store-you-selected-with-your-voice-is-being-set')}
+                                    </AlertDescription>
+                                </Alert>
+                            )}
+                        </div>
+
                         <FormField
                             control={form.control}
                             name="name"
@@ -370,43 +407,6 @@ export default function CheckoutPage() {
                             </FormItem>
                             )}
                         />
-                        
-                        <div className="space-y-2 pt-4 border-t">
-                            <FormLabel>{t('fulfilling-store')}</FormLabel>
-                            <Select onValueChange={setActiveStoreId} value={activeStoreId || ""}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder={t('select-a-store-to-fulfill')} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {allStores.map(store => (
-                                        <SelectItem key={store.id} value={store.id}>
-                                            <div className="flex items-center gap-2">
-                                                <StoreIcon className="h-4 w-4 text-muted-foreground" />
-                                                <span>{store.name}</span>
-                                            </div>
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            {!activeStoreId && !isWaitingForQuickOrderConfirmation && (
-                                <Alert variant="destructive" id="action-required-alert">
-                                    <AlertCircle className="h-4 w-4" />
-                                    <AlertTitle>{t('action-required')}</AlertTitle>
-                                    <AlertDescription>
-                                        {t('please-select-a-store-to-continue')}
-                                    </AlertDescription>
-                                </Alert>
-                            )}
-                             {isWaitingForQuickOrderConfirmation && !activeStoreId && (
-                                <Alert variant="default" id="action-required-alert">
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    <AlertTitle>{t('waiting-for-store')}</AlertTitle>
-                                    <AlertDescription>
-                                       {t('the-store-you-selected-with-your-voice-is-being-set')}
-                                    </AlertDescription>
-                                </Alert>
-                            )}
-                        </div>
 
                         <Button ref={placeOrderBtnRef} type="submit" disabled={isPlacingOrder || !activeStoreId} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
                             {isPlacingOrder ? t('placing-order') : t('place-order')}
