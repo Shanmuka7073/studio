@@ -38,6 +38,8 @@ import { create } from 'zustand';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useAppStore } from '@/lib/store';
 import { t } from '@/lib/locales';
+import { useVoiceCommander } from '@/components/layout/main-layout';
+
 
 const checkoutSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -115,6 +117,8 @@ export default function CheckoutPage() {
       setHomeAddressBtnRef,
       setCurrentLocationBtnRef
     } = useCheckoutStore();
+  
+  const { triggerVoicePrompt } = useVoiceCommander();
 
   const hasItemsInCart = cartItems.length > 0;
   const finalTotal = hasItemsInCart ? cartTotal + DELIVERY_FEE : 0;
@@ -185,6 +189,16 @@ export default function CheckoutPage() {
       }
     }
   }, [userData, form, toast]);
+
+  // Safely watch the delivery address and trigger voice prompt when it changes
+  const deliveryAddressValue = form.watch('deliveryAddress');
+  useEffect(() => {
+    if (deliveryAddressValue && deliveryAddressValue.length > 10) {
+      if (triggerVoicePrompt) {
+        triggerVoicePrompt();
+      }
+    }
+  }, [deliveryAddressValue, triggerVoicePrompt]);
 
 
   // Effect to pre-fill form with user data
@@ -450,3 +464,5 @@ export default function CheckoutPage() {
     </div>
   );
 }
+
+    
