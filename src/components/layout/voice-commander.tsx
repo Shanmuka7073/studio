@@ -92,20 +92,22 @@ export function VoiceCommander({
     }
     // Populate voices
     const getVoices = () => {
-      const voices = window.speechSynthesis.getVoices();
-      if (voices.length > 0) {
-        setSpeechSynthesisVoices(voices);
-      }
+        const allVoices = window.speechSynthesis.getVoices();
+        if (allVoices.length > 0) {
+            setSpeechSynthesisVoices(allVoices);
+        }
     };
     
     // Voices may load asynchronously.
-    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+    if ('onvoiceschanged' in window.speechSynthesis) {
         window.speechSynthesis.onvoiceschanged = getVoices;
     }
     getVoices(); // Also call it directly in case they are already loaded.
 
     return () => {
-      window.speechSynthesis.onvoiceschanged = null;
+      if ('onvoiceschanged' in window.speechSynthesis) {
+        window.speechSynthesis.onvoiceschanged = null;
+      }
     }
   }, [firestore, fetchInitialData]);
   
@@ -131,15 +133,26 @@ export function VoiceCommander({
         return;
     }
 
+    // Cancel any ongoing speech first
+    window.speechSynthesis.cancel();
+    isSpeakingRef.current = false;
+    
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.pitch = 1;
     utterance.rate = 1.1;
     utterance.lang = currentLanguage;
 
-    const desiredVoice = speechSynthesisVoices.find(voice => voice.lang === currentLanguage && !voice.name.includes('Google'));
+    const desiredVoice = speechSynthesisVoices.find(voice => voice.lang === currentLanguage && voice.localService);
     if (desiredVoice) {
         utterance.voice = desiredVoice;
+    } else {
+        // Fallback to a generic voice for the language if a specific one isn't found
+        const langVoices = speechSynthesisVoices.filter(v => v.lang.startsWith(currentLanguage.split('-')[0]));
+        if (langVoices.length > 0) {
+            utterance.voice = langVoices[0];
+        }
     }
+
 
     utterance.onend = () => {
         isSpeakingRef.current = false;
@@ -164,22 +177,9 @@ export function VoiceCommander({
         }
     };
     
-    const speakNow = () => {
-        if (window.speechSynthesis.speaking) {
-            window.speechSynthesis.cancel();
-            setTimeout(() => {
-                 isSpeakingRef.current = true;
-                recognition?.stop();
-                window.speechSynthesis.speak(utterance);
-            }, 100);
-        } else {
-            isSpeakingRef.current = true;
-            recognition?.stop();
-            window.speechSynthesis.speak(utterance);
-        }
-    };
-
-    speakNow();
+    isSpeakingRef.current = true;
+    recognition?.stop();
+    window.speechSynthesis.speak(utterance);
 
   }, [currentLanguage, speechSynthesisVoices]);
 
@@ -214,34 +214,38 @@ export function VoiceCommander({
       setIsWaitingForAddressType(false);
       return;
     }
-
+  
     if (enabled && !hasSpokenCheckoutPrompt.current) {
       const speakTimeout = setTimeout(() => {
         const addressValue = (document.querySelector('input[name="deliveryAddress"]') as HTMLInputElement)?.value;
-        const actionAlert = document.getElementById('action-required-alert');
-
+  
+        // Check for active store using the hook
+        const currentActiveStoreId = useCart.getState().activeStoreId;
+        const storeActionAlert = document.getElementById('action-required-alert');
+  
         if (isWaitingForQuickOrderConfirmation) {
-            const totalAmountEl = document.getElementById('final-total-amount');
-            if (totalAmountEl) {
-                const totalText = totalAmountEl.innerText;
-                speak(`Your total is ${totalText}. Please say "confirm order" to place your order.`);
-            }
+          const totalAmountEl = document.getElementById('final-total-amount');
+          if (totalAmountEl) {
+            const totalText = totalAmountEl.innerText;
+            speak(`Your total is ${totalText}. Please say "confirm order" to place your order.`);
+          }
         } else if (!addressValue) {
-            speak("Should I deliver to your home address or current location?");
-            setIsWaitingForAddressType(true);
-        } else if (actionAlert) {
-            speak(`Action required. Please select a store to continue, or tell me the store name.`);
-            setIsWaitingForStoreName(true);
+          speak("Should I deliver to your home address or current location?");
+          setIsWaitingForAddressType(true);
+        } else if (!currentActiveStoreId && storeActionAlert) {
+          // Check the Zustand state directly, then look for the alert
+          speak(`Action required. Please select a store to continue, or tell me the store name.`);
+          setIsWaitingForStoreName(true);
         } else {
-            const totalAmountEl = document.getElementById('final-total-amount');
-            if (totalAmountEl) {
-                const totalText = totalAmountEl.innerText;
-                speak(`Your total is ${totalText}. Please say "place order" to confirm.`);
-            }
+          const totalAmountEl = document.getElementById('final-total-amount');
+          if (totalAmountEl) {
+            const totalText = totalAmountEl.innerText;
+            speak(`Your total is ${totalText}. Please say "place order" to confirm.`);
+          }
         }
         hasSpokenCheckoutPrompt.current = true;
       }, 1500);
-
+  
       return () => clearTimeout(speakTimeout);
     }
   }, [pathname, enabled, speak, hasMounted, isWaitingForQuickOrderConfirmation, activeStoreId]);
@@ -426,11 +430,10 @@ export function VoiceCommander({
                     setIsWaitingForStoreName(false);
                     speak(`Okay, ordering from ${bestMatch.name}.`);
                     setActiveStoreId(bestMatch.id);
-                    // No longer need to click the button here, the UI will react to activeStoreId change
                 } else {
                     speak(`Sorry, I couldn't find a store named ${commandText}. Please try again.`);
                 }
-                // Do not reset context here, let the UI update trigger the next voice prompt
+                hasSpokenCheckoutPrompt.current = false; // Allow re-prompting for the next step
                 return;
             }
 
@@ -472,13 +475,19 @@ export function VoiceCommander({
                 speak(bestCommand.command.reply, () => bestCommand.command.action());
                 resetContext();
             } else {
-                 const { product } = await findProductAndVariant(commandText);
-                 if (product) {
+                const itemPhrases = commandText.split(/,?\s+(?:and|మరియు)\s+|,/);
+                 if (itemPhrases.length > 1) {
                      await commandActionsRef.current.orderItem({ phrase: commandText });
                      resetContext();
                  } else {
-                    speak("Sorry, I didn't understand that. Please try again.");
-                    resetContext();
+                    const { product } = await findProductAndVariant(commandText);
+                     if (product) {
+                        await commandActionsRef.current.orderItem({ phrase: commandText });
+                        resetContext();
+                     } else {
+                        speak("Sorry, I didn't understand that. Please try again.");
+                        resetContext();
+                     }
                  }
             }
 
@@ -505,11 +514,13 @@ export function VoiceCommander({
       homeAddress: () => {
         if(pathname === '/checkout' && homeAddressBtnRef?.current) {
           homeAddressBtnRef.current.click();
+          hasSpokenCheckoutPrompt.current = false; // Allow re-prompting
         }
       },
       currentLocation: () => {
         if(pathname === '/checkout' && currentLocationBtnRef?.current) {
           currentLocationBtnRef.current.click();
+          hasSpokenCheckoutPrompt.current = false; // Allow re-prompting
         }
       },
       recordOrder: () => {
@@ -659,7 +670,7 @@ export function VoiceCommander({
     };
 
     recognition.onerror = (event) => {
-      if (event.error !== 'aborted' && event.error !== 'no-speech') {
+      if (event.error !== 'aborted' && event.error !== 'no-speech' && event.error !== 'not-allowed') {
         console.error('Speech recognition error', event.error);
         onStatusUpdate(`⚠️ Error: ${event.error}`);
       }
@@ -667,13 +678,14 @@ export function VoiceCommander({
     
     recognition.onend = () => {
       if (isEnabledRef.current && !isSpeakingRef.current) {
-        // Use a small delay to prevent rapid, sequential restarts
+        // Use a small delay to prevent rapid, sequential restarts that can cause 'not-allowed' errors
         setTimeout(() => {
-          try {
-            recognition?.start();
-          } catch (e) {
-            // This can happen if the component unmounts or `enabled` becomes false
-            // during the timeout. It's safe to ignore.
+          if(isEnabledRef.current && !isSpeakingRef.current) {
+            try {
+              recognition?.start();
+            } catch (e) {
+              console.warn("Recognition restart failed, possibly due to rapid succession.", e);
+            }
           }
         }, 250);
       }
@@ -706,6 +718,7 @@ export function VoiceCommander({
                   setIsWaitingForStoreName(false);
                   speak(`Okay, ordering from ${store.name}.`);
                   setActiveStoreId(store.id);
+                  hasSpokenCheckoutPrompt.current = false; // Re-prompt for next step
                   return;
                 }
 
@@ -741,7 +754,5 @@ export function VoiceCommander({
 
   return null;
 }
-
-    
 
     
