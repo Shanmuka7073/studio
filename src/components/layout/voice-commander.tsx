@@ -212,51 +212,60 @@ export function VoiceCommander({
 
   // Proactive prompt on checkout page
   useEffect(() => {
-    if (pathname !== '/checkout' || !hasMounted) {
+    if (pathname !== '/checkout' || !hasMounted || !enabled) {
       hasSpokenCheckoutPrompt.current = false;
       return;
     }
   
-    if (enabled && !hasSpokenCheckoutPrompt.current && !isSpeakingRef.current) {
-      const speakTimeout = setTimeout(() => {
-        const addressInput = document.querySelector('input[name="deliveryAddress"]') as HTMLInputElement;
-        const addressValue = addressInput?.value;
+    // This function will be called by the timeout
+    const performCheckoutPrompt = () => {
+      if (isSpeakingRef.current || hasSpokenCheckoutPrompt.current) return;
 
-        if (isWaitingForQuickOrderConfirmation) {
-          const totalAmountEl = document.getElementById('final-total-amount');
+      const addressValue = (document.querySelector('input[name="deliveryAddress"]') as HTMLInputElement)?.value;
+      const storeAlert = document.getElementById('action-required-alert');
+
+      if (isWaitingForQuickOrderConfirmation) {
+        const totalAmountEl = document.getElementById('final-total-amount');
+        if (totalAmountEl) {
+          const totalText = totalAmountEl.innerText;
+          speak(`Your total is ${totalText}. Please say "confirm order" to place your order.`);
+          hasSpokenCheckoutPrompt.current = true;
+        }
+      } else if (!addressValue) {
+        speak("Should I deliver to your home address or current location?");
+        setIsWaitingForAddressType(true);
+        hasSpokenCheckoutPrompt.current = true;
+      } else if (addressValue && !activeStoreId && storeAlert) {
+         speak(`Please tell me which store should fulfill your order.`);
+        setIsWaitingForStoreName(true);
+        hasSpokenCheckoutPrompt.current = true;
+      } else if (addressValue && activeStoreId) {
+         const totalAmountEl = document.getElementById('final-total-amount');
           if (totalAmountEl) {
             const totalText = totalAmountEl.innerText;
-            speak(`Your total is ${totalText}. Please say "confirm order" to place your order.`);
+            speak(`Your total is ${totalText}. Please say "place order" to confirm.`);
             hasSpokenCheckoutPrompt.current = true;
           }
-        } else if (addressValue && !activeStoreId) {
-          speak("Please tell me which store should fulfill your order.");
-          setIsWaitingForStoreName(true);
-          hasSpokenCheckoutPrompt.current = true;
-        } else if (addressValue && activeStoreId) {
-           const totalAmountEl = document.getElementById('final-total-amount');
-            if (totalAmountEl) {
-              const totalText = totalAmountEl.innerText;
-              speak(`Your total is ${totalText}. Please say "place order" to confirm.`);
-              hasSpokenCheckoutPrompt.current = true;
-            }
-        }
-      }, 1500);
+      }
+    };
+    
+    const speakTimeout = setTimeout(performCheckoutPrompt, 1500);
   
-      return () => clearTimeout(speakTimeout);
-    }
-  }, [pathname, enabled, speak, hasMounted, isWaitingForQuickOrderConfirmation, activeStoreId]);
+    // Cleanup function to clear the timeout if the component unmounts or dependencies change
+    return () => clearTimeout(speakTimeout);
+
+  }, [pathname, hasMounted, enabled, isWaitingForQuickOrderConfirmation, activeStoreId, speak]);
 
 
   // Proactive prompt on profile page
   useEffect(() => {
-    if (pathname !== '/dashboard/customer/my-profile' || !hasMounted) {
+    if (pathname !== '/dashboard/customer/my-profile' || !hasMounted || !enabled) {
       hasSpokenProfilePrompt.current = false;
       formFieldToFillRef.current = null;
       return;
     }
 
-    if (enabled && !hasSpokenProfilePrompt.current && profileForm) {
+    if (!hasSpokenProfilePrompt.current && profileForm) {
       const speakTimeout = setTimeout(() => {
         handleProfileFormInteraction();
         hasSpokenProfilePrompt.current = true;
@@ -264,7 +273,7 @@ export function VoiceCommander({
 
       return () => clearTimeout(speakTimeout);
     }
-  }, [pathname, enabled, profileForm, hasMounted, handleProfileFormInteraction]);
+  }, [pathname, hasMounted, enabled, profileForm, handleProfileFormInteraction]);
 
 
   const findProductAndVariant = useCallback(async (phrase: string): Promise<{ product: Product | null, variant: ProductVariant | null, remainingPhrase: string }> => {
@@ -764,7 +773,7 @@ export function VoiceCommander({
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firestore, user, cartItems, profileForm, isWaitingForStoreName, activeStoreId, placeOrderBtnRef, enabled, pathname, findProductAndVariant, handleProfileFormInteraction, speak, toast, router, onSuggestions, onStatusUpdate, onCloseCart, onOpenCart, setActiveStoreId, clarificationStores, isWaitingForQuantity, updateQuantity, isWaitingForQuickOrderConfirmation, clearCart, setIsWaitingForQuickOrderConfirmation, stores, masterProducts, homeAddressBtnRef, currentLocationBtnRef]);
+  }, [firestore, user, cartItems, profileForm, isWaitingForStoreName, activeStoreId, placeOrderBtnRef, enabled, pathname, findProductAndVariant, handleProfileFormInteraction, speak, toast, router, onSuggestions, onStatusUpdate, onCloseCart, onOpenCart, setActiveStoreId, clarificationStores, isWaitingForQuantity, updateQuantity, isWaitingForQuickOrderConfirmation, clearCart, setIsWaitingForQuickOrderConfirmation, stores, masterProducts, homeAddressBtnRef, currentLocationBtnRef, hasMounted]);
 
   return null;
 }

@@ -133,7 +133,7 @@ export default function CheckoutPage() {
                 setDeliveryCoords({ lat: latitude, lng: longitude });
                 // We don't have a reverse geocoded address, so we use a placeholder.
                 // A real app would use a Geocoding API here.
-                form.setValue('deliveryAddress', `Current Location (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`);
+                form.setValue('deliveryAddress', `Current Location (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`, { shouldValidate: true });
                 toast({ title: "Location Fetched!", description: "Your current location has been set for delivery." });
             },
             () => {
@@ -173,7 +173,7 @@ export default function CheckoutPage() {
   const handleUseHomeAddress = useCallback(() => {
     if (userData) {
       if(userData.address) {
-        form.setValue('deliveryAddress', userData.address);
+        form.setValue('deliveryAddress', userData.address, { shouldValidate: true });
         toast({ title: "Home Address Set!", description: "Your saved home address will be used for delivery." });
         
         // Note: We don't have lat/lng for home address in this version.
