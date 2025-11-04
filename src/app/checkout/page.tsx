@@ -158,9 +158,10 @@ export default function CheckoutPage() {
       setPlaceOrderBtnRef(null);
       setHomeAddressBtnRef(null);
       setCurrentLocationBtnRef(null);
-      setIsWaitingForQuickOrderConfirmation(false);
+      // Do NOT reset the confirmation flag here, as it might be needed across re-renders
+      // It will be reset by the voice commander after the action is complete.
     }
-  }, [setPlaceOrderBtnRef, setHomeAddressBtnRef, setCurrentLocationBtnRef, setIsWaitingForQuickOrderConfirmation]);
+  }, [setPlaceOrderBtnRef, setHomeAddressBtnRef, setCurrentLocationBtnRef]);
 
 
    const userDocRef = useMemoFirebase(() => {
@@ -467,7 +468,3 @@ export default function CheckoutPage() {
     </div>
   );
 }
-
-    
-
-    

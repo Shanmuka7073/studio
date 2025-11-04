@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -457,38 +458,46 @@ export function VoiceCommander({
           hasSpokenCheckoutPrompt.current = false;
         };
 
-        // --- PRIORITY 1: GLOBAL NAVIGATION ---
+        // --- PRIORITY 1: High-priority global navigation ---
         const highPriorityCommands = ["home", "stores", "dashboard", "cart", "orders", "deliveries", "myStore", "checkout", "refresh"];
-        let bestNavCommand: { command: Command, similarity: number } | null = null;
-        
         for (const key of highPriorityCommands) {
             const cmdGroup = fileCommandsRef.current[key];
             if (!cmdGroup) continue;
 
             const allAliases = [t(key.toLowerCase(), 'en'), ...cmdGroup.aliases];
             for (const alias of allAliases) {
-                const similarity = calculateSimilarity(commandText.toLowerCase(), alias);
-                if (!bestNavCommand || similarity > bestNavCommand.similarity) {
-                    bestNavCommand = {
-                        command: {
-                            command: alias,
-                            action: commandActionsRef.current[key],
-                            display: cmdGroup.display,
-                            reply: cmdGroup.reply
-                        },
-                        similarity: similarity
-                    };
+                if (calculateSimilarity(commandText.toLowerCase(), alias) > 0.9) {
+                     speak(cmdGroup.reply, () => commandActionsRef.current[key]());
+                     resetContext();
+                     return;
                 }
             }
         }
         
-        if (bestNavCommand && bestNavCommand.similarity > 0.8) {
-            speak(bestNavCommand.command.reply, () => bestNavCommand!.command.action());
-            resetContext();
-            return;
+        // --- PRIORITY 2: Quick Order command ---
+        const quickOrderAliases = fileCommandsRef.current.quickOrder?.aliases || [];
+        for (const alias of quickOrderAliases) {
+            const pattern = alias
+                .replace(/\{(\w+)\}/g, '(.+)')
+                .replace(/\s/g, '\\s+'); // Match one or more spaces
+            const regex = new RegExp(`^${pattern}$`, 'i');
+            const match = commandText.match(regex);
+
+            if (match) {
+                const params: Record<string, string> = {};
+                // Extract keys like {product}, {quantity}, {store}
+                const keys = (alias.match(/\{(\w+)\}/g) || []).map(key => key.slice(1, -1));
+                keys.forEach((key, index) => {
+                    params[key] = match[index + 1]?.trim();
+                });
+                
+                await commandActionsRef.current.quickOrder(params);
+                resetContext();
+                return; // Stop further processing
+            }
         }
 
-        // --- PRIORITY 2: CONTEXTUAL REPLIES (Checkout, Forms, etc.) ---
+        // --- PRIORITY 3: CONTEXTUAL REPLIES (Checkout, Forms, etc.) ---
         if (isWaitingForAddressType) {
           const cmd = commandText.toLowerCase();
           const homeKeywords = ['home', 'address', 'గృహ', 'మనె', 'घर', 'पता'];
@@ -591,10 +600,11 @@ export function VoiceCommander({
           return;
         }
         
-        // --- PRIORITY 3: General Commands & Fallbacks ---
+        // --- PRIORITY 4: General Commands & Fallbacks ---
         
         const allCommands = [...commandsRef.current];
         for (const key in fileCommandsRef.current) {
+          if (key === 'quickOrder') continue; // Already handled
           const cmdGroup = fileCommandsRef.current[key];
           const action = commandActionsRef.current[key];
           if (action) {
@@ -650,6 +660,40 @@ export function VoiceCommander({
         onStatusUpdate(`⚠️ Action failed. Please try again.`);
         speak("Sorry, I couldn't do that. Please check your connection and try again.");
         onSuggestions([]);
+      }
+    };
+
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onstart = () => {
+      onStatusUpdate(`Listening... (${currentRecognitionLang})`);
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[event.results.length - 1][0].transcript.trim();
+      console.log('Recognized:', transcript, 'Language:', currentRecognitionLang);
+      handleCommand(transcript);
+    };
+
+    recognition.onerror = (event) => {
+      if (event.error !== 'aborted' && event.error !== 'no-speech' && event.error !== 'not-allowed') {
+        console.error('Speech recognition error', event.error);
+        onStatusUpdate(`⚠️ Error: ${event.error}`);
+      }
+    };
+
+    recognition.onend = () => {
+      if (isEnabledRef.current && !isSpeakingRef.current) {
+        setTimeout(() => {
+          if(isEnabledRef.current && !isSpeakingRef.current) {
+            try {
+              recognition?.start();
+            } catch (e) {
+              console.warn("Recognition restart failed, possibly due to rapid succession.", e);
+            }
+          }
+        }, 250);
       }
     };
 
@@ -813,40 +857,6 @@ export function VoiceCommander({
           router.push('/checkout');
         }, 500);
       },
-    };
-
-    recognition.continuous = false;
-    recognition.interimResults = false;
-
-    recognition.onstart = () => {
-      onStatusUpdate(`Listening... (${currentRecognitionLang})`);
-    };
-
-    recognition.onresult = (event) => {
-      const transcript = event.results[event.results.length - 1][0].transcript.trim();
-      console.log('Recognized:', transcript, 'Language:', currentRecognitionLang);
-      handleCommand(transcript);
-    };
-
-    recognition.onerror = (event) => {
-      if (event.error !== 'aborted' && event.error !== 'no-speech' && event.error !== 'not-allowed') {
-        console.error('Speech recognition error', event.error);
-        onStatusUpdate(`⚠️ Error: ${event.error}`);
-      }
-    };
-
-    recognition.onend = () => {
-      if (isEnabledRef.current && !isSpeakingRef.current) {
-        setTimeout(() => {
-          if(isEnabledRef.current && !isSpeakingRef.current) {
-            try {
-              recognition?.start();
-            } catch (e) {
-              console.warn("Recognition restart failed, possibly due to rapid succession.", e);
-            }
-          }
-        }, 250);
-      }
     };
 
     if (firestore && user) {
