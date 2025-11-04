@@ -55,7 +55,7 @@ export function VoiceCommander({
   const { clearCart, addItem: addItemToCart, updateQuantity, activeStoreId, setActiveStoreId } = useCart();
   
   // Get data from the central Zustand store
-  const { stores, masterProducts, productPrices, fetchInitialData, fetchProductPrices, language, setLanguage } = useAppStore();
+  const { stores, masterProducts, productPrices, fetchInitialData, fetchProductPrices } = useAppStore();
 
   const { form: profileForm } = useProfileFormStore();
   const { placeOrderBtnRef, setIsWaitingForQuickOrderConfirmation, isWaitingForQuickOrderConfirmation } = useCheckoutStore();
@@ -81,6 +81,8 @@ export function VoiceCommander({
   const [hasMounted, setHasMounted] = useState(false);
   
   const [speechSynthesisVoices, setSpeechSynthesisVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [currentLanguage, setCurrentLanguage] = useState('en-IN');
+
 
   useEffect(() => {
     setHasMounted(true);
@@ -110,7 +112,7 @@ export function VoiceCommander({
     isEnabledRef.current = enabled;
     if (recognition) {
       if (enabled) {
-        recognition.lang = language;
+        recognition.lang = currentLanguage;
         try {
           recognition.start();
         } catch (e) {
@@ -120,7 +122,7 @@ export function VoiceCommander({
         recognition.abort();
       }
     }
-  }, [enabled, language]);
+  }, [enabled, currentLanguage]);
 
   const speak = useCallback((text: string, onEndCallback?: () => void) => {
     if (typeof window === 'undefined' || !window.speechSynthesis) {
@@ -131,10 +133,10 @@ export function VoiceCommander({
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.pitch = 1;
     utterance.rate = 1.1;
-    utterance.lang = language; // Set language directly on utterance
+    utterance.lang = currentLanguage;
 
     // Find a matching voice, but don't fail if not found.
-    const desiredVoice = speechSynthesisVoices.find(voice => voice.lang === language);
+    const desiredVoice = speechSynthesisVoices.find(voice => voice.lang === currentLanguage);
     if (desiredVoice) {
         utterance.voice = desiredVoice;
     }
@@ -155,21 +157,32 @@ export function VoiceCommander({
         console.error("Speech synthesis error:", e.error); // Log the specific error
         isSpeakingRef.current = false;
         if (onEndCallback) onEndCallback();
+         if (isEnabledRef.current) {
+            try {
+                recognition?.start();
+            } catch(e) {}
+        }
     };
-
+    
+    // Ensure the synthesis engine is not busy before speaking
     const speakNow = () => {
         if (window.speechSynthesis.speaking) {
             window.speechSynthesis.cancel();
+            setTimeout(() => { // Give it a moment to cancel
+                 isSpeakingRef.current = true;
+                recognition?.stop();
+                window.speechSynthesis.speak(utterance);
+            }, 100);
+        } else {
+            isSpeakingRef.current = true;
+            recognition?.stop();
+            window.speechSynthesis.speak(utterance);
         }
-        isSpeakingRef.current = true;
-        recognition?.stop();
-        window.speechSynthesis.speak(utterance);
     };
 
-    // Use a small timeout to ensure the synthesis engine is ready.
-    setTimeout(speakNow, 100);
+    speakNow();
 
-  }, [language, speechSynthesisVoices]);
+  }, [currentLanguage, speechSynthesisVoices]);
 
   const handleProfileFormInteraction = useCallback(() => {
     if (!profileForm) {
@@ -249,15 +262,13 @@ export function VoiceCommander({
   }, [pathname, enabled, profileForm, hasMounted, handleProfileFormInteraction]);
 
 
-  const findProductAndVariant = useCallback(async (phrase: string): Promise<{ product: Product | null, variant: ProductVariant | null, remainingPhrase: string }> => {
+ const findProductAndVariant = useCallback(async (phrase: string): Promise<{ product: Product | null, variant: ProductVariant | null, remainingPhrase: string }> => {
     const lowerPhrase = phrase.toLowerCase();
     
     let bestMatch: { product: Product, alias: string, similarity: number } | null = null;
 
-    // --- PASS 1: Find the best product match in the phrase ---
     for (const p of masterProducts) {
         if (!p.name) continue;
-        // Ensure the product's own name is in the list of aliases to check
         const aliasesToCheck = [p.name.toLowerCase(), ...Object.values(getAllAliases(p.name.toLowerCase().replace(/ /g, '-'))).flat().map(name => name.toLowerCase())];
         const uniqueAliases = [...new Set(aliasesToCheck)];
 
@@ -276,7 +287,6 @@ export function VoiceCommander({
     const productMatch = bestMatch.product;
     const remainingPhrase = lowerPhrase.replace(bestMatch.alias, '').trim();
 
-    // --- PASS 2: Find the best variant match for the found product ---
     let priceData = productPrices[productMatch.name.toLowerCase()];
     if (priceData === undefined && firestore) {
         await fetchProductPrices(firestore, [productMatch.name]);
@@ -284,18 +294,17 @@ export function VoiceCommander({
     }
 
     if (!priceData || !priceData.variants || priceData.variants.length === 0) {
-        return { product: null, variant: null, remainingPhrase: phrase };
+        return { product: productMatch, variant: null, remainingPhrase: phrase };
     }
     
-    // Look for explicit weight mentions in the phrase
     const weightRegex = /(\d+)\s?(kg|g|gm|gram|grams|kilo|kilos)/i;
     const weightMatch = lowerPhrase.match(weightRegex);
 
     if (weightMatch) {
         const number = parseInt(weightMatch[1], 10);
+        let desiredWeightStr = `${number}kg`; // Default to kg
         const unit = weightMatch[2].toLowerCase();
-        let desiredWeightStr = `${number}${unit.startsWith('g') ? 'gm' : 'kg'}`;
-        if (unit === 'g' || unit === 'gm' || unit === 'gram' || unit === 'grams') {
+        if (unit.startsWith('g')) {
             desiredWeightStr = `${number}gm`;
         }
         
@@ -305,7 +314,6 @@ export function VoiceCommander({
         }
     }
     
-    // If no weight is specified, or no match, find a sensible default (e.g., 1kg, 1 pack, or the first one)
     const defaultVariant = 
         priceData.variants.find(v => v.weight === '1kg') ||
         priceData.variants.find(v => v.weight.includes('pack')) ||
@@ -338,11 +346,11 @@ export function VoiceCommander({
                 setIsWaitingForVoiceOrder(false);
             };
 
-            // Language detection
             let detectedLang = 'en';
             if (/[అ-హ]/.test(commandText)) detectedLang = 'te';
-            if (language !== `${detectedLang}-IN`) {
-              setLanguage(`${detectedLang}-IN`);
+            const langCode = `${detectedLang}-IN`;
+            if (currentLanguage !== langCode) {
+              setCurrentLanguage(langCode);
             }
 
             if (isWaitingForVoiceOrder) {
@@ -551,13 +559,16 @@ export function VoiceCommander({
         }
       },
       refresh: () => window.location.reload(),
-      orderItem: async ({ phrase }: { phrase: string }) => {
+      orderItem: async ({ phrase, quantity }: { phrase: string, quantity?: string }) => {
         const itemPhrases = phrase.split(/,?\s+and\s+|,/);
         let addedItems: string[] = [];
 
         for (const itemPhrase of itemPhrases) {
             if (!itemPhrase.trim()) continue;
-            const { product: foundProduct, variant } = await findProductAndVariant(itemPhrase);
+            // The quantity from the template is passed here, along with the item phrase which might also contain a quantity.
+            const combinedPhrase = quantity ? `${quantity} ${itemPhrase}` : itemPhrase;
+            const { product: foundProduct, variant } = await findProductAndVariant(combinedPhrase);
+
             if (foundProduct && variant) {
                 addItemToCart(foundProduct, variant, 1);
                 const productName = t(foundProduct.name.toLowerCase().replace(/ /g, '-')).split(' / ')[0];
@@ -577,8 +588,9 @@ export function VoiceCommander({
             speak("You need to specify a store for a quick order. For example, say 'order 1kg potatoes from Fresh Produce'.");
             return;
         }
-
-        const { product: foundProduct, variant } = await findProductAndVariant(product);
+        
+        const combinedPhrase = quantity ? `${quantity} ${product}` : product;
+        const { product: foundProduct, variant } = await findProductAndVariant(combinedPhrase);
         if (!foundProduct || !variant) {
             speak(`Sorry, I could not find ${product}.`);
             return;
@@ -707,7 +719,8 @@ export function VoiceCommander({
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firestore, user, cartItems, profileForm, isWaitingForStoreName, activeStoreId, placeOrderBtnRef, enabled, pathname, findProductAndVariant, handleProfileFormInteraction, speak, toast, router, onSuggestions, onStatusUpdate, onCloseCart, onOpenCart, setActiveStoreId, clarificationStores, isWaitingForQuantity, updateQuantity, isWaitingForQuickOrderConfirmation, clearCart, setIsWaitingForQuickOrderConfirmation, stores, masterProducts, language, isWaitingForVoiceOrder, setLanguage]);
+  }, [firestore, user, cartItems, profileForm, isWaitingForStoreName, activeStoreId, placeOrderBtnRef, enabled, pathname, findProductAndVariant, handleProfileFormInteraction, speak, toast, router, onSuggestions, onStatusUpdate, onCloseCart, onOpenCart, setActiveStoreId, clarificationStores, isWaitingForQuantity, updateQuantity, isWaitingForQuickOrderConfirmation, clearCart, setIsWaitingForQuickOrderConfirmation, stores, masterProducts]);
 
   return null;
 }
+
