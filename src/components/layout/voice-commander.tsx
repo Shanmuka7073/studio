@@ -212,40 +212,39 @@ export function VoiceCommander({
 
   // Proactive prompt on checkout page
   useEffect(() => {
-    if (pathname !== '/checkout' || !hasMounted || !enabled || hasSpokenCheckoutPrompt.current || isSpeakingRef.current) {
+    if (pathname !== '/checkout' || !hasMounted) {
+      hasSpokenCheckoutPrompt.current = false;
       return;
     }
   
-    const speakTimeout = setTimeout(() => {
-      const addressInput = document.querySelector('input[name="deliveryAddress"]') as HTMLInputElement;
-      const addressValue = addressInput?.value;
-  
-      if (isWaitingForQuickOrderConfirmation) {
-        const totalAmountEl = document.getElementById('final-total-amount');
-        if (totalAmountEl) {
-          const totalText = totalAmountEl.innerText;
-          speak(`Your total is ${totalText}. Please say "confirm order" to place your order.`);
+    if (enabled && !hasSpokenCheckoutPrompt.current && !isSpeakingRef.current) {
+      const speakTimeout = setTimeout(() => {
+        const addressInput = document.querySelector('input[name="deliveryAddress"]') as HTMLInputElement;
+        const addressValue = addressInput?.value;
+
+        if (isWaitingForQuickOrderConfirmation) {
+          const totalAmountEl = document.getElementById('final-total-amount');
+          if (totalAmountEl) {
+            const totalText = totalAmountEl.innerText;
+            speak(`Your total is ${totalText}. Please say "confirm order" to place your order.`);
+            hasSpokenCheckoutPrompt.current = true;
+          }
+        } else if (addressValue && !activeStoreId) {
+          speak("Please tell me which store should fulfill your order.");
+          setIsWaitingForStoreName(true);
           hasSpokenCheckoutPrompt.current = true;
+        } else if (addressValue && activeStoreId) {
+           const totalAmountEl = document.getElementById('final-total-amount');
+            if (totalAmountEl) {
+              const totalText = totalAmountEl.innerText;
+              speak(`Your total is ${totalText}. Please say "place order" to confirm.`);
+              hasSpokenCheckoutPrompt.current = true;
+            }
         }
-      } else if (!addressValue) {
-        speak("Should I deliver to your home address or current location?");
-        setIsWaitingForAddressType(true);
-        hasSpokenCheckoutPrompt.current = true;
-      } else if (addressValue && !activeStoreId) {
-        speak("Please tell me which store should fulfill your order.");
-        setIsWaitingForStoreName(true);
-        hasSpokenCheckoutPrompt.current = true;
-      } else if (addressValue && activeStoreId) {
-        const totalAmountEl = document.getElementById('final-total-amount');
-        if (totalAmountEl) {
-          const totalText = totalAmountEl.innerText;
-          speak(`Your total is ${totalText}. Please say "place order" to confirm.`);
-          hasSpokenCheckoutPrompt.current = true;
-        }
-      }
-    }, 1500); // Small delay to let the page settle
+      }, 1500);
   
-    return () => clearTimeout(speakTimeout);
+      return () => clearTimeout(speakTimeout);
+    }
   }, [pathname, enabled, speak, hasMounted, isWaitingForQuickOrderConfirmation, activeStoreId]);
 
 
