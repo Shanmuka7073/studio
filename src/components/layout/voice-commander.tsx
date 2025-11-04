@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -218,9 +217,6 @@ export function VoiceCommander({
     if (enabled && !hasSpokenCheckoutPrompt.current) {
       const speakTimeout = setTimeout(() => {
         const addressValue = (document.querySelector('input[name="deliveryAddress"]') as HTMLInputElement)?.value;
-  
-        // Check for active store using the hook
-        const currentActiveStoreId = useCart.getState().activeStoreId;
         const storeActionAlert = document.getElementById('action-required-alert');
   
         if (isWaitingForQuickOrderConfirmation) {
@@ -232,11 +228,10 @@ export function VoiceCommander({
         } else if (!addressValue) {
           speak("Should I deliver to your home address or current location?");
           setIsWaitingForAddressType(true);
-        } else if (!currentActiveStoreId && storeActionAlert) {
-          // Check the Zustand state directly, then look for the alert
+        } else if (!activeStoreId && storeActionAlert) {
           speak(`Action required. Please select a store to continue, or tell me the store name.`);
           setIsWaitingForStoreName(true);
-        } else {
+        } else if (activeStoreId && addressValue) {
           const totalAmountEl = document.getElementById('final-total-amount');
           if (totalAmountEl) {
             const totalText = totalAmountEl.innerText;
