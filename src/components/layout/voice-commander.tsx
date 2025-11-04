@@ -218,6 +218,7 @@ export function VoiceCommander({
     if (enabled && !hasSpokenCheckoutPrompt.current) {
       const speakTimeout = setTimeout(() => {
         const addressValue = (document.querySelector('input[name="deliveryAddress"]') as HTMLInputElement)?.value;
+        const actionAlert = document.getElementById('action-required-alert');
 
         if (isWaitingForQuickOrderConfirmation) {
             const totalAmountEl = document.getElementById('final-total-amount');
@@ -228,17 +229,14 @@ export function VoiceCommander({
         } else if (!addressValue) {
             speak("Should I deliver to your home address or current location?");
             setIsWaitingForAddressType(true);
+        } else if (actionAlert) {
+            speak(`Action required. Please select a store to continue, or tell me the store name.`);
+            setIsWaitingForStoreName(true);
         } else {
-            const actionAlert = document.getElementById('action-required-alert');
-            if (actionAlert) {
-                speak(`Action required. Please select a store to continue, or tell me the store name.`);
-                setIsWaitingForStoreName(true);
-            } else {
-                const totalAmountEl = document.getElementById('final-total-amount');
-                if (totalAmountEl) {
-                    const totalText = totalAmountEl.innerText;
-                    speak(`Your total is ${totalText}. Please say "place order" to confirm.`);
-                }
+            const totalAmountEl = document.getElementById('final-total-amount');
+            if (totalAmountEl) {
+                const totalText = totalAmountEl.innerText;
+                speak(`Your total is ${totalText}. Please say "place order" to confirm.`);
             }
         }
         hasSpokenCheckoutPrompt.current = true;
@@ -246,7 +244,7 @@ export function VoiceCommander({
 
       return () => clearTimeout(speakTimeout);
     }
-  }, [pathname, enabled, speak, hasMounted, isWaitingForQuickOrderConfirmation]);
+  }, [pathname, enabled, speak, hasMounted, isWaitingForQuickOrderConfirmation, activeStoreId]);
 
   // Proactive prompt on profile page
   useEffect(() => {
@@ -763,3 +761,5 @@ export function VoiceCommander({
 
   return null;
 }
+
+    
