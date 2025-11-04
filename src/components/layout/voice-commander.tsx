@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -82,6 +81,10 @@ export function VoiceCommander({
 
   const [speechSynthesisVoices, setSpeechSynthesisVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [currentLanguage, setCurrentLanguage] = useState('en-IN');
+
+  // Track checkout state
+  const [checkoutReady, setCheckoutReady] = useState(false);
+  const addressValueRef = useRef<string>('');
 
   useEffect(() => {
     setHasMounted(true);
@@ -202,53 +205,110 @@ export function VoiceCommander({
     }
   }, [profileForm, speak]);
 
+  // Monitor checkout conditions
+  const checkCheckoutConditions = useCallback(() => {
+    if (pathname !== '/checkout') return false;
+
+    const addressInput = document.querySelector('input[name="deliveryAddress"]') as HTMLInputElement;
+    const currentAddress = addressInput?.value || '';
+    addressValueRef.current = currentAddress;
+
+    const hasValidAddress = currentAddress && currentAddress.length >= 10;
+    const hasStore = !!activeStoreId;
+    const hasCartItems = cartItems.length > 0;
+
+    return hasValidAddress && hasStore && hasCartItems;
+  }, [pathname, activeStoreId, cartItems.length]);
+
+  // Enhanced checkout prompt function
   const runCheckoutPrompt = useCallback(() => {
-    if (pathname !== '/checkout' || !hasMounted || !enabled || isSpeakingRef.current || hasSpokenCheckoutPrompt.current) {
+    if (pathname !== '/checkout' || !hasMounted || !enabled || isSpeakingRef.current) {
       return;
     }
 
-    const addressValue = (document.querySelector('input[name="deliveryAddress"]') as HTMLInputElement)?.value;
-
-    // Check if we're already waiting for order confirmation
+    // Don't speak if we're already in a confirmation state
     if (isWaitingForQuickOrderConfirmation) {
-      speak(`Please say "confirm order" to place your order.`);
-      hasSpokenCheckoutPrompt.current = true;
+      if (!hasSpokenCheckoutPrompt.current) {
+        speak(`Please say "confirm order" to place your order.`);
+        hasSpokenCheckoutPrompt.current = true;
+      }
       return;
     }
 
-    // Check address first
-    if (!addressValue || addressValue.length < 10) {
-      speak("Should I deliver to your home address or current location?");
-      setIsWaitingForAddressType(true);
+    // Check if all conditions are met for final step
+    const isCheckoutReady = checkCheckoutConditions();
+    
+    if (isCheckoutReady && !hasSpokenCheckoutPrompt.current) {
+      console.log('All checkout conditions met - prompting for place order');
+      speak(`Everything is ready! Your order will be delivered to ${addressValueRef.current.substring(0, 30)}... Please say "place order" to confirm your order.`);
       hasSpokenCheckoutPrompt.current = true;
+      setCheckoutReady(true);
       return;
     }
 
-    // Check store selection
-    if (!activeStoreId) {
-      speak(`Please tell me which store should fulfill your order.`);
-      setIsWaitingForStoreName(true);
-      hasSpokenCheckoutPrompt.current = true;
-      return;
-    }
+    // If not ready, guide through steps
+    if (!hasSpokenCheckoutPrompt.current) {
+      const addressInput = document.querySelector('input[name="deliveryAddress"]') as HTMLInputElement;
+      const currentAddress = addressInput?.value || '';
 
-    // FINAL STEP: All conditions met - ask to place order
-    if (addressValue && addressValue.length >= 10 && activeStoreId && cartItems.length > 0) {
-      speak(`Everything is ready! Please say "place order" to confirm your order.`);
-      hasSpokenCheckoutPrompt.current = true;
-    }
-  }, [pathname, hasMounted, enabled, isWaitingForQuickOrderConfirmation, activeStoreId, cartItems.length, speak]);
+      if (!currentAddress || currentAddress.length < 10) {
+        speak("Should I deliver to your home address or current location?");
+        setIsWaitingForAddressType(true);
+        hasSpokenCheckoutPrompt.current = true;
+        return;
+      }
 
-  // Effect to run checkout prompt when voiceTrigger changes
+      if (!activeStoreId) {
+        speak(`Please tell me which store should fulfill your order.`);
+        setIsWaitingForStoreName(true);
+        hasSpokenCheckoutPrompt.current = true;
+        return;
+      }
+
+      if (cartItems.length === 0) {
+        speak("Your cart is empty. Please add some items first.");
+        hasSpokenCheckoutPrompt.current = true;
+        return;
+      }
+    }
+  }, [pathname, hasMounted, enabled, isSpeakingRef.current, isWaitingForQuickOrderConfirmation, checkCheckoutConditions, speak, activeStoreId, cartItems.length]);
+
+  // Effect to monitor checkout state changes
   useEffect(() => {
-    // Reset the flag to allow the prompt to run again
-    hasSpokenCheckoutPrompt.current = false;
-    const speakTimeout = setTimeout(() => {
-      runCheckoutPrompt();
-    }, 500);
-    return () => clearTimeout(speakTimeout);
-  }, [voiceTrigger, runCheckoutPrompt]);
-  
+    if (pathname === '/checkout') {
+      const interval = setInterval(() => {
+        const isReady = checkCheckoutConditions();
+        if (isReady && !hasSpokenCheckoutPrompt.current && !isSpeakingRef.current) {
+          console.log('Checkout conditions now met - triggering prompt');
+          hasSpokenCheckoutPrompt.current = false;
+          setTimeout(runCheckoutPrompt, 1000);
+        }
+      }, 2000);
+
+      return () => clearInterval(interval);
+    }
+  }, [pathname, checkCheckoutConditions, runCheckoutPrompt]);
+
+  // Effect to run checkout prompt on voice trigger
+  useEffect(() => {
+    if (pathname === '/checkout') {
+      const timeout = setTimeout(() => {
+        hasSpokenCheckoutPrompt.current = false;
+        runCheckoutPrompt();
+      }, 1000);
+      return () => clearTimeout(timeout);
+    }
+  }, [voiceTrigger, pathname, runCheckoutPrompt]);
+
+  // Effect to reset prompt when relevant states change
+  useEffect(() => {
+    if (pathname === '/checkout') {
+      hasSpokenCheckoutPrompt.current = false;
+      const timeout = setTimeout(runCheckoutPrompt, 500);
+      return () => clearTimeout(timeout);
+    }
+  }, [cartItems.length, activeStoreId, pathname, runCheckoutPrompt]);
+
   // Proactive prompt on profile page
   useEffect(() => {
     if (pathname !== '/dashboard/customer/my-profile' || !hasMounted || !enabled) {
@@ -329,6 +389,7 @@ export function VoiceCommander({
   useEffect(() => {
     if (pathname !== '/checkout') {
       hasSpokenCheckoutPrompt.current = false;
+      setCheckoutReady(false);
     }
   }, [pathname]);
 
@@ -372,8 +433,20 @@ export function VoiceCommander({
           const cmd = commandText.toLowerCase();
           if (cmd.includes('home') || cmd.includes('address')) {
             homeAddressBtnRef?.current?.click();
+            speak("Setting delivery to your home address.");
+            // Reset prompt to continue flow
+            setTimeout(() => {
+              hasSpokenCheckoutPrompt.current = false;
+              runCheckoutPrompt();
+            }, 2000);
           } else if (cmd.includes('current') || cmd.includes('location')) {
             currentLocationBtnRef?.current?.click();
+            speak("Using your current location for delivery.");
+            // Reset prompt to continue flow
+            setTimeout(() => {
+              hasSpokenCheckoutPrompt.current = false;
+              runCheckoutPrompt();
+            }, 2000);
           } else {
             speak("Sorry, I didn't understand. Please say 'home address' or 'current location'.");
           }
@@ -382,9 +455,10 @@ export function VoiceCommander({
         }
 
         if (isWaitingForQuickOrderConfirmation) {
-          const confirmAliases = fileCommandsRef.current.quickOrderConfirm?.aliases || [];
-          if (confirmAliases.includes(commandText.toLowerCase())) {
+          const confirmAliases = ['confirm', 'confirm order', 'place order', 'yes'];
+          if (confirmAliases.some(alias => commandText.toLowerCase().includes(alias))) {
             placeOrderBtnRef?.current?.click();
+            speak("Placing your order now.");
           } else {
             speak("Okay, cancelling the order.");
             clearCart();
@@ -409,7 +483,7 @@ export function VoiceCommander({
             }
           }
 
-          if (quantity !== null) {
+          if (quantity !== null && quantity > 0) {
             updateQuantity(itemToUpdateSkuRef.current, quantity);
             speak(`Okay, updated to ${quantity}.`);
           } else {
@@ -429,6 +503,11 @@ export function VoiceCommander({
           if (bestMatch && bestMatch.similarity > 0.7) {
             speak(`Okay, ordering from ${bestMatch.name}.`);
             setActiveStoreId(bestMatch.id);
+            // Reset prompt to continue to final step
+            setTimeout(() => {
+              hasSpokenCheckoutPrompt.current = false;
+              runCheckoutPrompt();
+            }, 1000);
           } else {
             speak(`Sorry, I couldn't find a store named ${commandText}. Please try again.`);
           }
@@ -440,6 +519,13 @@ export function VoiceCommander({
           profileForm.setValue(formFieldToFillRef.current, commandText, { shouldValidate: true });
           formFieldToFillRef.current = null;
           handleProfileFormInteraction();
+          return;
+        }
+        
+        // Handle "place order" command directly
+        if (commandText.toLowerCase().includes('place order') || commandText.toLowerCase().includes('confirm order')) {
+          await commandActionsRef.current.placeOrder();
+          resetContext();
           return;
         }
         
@@ -588,9 +674,17 @@ export function VoiceCommander({
         }
       },
       placeOrder: () => {
-        if (pathname === '/checkout' && placeOrderBtnRef?.current) {
-          placeOrderBtnRef.current.click();
-          speak("Placing your order now.");
+        if (pathname === '/checkout') {
+          if (placeOrderBtnRef?.current) {
+            placeOrderBtnRef.current.click();
+            speak("Placing your order now.");
+          } else if (checkoutReady) {
+            // Fallback: if button not available but checkout is ready
+            speak("I'm trying to place your order. Please check the checkout page.");
+            // You might want to trigger the order placement programmatically here
+          } else {
+            speak("Please complete all checkout steps first.");
+          }
           return;
         }
         
@@ -742,6 +836,8 @@ export function VoiceCommander({
                   setIsWaitingForStoreName(false);
                   speak(`Okay, ordering from ${store.name}.`);
                   setActiveStoreId(store.id);
+                  hasSpokenCheckoutPrompt.current = false;
+                  setTimeout(() => runCheckoutPrompt(), 1000);
                   return;
                 }
 
@@ -805,7 +901,8 @@ export function VoiceCommander({
     hasMounted,
     voiceTrigger,
     isWaitingForVoiceOrder,
-    runCheckoutPrompt
+    runCheckoutPrompt,
+    checkoutReady
   ]);
 
   return null;
