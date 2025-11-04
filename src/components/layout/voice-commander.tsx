@@ -132,7 +132,7 @@ export function VoiceCommander({
         return;
     }
 
-    // Cancel any ongoing speech first
+    // Cancel any ongoing speech first to prevent "interrupted" errors.
     window.speechSynthesis.cancel();
     isSpeakingRef.current = false;
     
