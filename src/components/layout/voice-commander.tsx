@@ -457,16 +457,41 @@ export function VoiceCommander({
           hasSpokenCheckoutPrompt.current = false;
         };
 
-        if (isWaitingForVoiceOrder) {
-          await commandActionsRef.current.createVoiceOrder(commandText);
-          resetContext();
-          return;
+        // --- PRIORITY 1: GLOBAL NAVIGATION ---
+        const highPriorityCommands = ["home", "stores", "dashboard", "cart", "orders", "deliveries", "myStore", "checkout", "refresh"];
+        let bestNavCommand: { command: Command, similarity: number } | null = null;
+        
+        for (const key of highPriorityCommands) {
+            const cmdGroup = fileCommandsRef.current[key];
+            if (!cmdGroup) continue;
+
+            const allAliases = [t(key.toLowerCase(), 'en'), ...cmdGroup.aliases];
+            for (const alias of allAliases) {
+                const similarity = calculateSimilarity(commandText.toLowerCase(), alias);
+                if (!bestNavCommand || similarity > bestNavCommand.similarity) {
+                    bestNavCommand = {
+                        command: {
+                            command: alias,
+                            action: commandActionsRef.current[key],
+                            display: cmdGroup.display,
+                            reply: cmdGroup.reply
+                        },
+                        similarity: similarity
+                    };
+                }
+            }
+        }
+        
+        if (bestNavCommand && bestNavCommand.similarity > 0.8) {
+            speak(bestNavCommand.command.reply, () => bestNavCommand!.command.action());
+            resetContext();
+            return;
         }
 
+        // --- PRIORITY 2: CONTEXTUAL REPLIES (Checkout, Forms, etc.) ---
         if (isWaitingForAddressType) {
           const cmd = commandText.toLowerCase();
-          // Support multiple languages for address selection
-          const homeKeywords = ['home', 'address', 'గృహ', 'మనೆ', 'घर', 'पता'];
+          const homeKeywords = ['home', 'address', 'గృహ', 'మనె', 'घर', 'पता'];
           const locationKeywords = ['current', 'location', 'ప్రస్తుత', 'స్థానం', 'वर्तमान', 'स्थान'];
           
           if (homeKeywords.some(keyword => cmd.includes(keyword))) {
@@ -490,8 +515,13 @@ export function VoiceCommander({
           return;
         }
 
+        if (isWaitingForVoiceOrder) {
+          await commandActionsRef.current.createVoiceOrder(commandText);
+          resetContext();
+          return;
+        }
+
         if (isWaitingForQuickOrderConfirmation) {
-          // Support multiple languages for confirmation
           const confirmKeywords = ['confirm', 'confirm order', 'place order', 'yes', 'అవును', 'సమర్థించు', 'हाँ', 'पुष्टि'];
           if (confirmKeywords.some(keyword => commandText.toLowerCase().includes(keyword))) {
             placeOrderBtnRef?.current?.click();
@@ -506,19 +536,13 @@ export function VoiceCommander({
         }
 
         if (isWaitingForQuantity && itemToUpdateSkuRef.current) {
-          // Support numbers in multiple languages
           const numberWords: Record<string, number> = { 
-            // English
             'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5, 'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10,
-            // Telugu
             'ఒకటి': 1, 'రెండు': 2, 'మూడు': 3, 'నాలుగు': 4, 'ఐదు': 5, 'ఆరు': 6, 'ఏడు': 7, 'ఎనిమిది': 8, 'తొమ్మిది': 9, 'పది': 10,
-            // Hindi
             'एक': 1, 'दो': 2, 'तीन': 3, 'चार': 4, 'पांच': 5, 'छह': 6, 'सात': 7, 'आठ': 8, 'नौ': 9, 'दस': 10
           };
-          
           const parts = commandText.toLowerCase().split(' ');
           let quantity: number | null = null;
-
           const firstWordAsNum = numberWords[parts[0]];
           if (firstWordAsNum) {
             quantity = firstWordAsNum;
@@ -567,41 +591,10 @@ export function VoiceCommander({
           return;
         }
         
-        // Handle "place order" command in multiple languages
-        const placeOrderKeywords = ['place order', 'confirm order', 'ఆర్డర్ ఇవ్వండి', 'ఆర్డర్', 'ऑर्डर दें', 'ऑर्डर पुष्टि'];
-        if (placeOrderKeywords.some(keyword => commandText.toLowerCase().includes(keyword))) {
-          await commandActionsRef.current.placeOrder();
-          resetContext();
-          return;
-        }
-        
-        const quickOrderAliases = fileCommandsRef.current.quickOrder?.aliases || [];
-        for (const alias of quickOrderAliases) {
-          const pattern = alias
-            .replace(/\{(\w+)\}/g, '(.+)')
-            .replace(/\\s\*/g, '\\s+');
-          const regex = new RegExp(`^${pattern}$`, 'i');
-          const match = commandText.match(regex);
-
-          if (match) {
-            const params: Record<string, string> = {};
-            const keys = (alias.match(/\{(\w+)\}/g) || []).map(key => key.slice(1, -1));
-            keys.forEach((key, index) => {
-              params[key] = match[index + 1]?.trim();
-            });
-            
-            speak(fileCommandsRef.current.quickOrder.reply, () => commandActionsRef.current.quickOrder(params));
-            resetContext();
-            return;
-          }
-        }
-
-        let bestCommand: { command: Command, similarity: number } | null = null;
+        // --- PRIORITY 3: General Commands & Fallbacks ---
         
         const allCommands = [...commandsRef.current];
         for (const key in fileCommandsRef.current) {
-          if (key === 'quickOrder') continue;
-
           const cmdGroup = fileCommandsRef.current[key];
           const action = commandActionsRef.current[key];
           if (action) {
@@ -615,6 +608,8 @@ export function VoiceCommander({
             });
           }
         }
+        
+        let bestCommand: { command: Command, similarity: number } | null = null;
 
         for (const cmd of allCommands) {
           const similarity = calculateSimilarity(commandText.toLowerCase(), cmd.command);
