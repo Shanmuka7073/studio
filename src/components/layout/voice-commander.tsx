@@ -58,7 +58,7 @@ export function VoiceCommander({
   const { stores, masterProducts, productPrices, fetchInitialData, fetchProductPrices } = useAppStore();
 
   const { form: profileForm } = useProfileFormStore();
-  const { placeOrderBtnRef, setIsWaitingForQuickOrderConfirmation, isWaitingForQuickOrderConfirmation } = useCheckoutStore();
+  const { placeOrderBtnRef, setIsWaitingForQuickOrderConfirmation, isWaitingForQuickOrderConfirmation, homeAddressBtnRef, currentLocationBtnRef } = useCheckoutStore();
 
   const isSpeakingRef = useRef(false);
   const isEnabledRef = useRef(enabled);
@@ -72,6 +72,7 @@ export function VoiceCommander({
   const [clarificationStores, setClarificationStores] = useState<Store[]>([]);
   const hasSpokenCheckoutPrompt = useRef(false);
   const hasSpokenProfilePrompt = useRef(false);
+  const [isWaitingForAddressType, setIsWaitingForAddressType] = useState(false);
 
   const [isWaitingForQuantity, setIsWaitingForQuantity] = useState(false);
   const itemToUpdateSkuRef = useRef<string | null>(null);
@@ -135,7 +136,6 @@ export function VoiceCommander({
     utterance.rate = 1.1;
     utterance.lang = currentLanguage;
 
-    // Find a matching voice, but don't fail if not found.
     const desiredVoice = speechSynthesisVoices.find(voice => voice.lang === currentLanguage && !voice.name.includes('Google'));
     if (desiredVoice) {
         utterance.voice = desiredVoice;
@@ -154,7 +154,7 @@ export function VoiceCommander({
     };
 
     utterance.onerror = (e) => {
-        console.error("Speech synthesis error:", e.error); // Log the specific error
+        console.error("Speech synthesis error:", e.error || e);
         isSpeakingRef.current = false;
         if (onEndCallback) onEndCallback();
          if (isEnabledRef.current) {
@@ -164,11 +164,10 @@ export function VoiceCommander({
         }
     };
     
-    // Ensure the synthesis engine is not busy before speaking
     const speakNow = () => {
         if (window.speechSynthesis.speaking) {
             window.speechSynthesis.cancel();
-            setTimeout(() => { // Give it a moment to cancel
+            setTimeout(() => {
                  isSpeakingRef.current = true;
                 recognition?.stop();
                 window.speechSynthesis.speak(utterance);
@@ -212,17 +211,23 @@ export function VoiceCommander({
     if (pathname !== '/checkout' || !hasMounted) {
       hasSpokenCheckoutPrompt.current = false;
       setIsWaitingForStoreName(false);
+      setIsWaitingForAddressType(false);
       return;
     }
 
     if (enabled && !hasSpokenCheckoutPrompt.current) {
       const speakTimeout = setTimeout(() => {
+        const addressValue = (document.querySelector('input[name="deliveryAddress"]') as HTMLInputElement)?.value;
+
         if (isWaitingForQuickOrderConfirmation) {
             const totalAmountEl = document.getElementById('final-total-amount');
             if (totalAmountEl) {
                 const totalText = totalAmountEl.innerText;
                 speak(`Your total is ${totalText}. Please say "confirm order" to place your order.`);
             }
+        } else if (!addressValue) {
+            speak("Should I deliver to your home address or current location?");
+            setIsWaitingForAddressType(true);
         } else {
             const actionAlert = document.getElementById('action-required-alert');
             if (actionAlert) {
@@ -345,6 +350,7 @@ export function VoiceCommander({
                 onSuggestions([]);
                 setIsWaitingForQuickOrderConfirmation(false);
                 setIsWaitingForVoiceOrder(false);
+                setIsWaitingForAddressType(false);
             };
 
             let detectedLang = 'en';
@@ -356,6 +362,19 @@ export function VoiceCommander({
 
             if (isWaitingForVoiceOrder) {
               await commandActionsRef.current.createVoiceOrder(commandText);
+              resetContext();
+              return;
+            }
+
+            if (isWaitingForAddressType) {
+              const cmd = commandText.toLowerCase();
+              if (cmd.includes('home') || cmd.includes('address')) {
+                homeAddressBtnRef?.current?.click();
+              } else if (cmd.includes('current') || cmd.includes('location')) {
+                currentLocationBtnRef?.current?.click();
+              } else {
+                speak("Sorry, I didn't understand. Please say 'home address' or 'current location'.");
+              }
               resetContext();
               return;
             }
@@ -499,6 +518,16 @@ export function VoiceCommander({
         onCloseCart();
         router.push('/checkout');
       },
+      homeAddress: () => {
+        if(pathname === '/checkout' && homeAddressBtnRef?.current) {
+          homeAddressBtnRef.current.click();
+        }
+      },
+      currentLocation: () => {
+        if(pathname === '/checkout' && currentLocationBtnRef?.current) {
+          currentLocationBtnRef.current.click();
+        }
+      },
       recordOrder: () => {
         speak("I'm ready. Please list the items you need for your order.");
         setIsWaitingForVoiceOrder(true);
@@ -562,40 +591,38 @@ export function VoiceCommander({
       },
       refresh: () => window.location.reload(),
       orderItem: async ({ phrase, quantity }: { phrase: string, quantity?: string }) => {
-        const itemPhrases = phrase.split(/,?\s+and\s+|,/);
-        let addedItems: string[] = [];
-        let notFoundItems: string[] = [];
-        let suggestions: Command[] = [];
+          const itemPhrases = phrase.split(/,?\s+(?:and|మరియు)\s+|,/);
+          let addedItems: string[] = [];
+          let notFoundItems: string[] = [];
+          
+          for (const itemPhrase of itemPhrases) {
+              if (!itemPhrase.trim()) continue;
+              
+              const combinedPhrase = quantity ? `${quantity} ${itemPhrase}` : itemPhrase;
+              const { product: foundProduct, variant } = await findProductAndVariant(combinedPhrase);
 
-        for (const itemPhrase of itemPhrases) {
-            if (!itemPhrase.trim()) continue;
-            
-            const combinedPhrase = quantity ? `${quantity} ${itemPhrase}` : itemPhrase;
-            const { product: foundProduct, variant } = await findProductAndVariant(combinedPhrase);
-
-            if (foundProduct && variant) {
-                addItemToCart(foundProduct, variant, 1); // For simplicity, always add 1. Quantity can be changed in cart.
-                const productName = t(foundProduct.name.toLowerCase().replace(/ /g, '-')).split(' / ')[0];
-                addedItems.push(productName);
-            } else if (foundProduct) {
-                // Product found, but no matching variant
-                notFoundItems.push(`${itemPhrase} (variant not found)`);
-            } else {
-                notFoundItems.push(itemPhrase);
-            }
-        }
-        
-        if (addedItems.length > 0) {
-            speak(`Okay, I've added ${addedItems.join(', ')} to your cart.`);
-            onOpenCart();
-        } 
-        
-        if (notFoundItems.length > 0 && addedItems.length === 0) {
-             speak(`Sorry, I couldn't find ${notFoundItems.join(', ')}.`);
-        } else if (notFoundItems.length > 0) {
-            speak(`I added some items, but couldn't find ${notFoundItems.join(', ')}.`);
-        }
-      },
+              if (foundProduct && variant) {
+                  addItemToCart(foundProduct, variant, 1);
+                  const productName = t(foundProduct.name.toLowerCase().replace(/ /g, '-')).split(' / ')[0];
+                  addedItems.push(productName);
+              } else if (foundProduct) {
+                  notFoundItems.push(`${itemPhrase} (variant not found)`);
+              } else {
+                  notFoundItems.push(itemPhrase);
+              }
+          }
+          
+          if (addedItems.length > 0) {
+              speak(`Okay, I've added ${addedItems.join(', ')} to your cart.`);
+              onOpenCart();
+          } 
+          
+          if (notFoundItems.length > 0 && addedItems.length === 0) {
+               speak(`Sorry, I couldn't find ${notFoundItems.join(', ')}.`);
+          } else if (notFoundItems.length > 0) {
+              speak(`I added some items, but couldn't find ${notFoundItems.join(', ')}.`);
+          }
+        },
       quickOrder: async ({ product, quantity, store: storeName }: { product: string, quantity?: string, store?: string }) => {
         if (!storeName) {
             speak("You need to specify a store for a quick order. For example, say 'order 1kg potatoes from Fresh Produce'.");
@@ -732,7 +759,7 @@ export function VoiceCommander({
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firestore, user, cartItems, profileForm, isWaitingForStoreName, activeStoreId, placeOrderBtnRef, enabled, pathname, findProductAndVariant, handleProfileFormInteraction, speak, toast, router, onSuggestions, onStatusUpdate, onCloseCart, onOpenCart, setActiveStoreId, clarificationStores, isWaitingForQuantity, updateQuantity, isWaitingForQuickOrderConfirmation, clearCart, setIsWaitingForQuickOrderConfirmation, stores, masterProducts]);
+  }, [firestore, user, cartItems, profileForm, isWaitingForStoreName, activeStoreId, placeOrderBtnRef, enabled, pathname, findProductAndVariant, handleProfileFormInteraction, speak, toast, router, onSuggestions, onStatusUpdate, onCloseCart, onOpenCart, setActiveStoreId, clarificationStores, isWaitingForQuantity, updateQuantity, isWaitingForQuickOrderConfirmation, clearCart, setIsWaitingForQuickOrderConfirmation, stores, masterProducts, homeAddressBtnRef, currentLocationBtnRef]);
 
   return null;
 }

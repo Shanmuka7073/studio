@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useCart } from '@/lib/cart';
@@ -32,7 +31,7 @@ import { useTransition, useState, useCallback, useEffect, useMemo, RefObject, us
 import { useFirebase, errorEmitter, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, addDoc, serverTimestamp, doc } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { CheckCircle, MapPin, Loader2, AlertCircle, Store as StoreIcon } from 'lucide-react';
+import { CheckCircle, MapPin, Loader2, AlertCircle, Store as StoreIcon, Home, LocateFixed } from 'lucide-react';
 import Link from 'next/link';
 import type { User as AppUser, Store } from '@/lib/types';
 import { create } from 'zustand';
@@ -43,6 +42,7 @@ import { t } from '@/lib/locales';
 const checkoutSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   phone: z.string().min(10, 'Please enter a valid phone number'),
+  deliveryAddress: z.string().min(10, 'Please provide a valid delivery address.'),
 });
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
@@ -73,6 +73,10 @@ interface PassThroughState {
   setPlaceOrderBtnRef: (ref: RefObject<HTMLButtonElement> | null) => void;
   isWaitingForQuickOrderConfirmation: boolean;
   setIsWaitingForQuickOrderConfirmation: (isWaiting: boolean) => void;
+  homeAddressBtnRef: RefObject<HTMLButtonElement> | null;
+  setHomeAddressBtnRef: (ref: RefObject<HTMLButtonElement> | null) => void;
+  currentLocationBtnRef: RefObject<HTMLButtonElement> | null;
+  setCurrentLocationBtnRef: (ref: RefObject<HTMLButtonElement> | null) => void;
 }
 
 export const useCheckoutStore = create<PassThroughState>((set) => ({
@@ -80,6 +84,10 @@ export const useCheckoutStore = create<PassThroughState>((set) => ({
   setPlaceOrderBtnRef: (placeOrderBtnRef) => set({ placeOrderBtnRef }),
   isWaitingForQuickOrderConfirmation: false,
   setIsWaitingForQuickOrderConfirmation: (isWaiting) => set({ isWaitingForQuickOrderConfirmation: isWaiting }),
+  homeAddressBtnRef: null,
+  setHomeAddressBtnRef: (ref) => set({ homeAddressBtnRef: ref }),
+  currentLocationBtnRef: null,
+  setCurrentLocationBtnRef: (ref) => set({ currentLocationBtnRef: ref }),
 }));
 
 export default function CheckoutPage() {
@@ -92,13 +100,21 @@ export default function CheckoutPage() {
   const [deliveryCoords, setDeliveryCoords] = useState<{lat: number, lng: number} | null>(null);
   const [images, setImages] = useState({});
   const placeOrderBtnRef = useRef<HTMLButtonElement>(null);
+  const homeAddressBtnRef = useRef<HTMLButtonElement>(null);
+  const currentLocationBtnRef = useRef<HTMLButtonElement>(null);
   
   const { allStores, fetchInitialData } = useAppStore((state) => ({
     allStores: state.stores,
     fetchInitialData: state.fetchInitialData,
   }));
 
-  const { isWaitingForQuickOrderConfirmation, setPlaceOrderBtnRef, setIsWaitingForQuickOrderConfirmation } = useCheckoutStore();
+  const { 
+      isWaitingForQuickOrderConfirmation, 
+      setPlaceOrderBtnRef, 
+      setIsWaitingForQuickOrderConfirmation,
+      setHomeAddressBtnRef,
+      setCurrentLocationBtnRef
+    } = useCheckoutStore();
 
   const hasItemsInCart = cartItems.length > 0;
   const finalTotal = hasItemsInCart ? cartTotal + DELIVERY_FEE : 0;
@@ -109,42 +125,38 @@ export default function CheckoutPage() {
     }
   }, [firestore, fetchInitialData]);
 
-  const handleGetLocation = useCallback(() => {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    setDeliveryCoords({
-                        lat: position.coords.latitude,
-                        lng: position.coords.longitude
-                    });
-                    toast({ title: "Location Fetched!", description: "Your current location has been captured for delivery." });
-                },
-                () => {
-                    toast({ variant: 'destructive', title: "Location Error", description: "Could not retrieve your location. Please ensure permissions are enabled." });
-                },
-                { timeout: 10000 }
-            );
-        } else {
-            toast({ variant: 'destructive', title: "Not Supported", description: "Geolocation is not supported by your browser." });
-        }
-    }, [toast]);
-    
-  // Automatically trigger location capture on page load if needed.
-  useEffect(() => {
-    if (hasItemsInCart && !deliveryCoords) {
-        const timeoutId = setTimeout(() => handleGetLocation(), 1000); // 1-second delay
-        return () => clearTimeout(timeoutId);
+  const handleUseCurrentLocation = useCallback(() => {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords;
+                setDeliveryCoords({ lat: latitude, lng: longitude });
+                // We don't have a reverse geocoded address, so we use a placeholder.
+                // A real app would use a Geocoding API here.
+                form.setValue('deliveryAddress', `Current Location (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`);
+                toast({ title: "Location Fetched!", description: "Your current location has been set for delivery." });
+            },
+            () => {
+                toast({ variant: 'destructive', title: "Location Error", description: "Could not retrieve your location. Please ensure permissions are enabled." });
+            },
+            { timeout: 10000 }
+        );
+    } else {
+        toast({ variant: 'destructive', title: "Not Supported", description: "Geolocation is not supported by your browser." });
     }
-  }, [hasItemsInCart, deliveryCoords, handleGetLocation]);
+  }, [toast]);
 
   useEffect(() => {
     setPlaceOrderBtnRef(placeOrderBtnRef);
-    // When the component unmounts, reset the confirmation state.
+    setHomeAddressBtnRef(homeAddressBtnRef);
+    setCurrentLocationBtnRef(currentLocationBtnRef);
     return () => {
       setPlaceOrderBtnRef(null);
+      setHomeAddressBtnRef(null);
+      setCurrentLocationBtnRef(null);
       setIsWaitingForQuickOrderConfirmation(false);
     }
-  }, [setPlaceOrderBtnRef, setIsWaitingForQuickOrderConfirmation]);
+  }, [setPlaceOrderBtnRef, setHomeAddressBtnRef, setCurrentLocationBtnRef, setIsWaitingForQuickOrderConfirmation]);
 
 
    const userDocRef = useMemoFirebase(() => {
@@ -155,8 +167,25 @@ export default function CheckoutPage() {
 
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
-    defaultValues: { name: '', phone: '' },
+    defaultValues: { name: '', phone: '', deliveryAddress: '' },
   });
+  
+  const handleUseHomeAddress = useCallback(() => {
+    if (userData) {
+      if(userData.address) {
+        form.setValue('deliveryAddress', userData.address);
+        toast({ title: "Home Address Set!", description: "Your saved home address will be used for delivery." });
+        
+        // Note: We don't have lat/lng for home address in this version.
+        // A real app would geocode the address to get coordinates.
+        // For now, we'll clear coords if they were set.
+        setDeliveryCoords(null); 
+      } else {
+        toast({ variant: 'destructive', title: 'No Home Address', description: 'Please set your home address in your profile first.' });
+      }
+    }
+  }, [userData, form, toast]);
+
 
   // Effect to pre-fill form with user data
   useEffect(() => {
@@ -164,6 +193,7 @@ export default function CheckoutPage() {
       form.reset({
         name: `${userData.firstName} ${userData.lastName}`,
         phone: userData.phoneNumber,
+        deliveryAddress: form.getValues('deliveryAddress') || '',
       });
     }
   }, [userData, form]);
@@ -190,10 +220,6 @@ export default function CheckoutPage() {
         toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to place an order.' });
         return;
     }
-    if (!deliveryCoords) {
-        toast({ variant: 'destructive', title: 'Location Required', description: 'Please capture your current location for delivery.' });
-        return;
-    }
     
     if (cartItems.length === 0) {
         toast({ variant: 'destructive', title: 'Error', description: 'Your cart is empty. Please add items before checking out.' });
@@ -218,9 +244,9 @@ export default function CheckoutPage() {
             storeId: activeStoreId,
             storeOwnerId: storeData.ownerId, // Denormalized store owner ID
             customerName: data.name,
-            deliveryAddress: 'Delivery via captured GPS coordinates',
-            deliveryLat: deliveryCoords.lat,
-            deliveryLng: deliveryCoords.lng,
+            deliveryAddress: data.deliveryAddress,
+            deliveryLat: deliveryCoords?.lat || 0, // Fallback to 0 if not set
+            deliveryLng: deliveryCoords?.lng || 0, // Fallback to 0 if not set
             phone: data.phone,
             email: user.email,
             orderDate: serverTimestamp(),
@@ -308,24 +334,28 @@ export default function CheckoutPage() {
                             </FormItem>
                             )}
                         />
-                        <div className="space-y-2">
+                        <div className="space-y-4">
                             <FormLabel>{t('delivery-location')}</FormLabel>
-                             {deliveryCoords ? (
-                                <div className="flex items-center gap-4 pt-2">
-                                     <div className="flex items-center text-green-600">
-                                        <CheckCircle className="mr-2 h-5 w-5" />
-                                        <span>{t('location-captured')}</span>
-                                    </div>
-                                    <Button type="button" variant="outline" size="sm" onClick={handleGetLocation}>
-                                        <MapPin className="mr-2 h-4 w-4" /> {t('re-capture')}
-                                    </Button>
-                                </div>
-                            ) : (
-                                <div className="flex items-center gap-2 text-muted-foreground p-3 bg-muted/50 rounded-md">
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    <span>{t('getting-your-current-location')}</span>
-                                </div>
-                            )}
+                            <div className="grid grid-cols-2 gap-4">
+                               <Button ref={homeAddressBtnRef} type="button" variant="outline" onClick={handleUseHomeAddress} disabled={!userData?.address}>
+                                    <Home className="mr-2 h-4 w-4" /> Use Home Address
+                               </Button>
+                               <Button ref={currentLocationBtnRef} type="button" variant="outline" onClick={handleUseCurrentLocation}>
+                                    <LocateFixed className="mr-2 h-4 w-4" /> Use Current Location
+                               </Button>
+                            </div>
+                             <FormField
+                                control={form.control}
+                                name="deliveryAddress"
+                                render={({ field }) => (
+                                <FormItem>
+                                    <FormControl>
+                                    <Input placeholder="Select a delivery address above" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                                )}
+                            />
                         </div>
                         <FormField
                             control={form.control}

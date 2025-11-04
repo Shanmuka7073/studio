@@ -1,3 +1,4 @@
+
 {
   "quickOrder": {
     "display": "Quick Order an Item from a Store",
@@ -237,6 +238,24 @@
       "refresh",
       "reload",
       "restart"
+    ]
+  },
+  "homeAddress": {
+    "display": "Use Home Address",
+    "reply": "Using your saved home address.",
+    "aliases": [
+      "home address",
+      "use my home address",
+      "deliver to home"
+    ]
+  },
+  "currentLocation": {
+    "display": "Use Current Location",
+    "reply": "Okay, finding your current location for delivery.",
+    "aliases": [
+      "current location",
+      "use my current location",
+      "deliver here"
     ]
   }
 }
