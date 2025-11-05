@@ -81,6 +81,8 @@ interface PassThroughState {
   setCurrentLocationBtnRef: (ref: RefObject<HTMLButtonElement> | null) => void;
   homeAddress: string | null;
   setHomeAddress: (address: string | null) => void;
+  shouldPlaceOrderDirectly: boolean;
+  setShouldPlaceOrderDirectly: (shouldPlace: boolean) => void;
 }
 
 export const useCheckoutStore = create<PassThroughState>((set) => ({
@@ -94,6 +96,8 @@ export const useCheckoutStore = create<PassThroughState>((set) => ({
   setCurrentLocationBtnRef: (ref) => set({ currentLocationBtnRef: ref }),
   homeAddress: null,
   setHomeAddress: (address) => set({homeAddress: address}),
+  shouldPlaceOrderDirectly: false,
+  setShouldPlaceOrderDirectly: (shouldPlace) => set({ shouldPlaceOrderDirectly: shouldPlace }),
 }));
 
 export default function CheckoutPage() {
@@ -125,7 +129,9 @@ export default function CheckoutPage() {
       setHomeAddressBtnRef,
       setCurrentLocationBtnRef,
       homeAddress,
-      setHomeAddress
+      setHomeAddress,
+      shouldPlaceOrderDirectly,
+      setShouldPlaceOrderDirectly
     } = useCheckoutStore();
   
   const { triggerVoicePrompt } = useVoiceCommander();
@@ -326,6 +332,19 @@ export default function CheckoutPage() {
         });
     });
   };
+
+  const areAllDetailsReady = useMemo(() => {
+    return cartItems.length > 0 && activeStoreId && form.getValues('deliveryAddress').length > 10;
+  }, [cartItems.length, activeStoreId, form.getValues('deliveryAddress')]);
+
+  useEffect(() => {
+      if (shouldPlaceOrderDirectly && areAllDetailsReady && placeOrderBtnRef.current) {
+          console.log("Direct order conditions met. Clicking place order.");
+          placeOrderBtnRef.current.click();
+          setShouldPlaceOrderDirectly(false); // Reset after action
+      }
+  }, [shouldPlaceOrderDirectly, areAllDetailsReady, placeOrderBtnRef, setShouldPlaceOrderDirectly]);
+
 
   if (!hasItemsInCart && !isWaitingForQuickOrderConfirmation) {
       return (
