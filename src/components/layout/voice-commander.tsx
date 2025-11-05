@@ -58,7 +58,7 @@ export function VoiceCommander({
   const { stores, masterProducts, productPrices, fetchInitialData, fetchProductPrices } = useAppStore();
 
   const { form: profileForm } = useProfileFormStore();
-  const { placeOrderBtnRef, setIsWaitingForQuickOrderConfirmation, isWaitingForQuickOrderConfirmation, homeAddressBtnRef, currentLocationBtnRef } = useCheckoutStore();
+  const { placeOrderBtnRef, setIsWaitingForQuickOrderConfirmation, isWaitingForQuickOrderConfirmation, homeAddressBtnRef, currentLocationBtnRef, shouldPlaceOrderDirectly, setShouldPlaceOrderDirectly } = useCheckoutStore();
 
   const isSpeakingRef = useRef(false);
   const isEnabledRef = useRef(enabled);
@@ -125,7 +125,8 @@ export function VoiceCommander({
         setIsWaitingForAddressType(false);
         hasSpokenCheckoutPrompt.current = false;
         formFieldToFillRef.current = null;
-    }, [onSuggestions, setIsWaitingForQuickOrderConfirmation]);
+        setShouldPlaceOrderDirectly(false);
+    }, [onSuggestions, setIsWaitingForQuickOrderConfirmation, setShouldPlaceOrderDirectly]);
 
 
     // Effect to reset context when the user navigates away from a page
@@ -453,6 +454,17 @@ export function VoiceCommander({
     }
   }, [pathname]);
 
+  // This is the auto-submit logic for direct quick orders
+  const areAllDetailsReady = checkCheckoutConditions();
+  useEffect(() => {
+    if (shouldPlaceOrderDirectly && areAllDetailsReady && placeOrderBtnRef.current) {
+        console.log("Direct order conditions met. Clicking place order.");
+        placeOrderBtnRef.current.click();
+        setShouldPlaceOrderDirectly(false); // Reset after action
+    }
+  }, [shouldPlaceOrderDirectly, areAllDetailsReady, placeOrderBtnRef, setShouldPlaceOrderDirectly]);
+
+
   useEffect(() => {
     if (!recognition) {
       onStatusUpdate("Speech recognition not supported by this browser.");
@@ -461,6 +473,9 @@ export function VoiceCommander({
 
     const handleSmartOrder = async (command: string) => {
         let remainingCommand = command.toLowerCase();
+
+        // Check if it's an explicit "order" command
+        const isDirectOrder = ['order', 'buy'].some(kw => remainingCommand.startsWith(kw));
 
         // 1. Find Store
         let bestStoreMatch: { store: Store, similarity: number } | null = null;
@@ -507,22 +522,25 @@ export function VoiceCommander({
 
         // --- Optimistic UI Flow ---
         const qty = remainingCommand.match(/\d+/)?.[0] || '1';
-        speak(`Okay, ordering ${qty} of ${product.name} from ${bestStoreMatch.store.name}. Taking you to checkout.`);
+        speak(`Okay, preparing order for ${qty} of ${product.name} from ${bestStoreMatch.store.name}. Taking you to checkout.`);
 
         clearCart();
         addItemToCart(product, variant, 1);
         setActiveStoreId(bestStoreMatch.store.id);
 
-        // Set the address in the form *before* navigating
         if (destination === 'home' && userProfileRef.current?.address) {
-            // This is tricky because the form instance is on another page.
-            // We'll use a zustand store to pass this initial value.
             useCheckoutStore.getState().setHomeAddress(userProfileRef.current.address);
         } else {
              useCheckoutStore.getState().setHomeAddress(null);
         }
 
-        setIsWaitingForQuickOrderConfirmation(true);
+        // Set state based on command type
+        if (isDirectOrder) {
+            setShouldPlaceOrderDirectly(true);
+        } else {
+            setIsWaitingForQuickOrderConfirmation(true);
+        }
+
         router.push('/checkout');
     };
 
@@ -535,6 +553,8 @@ export function VoiceCommander({
         updateRecognitionLanguage(detectedLang);
         setCurrentLanguage(detectedLang);
         
+        const commandLower = commandText.toLowerCase();
+
         // --- PRIORITY 1: High-priority global navigation ---
         const highPriorityCommands = ["home", "stores", "dashboard", "cart", "orders", "deliveries", "myStore", "checkout", "refresh"];
         for (const key of highPriorityCommands) {
@@ -543,7 +563,7 @@ export function VoiceCommander({
 
             const allAliases = [t(key.toLowerCase(), 'en'), ...cmdGroup.aliases];
             for (const alias of allAliases) {
-                if (calculateSimilarity(commandText.toLowerCase(), alias) > 0.9) {
+                if (calculateSimilarity(commandLower, alias) > 0.7) {
                      speak(cmdGroup.reply, () => commandActionsRef.current[key]());
                      resetAllContext();
                      return;
@@ -552,20 +572,20 @@ export function VoiceCommander({
         }
         
         // --- PRIORITY 2: Smart Order command (isolated check) ---
-        const smartOrderAlias = (fileCommandsRef.current.smartOrder?.aliases || [])[0];
-        if(smartOrderAlias) {
-             const keywords = ['order', 'send', 'from', 'to'];
-             const commandLower = commandText.toLowerCase();
-             if (keywords.some(kw => commandLower.includes(kw)) && (commandLower.includes('from') || commandLower.includes('to'))) {
-                 await handleSmartOrder(commandText);
-                 resetAllContext();
-                 return; // Stop further processing
-             }
+        const actionKeywords = ['order', 'send', 'buy', 'get'];
+        const locationKeywords = ['from', 'to'];
+        const hasAction = actionKeywords.some(kw => commandLower.includes(kw));
+        const hasLocation = locationKeywords.some(kw => commandLower.includes(kw));
+
+        if (hasAction && hasLocation) {
+            await handleSmartOrder(commandText);
+            resetAllContext();
+            return;
         }
 
         // --- PRIORITY 3: CONTEXTUAL REPLIES (Checkout, Forms, etc.) ---
         if (isWaitingForAddressType) {
-          const cmd = commandText.toLowerCase();
+          const cmd = commandLower;
           const homeKeywords = ['home', 'address', 'గృహ', 'మనె', 'घर', 'पता'];
           const locationKeywords = ['current', 'location', 'ప్రస్తుత', 'స్థానం', 'वर्तमान', 'स्थान'];
           
@@ -598,7 +618,7 @@ export function VoiceCommander({
 
         if (isWaitingForQuickOrderConfirmation) {
           const confirmKeywords = ['confirm', 'confirm order', 'place order', 'yes', 'అవును', 'సమర్థించు', 'हाँ', 'पुष्टि'];
-          if (confirmKeywords.some(keyword => commandText.toLowerCase().includes(keyword))) {
+          if (confirmKeywords.some(keyword => commandLower.includes(keyword))) {
             placeOrderBtnRef?.current?.click();
             speak("Placing your order now.");
           } else {
@@ -616,7 +636,7 @@ export function VoiceCommander({
             'ఒకటి': 1, 'రెండు': 2, 'మూడు': 3, 'నాలుగు': 4, 'ఐదు': 5, 'ఆరు': 6, 'ఏడు': 7, 'ఎనిమిది': 8, 'తొమ్మిది': 9, 'పది': 10,
             'एक': 1, 'दो': 2, 'तीन': 3, 'चार': 4, 'पांच': 5, 'छह': 6, 'सात': 7, 'आठ': 8, 'नौ': 9, 'दस': 10
           };
-          const parts = commandText.toLowerCase().split(' ');
+          const parts = commandLower.split(' ');
           let quantity: number | null = null;
           const firstWordAsNum = numberWords[parts[0]];
           if (firstWordAsNum) {
@@ -640,7 +660,7 @@ export function VoiceCommander({
         }
 
         if (isWaitingForStoreName && pathname === '/checkout') {
-          const spokenStoreName = commandText.toLowerCase();
+          const spokenStoreName = commandLower;
           const bestMatch = stores
             .map(store => ({ ...store, similarity: calculateSimilarity(spokenStoreName, store.name.toLowerCase()) }))
             .sort((a, b) => b.similarity - a.similarity)[0];
@@ -670,7 +690,6 @@ export function VoiceCommander({
         
         const allCommands = [...commandsRef.current];
         for (const key in fileCommandsRef.current) {
-          if (key === 'smartOrder') continue; // Already handled
           const cmdGroup = fileCommandsRef.current[key];
           const action = commandActionsRef.current[key];
           if (action) {
@@ -688,7 +707,7 @@ export function VoiceCommander({
         let bestCommand: { command: Command, similarity: number } | null = null;
 
         for (const cmd of allCommands) {
-          const similarity = calculateSimilarity(commandText.toLowerCase(), cmd.command);
+          const similarity = calculateSimilarity(commandLower, cmd.command);
           if (!bestCommand || similarity > bestCommand.similarity) {
             bestCommand = { command: cmd, similarity };
           }
@@ -697,7 +716,7 @@ export function VoiceCommander({
         const isOrderItemCommand = fileCommandsRef.current.orderItem.aliases.some(alias => {
           const placeholderRegex = /{\w+}/g;
           const simplifiedAlias = alias.replace(placeholderRegex, '').trim();
-          const simplifiedCommandText = commandText.toLowerCase().replace(/\d+\s*(kg|kilo|kilos|g|gm|gram|grams)?/i, '').trim();
+          const simplifiedCommandText = commandLower.replace(/\d+\s*(kg|kilo|kilos|g|gm|gram|grams)?/i, '').trim();
           return calculateSimilarity(simplifiedCommandText, simplifiedAlias) > 0.6;
         });
 
@@ -945,8 +964,13 @@ export function VoiceCommander({
     detectLanguage,
     updateRecognitionLanguage,
     currentRecognitionLang,
-    resetAllContext
+    resetAllContext,
+    shouldPlaceOrderDirectly,
+    setShouldPlaceOrderDirectly,
+    areAllDetailsReady
   ]);
 
   return null;
 }
+
+    
